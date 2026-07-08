@@ -55,8 +55,11 @@ import { startLogCleanupCron } from "./cron/log-cleanup";
 import { startStorageOrphanCleanupCron } from "./cron/storage-orphan-cleanup";
 import { startCoffreBalanceSnapshotsCron } from "./cron/coffre-balance-snapshots";
 import { StorageService } from "./services/storage-service";
+import { getTenantConfig } from "./config/tenant-config";
 
 const app = express();
+const tenantConfig = getTenantConfig();
+logger.info({ tenantId: tenantConfig.id, features: tenantConfig.features }, "Configuration tenant validée");
 
 // Trust proxy for proper rate limiting behind reverse proxy
 app.set('trust proxy', 1);

@@ -4,7 +4,7 @@ import { Menu, X, LogOut, Lock } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { maintenanceApi, creditRefundsApi } from '../../lib/api-client';
 import { PLATFORM_MENU_ITEMS } from '../../constants/menuItems';
-import { ROUTES, canAccessRoute, type RouteConfig, getRouteByKey } from '../../lib/routes-config';
+import { ROUTES, canAccessRoute, isRouteEnabledForTenant, type RouteConfig, getRouteByKey } from '../../lib/routes-config';
 import IconButton from '../ui/IconButton';
 import { useBranding } from '../../contexts/BrandingContext';
 import { useAbilityContextOptional, useAbility } from '../../contexts/AbilityContext';
@@ -17,6 +17,7 @@ import { useEnqueteBadge } from '../../hooks/useEnqueteBadge';
 import { useCoffreBadge } from '../../hooks/useCoffreBadge';
 import { useHrBadge } from '../../hooks/hr/useHrBadge';
 import { useMonEspaceBadge } from '../../hooks/hr/useMonEspaceBadge';
+import { useTenant } from '../../contexts/TenantContext';
 
 interface PlatformSidebarContentProps {
   sidebarOpen: boolean;
@@ -41,6 +42,7 @@ export default function PlatformSidebarContent({
   useAbilityContextOptional(); // Subscribe to permission changes to force re-render
   const ability = useAbility();
   const appName = branding.appName;
+  const { config: tenantConfig } = useTenant();
 
   // Maintenance Status State
   const [lockedModules, setLockedModules] = useState<Set<string>>(new Set());
@@ -191,7 +193,7 @@ export default function PlatformSidebarContent({
   const accessibleRoutes = ROUTES.filter(route => {
     // Hide beta features in production
     if (route.key === 'kpi' && !import.meta.env.DEV) return false;
-    return canAccessRoute(route, ability);
+    return isRouteEnabledForTenant(route, tenantConfig.features) && canAccessRoute(route, ability);
   });
   const groupedRoutes: Record<string, RouteConfig[]> = {};
 

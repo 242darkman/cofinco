@@ -3,8 +3,11 @@
 # ============================================
 FROM node:20-alpine AS deps
 WORKDIR /app
-COPY package.json ./
-RUN npm install
+COPY package.json package-lock.json ./
+COPY apps/web/package.json ./apps/web/package.json
+COPY apps/api/package.json ./apps/api/package.json
+COPY packages/shared/package.json ./packages/shared/package.json
+RUN npm ci
 
 # ============================================
 # Stage: DEV — hot reload (tsx watch + Vite HMR)
@@ -28,7 +31,7 @@ RUN apk add --no-cache unzip
 WORKDIR /app
 COPY . .
 ENTRYPOINT ["sh", "-c"]
-CMD ["sh scripts/download-geonames.sh && npx drizzle-kit push --force && node --import tsx scripts/ensure-sql.ts && node --import tsx seeds/seed-prod.ts"]
+CMD ["sh scripts/download-geonames.sh && npm run db:migrate && node --import tsx scripts/ensure-sql.ts && node --import tsx seeds/seed-prod.ts"]
 
 # ============================================
 # Stage: TEST — unit + integration tests
@@ -58,9 +61,11 @@ CMD ["playwright", "test"]
 # ============================================
 FROM node:20-alpine AS build
 WORKDIR /app
+ARG TENANT_CONFIG_FILE=config/tenants/microflex.json
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
+RUN test -f "$TENANT_CONFIG_FILE" && cp "$TENANT_CONFIG_FILE" dist/tenant-config.json
 
 # ============================================
 # Stage 3: Production runtime
@@ -82,10 +87,14 @@ RUN apk add --no-cache wget tini
 WORKDIR /app
 
 ENV NODE_ENV=production
+ENV TENANT_CONFIG_PATH=dist/tenant-config.json
 
 # Install production dependencies only
-COPY package.json ./
-RUN npm install --omit=dev && npm cache clean --force
+COPY package.json package-lock.json ./
+COPY apps/web/package.json ./apps/web/package.json
+COPY apps/api/package.json ./apps/api/package.json
+COPY packages/shared/package.json ./packages/shared/package.json
+RUN npm ci --omit=dev && npm cache clean --force
 
 # Copy build artifacts
 COPY --from=build /app/dist ./dist

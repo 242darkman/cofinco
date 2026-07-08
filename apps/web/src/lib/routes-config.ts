@@ -4,6 +4,7 @@ import { SystemRole } from '@shared/types/roles';
 import { authService } from './auth';
 import { Action, Subject, MODULE_TO_SUBJECT, Actions, Subjects } from './casl';
 import type { AppAbility } from './casl';
+import type { TenantFeatureKey, TenantFeatureFlags } from '@shared/tenant-config';
 
 // Lazy load components
 const Dashboard = lazy(() => import('@/components/dashboard/Dashboard'));
@@ -48,6 +49,7 @@ export interface RouteConfig {
   // New CASL support
   requiredAbility?: { action: Action; subject: Subject }; // CASL ability check
   featureKey?: string; // Feature lock key (module lock)
+  tenantFeature?: TenantFeatureKey;
   label: string;
   labelKey?: string;
   group?: 'Principal' | 'Services Clients' | 'Opérations' | 'Gestion' | 'Système';
@@ -151,6 +153,7 @@ export const ROUTES: RouteConfig[] = [
     label: 'Tontines',
     labelKey: 'menuTontines',
     group: 'Services Clients',
+    tenantFeature: 'enableTontine',
   },
 
   // --- Opérations ---
@@ -184,6 +187,7 @@ export const ROUTES: RouteConfig[] = [
     label: 'Agent de Terrain',
     labelKey: 'menuAgentTerrain',
     group: 'Opérations',
+    tenantFeature: 'enableFieldAgents',
   },
   {
     key: 'agentModules',
@@ -193,6 +197,7 @@ export const ROUTES: RouteConfig[] = [
     label: 'Gestion Agent',
     labelKey: 'menuAgentModules',
     group: 'Opérations',
+    tenantFeature: 'enableFieldAgents',
     subRoutes: [
       { path: '/agent-terrain/dashboard', subModule: 'dashboard', label: 'Tableau de bord' },
       { path: '/agent-terrain/session', subModule: 'session', label: 'Session' },
@@ -442,6 +447,13 @@ export function canAccessRoute(route: RouteConfig, ability: AppAbility): boolean
 
   // Par défaut, accessible à tous (routes publiques comme profil)
   return true;
+}
+
+export function isRouteEnabledForTenant(
+  route: RouteConfig,
+  features: TenantFeatureFlags,
+): boolean {
+  return !route.tenantFeature || features[route.tenantFeature] === true;
 }
 
 /**

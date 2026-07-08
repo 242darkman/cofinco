@@ -1,0 +1,14 @@
+{
+  "id": "microflex",
+  "name": "MicroFlex",
+  "theme": {
+    "primaryColor": "hsl(210, 100%, 45%)",
+    "logoUrl": "/microflex-logo.png"
+  },
+  "features": {
+    "enableSms": true,
+    "enableTontine": true,
+    "enableMobileMoney": true,
+    "enableFieldAgents": true
+  }
+}

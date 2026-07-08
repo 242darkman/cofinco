@@ -1,23 +1,30 @@
-export interface TenantThemeConfig {
-  primaryColor: string;
-  secondaryColor?: string;
-  logoUrl?: string;
-  faviconUrl?: string;
-}
+import { z } from "zod";
 
-export interface TenantFeatureFlags {
-  enableSms: boolean;
-  enableTontine: boolean;
-  enableMobileMoney: boolean;
-  enableFieldAgents: boolean;
-}
+export const tenantFeatureFlagsSchema = z.object({
+  enableSms: z.boolean(),
+  enableTontine: z.boolean(),
+  enableMobileMoney: z.boolean(),
+  enableFieldAgents: z.boolean(),
+}).strict();
 
-export interface TenantConfig {
-  id: string;
-  name: string;
-  theme: TenantThemeConfig;
-  features: TenantFeatureFlags;
-}
+export const tenantThemeConfigSchema = z.object({
+  primaryColor: z.string().min(1).max(64),
+  secondaryColor: z.string().min(1).max(64).optional(),
+  logoUrl: z.string().min(1).max(512).optional(),
+  faviconUrl: z.string().min(1).max(512).optional(),
+}).strict();
+
+export const tenantConfigSchema = z.object({
+  id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$|^[a-z0-9]$/),
+  name: z.string().min(1).max(120),
+  theme: tenantThemeConfigSchema,
+  features: tenantFeatureFlagsSchema,
+}).strict();
+
+export type TenantThemeConfig = z.infer<typeof tenantThemeConfigSchema>;
+export type TenantFeatureFlags = z.infer<typeof tenantFeatureFlagsSchema>;
+export type TenantFeatureKey = keyof TenantFeatureFlags;
+export type TenantConfig = z.infer<typeof tenantConfigSchema>;
 
 // Default configuration for MicroFlex (Core)
 export const defaultTenantConfig: TenantConfig = {
@@ -32,5 +39,12 @@ export const defaultTenantConfig: TenantConfig = {
     enableTontine: true,
     enableMobileMoney: true,
     enableFieldAgents: true,
-  }
+  },
 };
+
+export function isTenantFeatureEnabled(
+  config: TenantConfig,
+  feature: TenantFeatureKey,
+): boolean {
+  return config.features[feature] === true;
+}

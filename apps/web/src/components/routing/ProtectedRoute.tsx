@@ -2,11 +2,12 @@ import { ReactNode, Suspense, useMemo } from 'react';
 import { Redirect, useLocation } from 'wouter';
 import { authService } from '@/lib/auth';
 import { buildLoginUrl } from '@/lib/navigation';
-import { canAccessRoute, type RouteConfig } from '@/lib/routes-config';
+import { canAccessRoute, isRouteEnabledForTenant, type RouteConfig } from '@/lib/routes-config';
 import { SystemRole } from '@shared/types/roles';
 import LoadingScreen from '@/components/ui/LoadingScreen';
 import { useSession, useIsSessionValid } from '@/contexts/SessionContext';
 import { useIsAdmin, useAbility } from '@/contexts/AbilityContext';
+import { useTenant } from '@/contexts/TenantContext';
 
 interface ProtectedRouteProps {
   route: RouteConfig;
@@ -23,6 +24,7 @@ export function ProtectedRoute({ route, children }: ProtectedRouteProps) {
   const ability = useAbility();
   const [location] = useLocation();
   const loginUrl = useMemo(() => buildLoginUrl(location), [location]);
+  const { config: tenantConfig } = useTenant();
 
   if (sessionValid === null || isChecking) {
     return (
@@ -40,7 +42,7 @@ export function ProtectedRoute({ route, children }: ProtectedRouteProps) {
     return <Redirect to={loginUrl} replace />;
   }
 
-  if (!canAccessRoute(route, ability)) {
+  if (!isRouteEnabledForTenant(route, tenantConfig.features) || !canAccessRoute(route, ability)) {
     return <Redirect to="/" replace />;
   }
 

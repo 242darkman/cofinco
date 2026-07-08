@@ -1,9 +1,10 @@
 import React, { Suspense } from 'react';
-import { ROUTES, canAccessRoute, getRouteByKey, type RouteConfig } from '@/lib/routes-config';
+import { ROUTES, canAccessRoute, isRouteEnabledForTenant, getRouteByKey, type RouteConfig } from '@/lib/routes-config';
 import { authService } from '@/lib/auth';
 import { SystemRole, getRoleLabel } from '@shared/types/roles';
 import LoadingScreen from '@/components/ui/LoadingScreen';
 import { useAbility } from '@/contexts/AbilityContext';
+import { useTenant } from '@/contexts/TenantContext';
 
 interface AppRouterProps {
   currentModule: string;
@@ -25,6 +26,7 @@ export default function AppRouter({
   componentProps = {},
 }: AppRouterProps) {
   const ability = useAbility();
+  const { config: tenantConfig } = useTenant();
 
   // Trouver la route principale
   const route = ROUTES.find(r => r.key === currentModule);
@@ -39,7 +41,7 @@ export default function AppRouter({
   }
 
   // Vérifier l'accès RBAC via CASL
-  if (!canAccessRoute(route, ability)) {
+  if (!isRouteEnabledForTenant(route, tenantConfig.features) || !canAccessRoute(route, ability)) {
     if (onAccessDenied) {
       onAccessDenied();
     }

@@ -1,6 +1,11 @@
 import React, { createContext, useContext, ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { defaultTenantConfig, type TenantConfig } from '@shared/tenant-config';
+import {
+  defaultTenantConfig,
+  tenantConfigSchema,
+  type TenantConfig,
+  type TenantFeatureKey,
+} from '@shared/tenant-config';
 
 interface TenantContextType {
   config: TenantConfig;
@@ -60,11 +65,12 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     queryFn: async () => {
       const res = await fetch('/api/tenant/config');
       if (!res.ok) throw new Error('Failed to fetch tenant config');
-      return res.json() as Promise<TenantConfig>;
+      return tenantConfigSchema.parse(await res.json());
     },
     // We can assume tenant config rarely changes during a session (requires restart/redeploy)
-    staleTime: Infinity, 
-    initialData: defaultTenantConfig, // Start with MicroFlex defaults
+    staleTime: 5 * 60 * 1000,
+    initialData: defaultTenantConfig,
+    initialDataUpdatedAt: 0,
   });
 
   // Apply CSS variables whenever config changes
@@ -83,4 +89,8 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
 export function useTenant() {
   return useContext(TenantContext);
+}
+
+export function useTenantFeature(feature: TenantFeatureKey): boolean {
+  return useTenant().config.features[feature] === true;
 }

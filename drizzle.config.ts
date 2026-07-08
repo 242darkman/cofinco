@@ -6,6 +6,7 @@ if (!process.env.DATABASE_URL) {
 
 export default defineConfig({
   schema: ["./packages/shared/schema", "./packages/shared/enum/enums.ts"],
+  out: "./drizzle",
   dialect: "postgresql",
   dbCredentials: {
     url: process.env.DATABASE_URL,

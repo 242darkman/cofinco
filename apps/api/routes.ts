@@ -52,12 +52,14 @@ import { registerProspectionPrimesRoutes } from "./routes/prospection-primes";
 import { registerVilleRoutes } from "./routes/villes";
 import { registerCatalogRoutes } from "./routes/catalog";
 import { scoringAdminRouter } from "./routes/scoring-admin";
+import { enforceTenantFeatures } from "./middleware/tenant-features";
 
 const logger = createLogger('Routes');
 
 export function registerRoutes(app: Express): Server {
   // Apply Maintenance Middleware globally
   app.use(checkMaintenanceMode);
+  app.use(enforceTenantFeatures);
 
   // ... existing routes
   app.use("/api/coffre", coffreRouter);

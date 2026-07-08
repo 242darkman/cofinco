@@ -1,1 +1,12 @@
-{"name": "@microflex/api","version": "1.0.0","type": "module"}
+{
+  "name": "@microflex/api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file=../../.env --import tsx index.ts"
+  },
+  "dependencies": {
+    "@microflex/shared": "1.0.0"
+  }
+}
