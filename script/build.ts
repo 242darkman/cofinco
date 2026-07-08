@@ -4,7 +4,7 @@ import { rm, readFile } from "node:fs/promises";
 
 // server deps to bundle to reduce openat(2) syscalls
 // which helps cold start times
-const allowlist = [
+const allowlist = new Set([
   "connect-pg-simple",
   "date-fns",
   "drizzle-orm",
@@ -19,7 +19,7 @@ const allowlist = [
   "ws",
   "xlsx",
   "zod",
-];
+]);
 
 async function buildAll() {
   await rm("dist", { recursive: true, force: true });
@@ -43,7 +43,7 @@ async function buildAll() {
     for (const dep of Object.keys(pkg.dependencies || {})) allDeps.add(dep);
     for (const dep of Object.keys(pkg.devDependencies || {})) allDeps.add(dep);
   }
-  const externals = [...allDeps].filter((dep) => !allowlist.includes(dep));
+  const externals = Array.from(allDeps).filter((dep) => !allowlist.has(dep));
 
   await esbuild({
     entryPoints: ["apps/api/index.ts"],
@@ -60,7 +60,9 @@ async function buildAll() {
   });
 }
 
-buildAll().catch((err) => {
+try {
+  await buildAll();
+} catch (err) {
   console.error(err);
   process.exit(1);
-});
+}
