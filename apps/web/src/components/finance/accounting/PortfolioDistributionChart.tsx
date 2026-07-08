@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Sector } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { TrendingUp } from 'lucide-react';
 import { useLanguage } from '../../../contexts/LanguageContext';
 
@@ -14,24 +14,6 @@ interface PortfolioDistributionChartProps {
   data: DistributionItem[];
   height?: number;
 }
-
-const renderActiveShape = (props: any) => {
-  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props;
-  return (
-    <g>
-      <Sector
-        cx={cx}
-        cy={cy}
-        innerRadius={innerRadius}
-        outerRadius={outerRadius + 5}
-        startAngle={startAngle}
-        endAngle={endAngle}
-        fill={fill}
-        cornerRadius={4}
-      />
-    </g>
-  );
-};
 
 export default function PortfolioDistributionChart({
   data,
@@ -83,8 +65,6 @@ export default function PortfolioDistributionChart({
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
-                activeIndex={activeIndex}
-                activeShape={renderActiveShape}
                 data={data}
                 cx="50%"
                 cy="50%"

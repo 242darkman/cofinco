@@ -915,7 +915,7 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
             <XAxis dataKey="name" tick={{ fill: 'var(--text-muted)', fontSize: 10 }} axisLine={false} tickLine={false} />
             <YAxis hide />
             <Tooltip
-              formatter={(value: number) => `${value.toLocaleString()} FCFA`}
+              formatter={(value) => `${Number(value).toLocaleString()} FCFA`}
               contentStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-default)', borderRadius: 8, fontSize: 11 }}
               itemStyle={{ color: 'var(--text-primary)' }}
             />

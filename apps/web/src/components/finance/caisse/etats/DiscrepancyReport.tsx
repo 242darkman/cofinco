@@ -330,8 +330,8 @@ export function DiscrepancyReport({
                     borderRadius: '8px',
                     color: 'var(--text-primary)',
                   }}
-                  formatter={(value: number) => [
-                    `${value > 0 ? '+' : ''}${value.toLocaleString('fr-FR')} FCFA`,
+                  formatter={(value) => [
+                    `${Number(value) > 0 ? '+' : ''}${Number(value).toLocaleString('fr-FR')} FCFA`,
                     'Écart',
                   ]}
                 />

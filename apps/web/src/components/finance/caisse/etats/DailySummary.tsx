@@ -332,7 +332,7 @@ export function DailySummary({ sessions, transactions, loading = false }: DailyS
                       fontSize: '12px',
                       padding: '8px'
                     }}
-                    formatter={(value: number) => [value.toLocaleString('fr-FR') + ' FCFA', '']}
+                    formatter={(value) => [Number(value).toLocaleString('fr-FR') + ' FCFA', '']}
                   />
                   <Bar dataKey="entrees" name="Entrées" fill={COLORS.entrees} radius={[3, 3, 0, 0]} maxBarSize={40} />
                   <Bar dataKey="sorties" name="Sorties" fill={COLORS.sorties} radius={[3, 3, 0, 0]} maxBarSize={40} />
@@ -364,7 +364,7 @@ export function DailySummary({ sessions, transactions, loading = false }: DailyS
                     outerRadius={80}
                     paddingAngle={2}
                     dataKey="value"
-                    label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
+                    label={({ percent = 0 }) => `${(percent * 100).toFixed(0)}%`}
                     labelLine={false}
                   >
                     {operationTypeData.map((_, index) => (
@@ -380,7 +380,7 @@ export function DailySummary({ sessions, transactions, loading = false }: DailyS
                       fontSize: '12px',
                       padding: '8px'
                     }}
-                    formatter={(value: number) => [value.toLocaleString('fr-FR') + ' FCFA', '']}
+                    formatter={(value) => [Number(value).toLocaleString('fr-FR') + ' FCFA', '']}
                   />
                   <Legend 
                     layout="vertical" 
@@ -438,7 +438,7 @@ export function DailySummary({ sessions, transactions, loading = false }: DailyS
                     fontSize: '12px',
                     padding: '8px'
                   }}
-                  formatter={(value: number) => [value.toLocaleString('fr-FR') + ' FCFA', 'Solde']}
+                  formatter={(value) => [Number(value).toLocaleString('fr-FR') + ' FCFA', 'Solde']}
                 />
                 <Area
                   type="monotone"

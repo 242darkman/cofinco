@@ -193,7 +193,7 @@ export default function HrAnalyticsDashboard() {
                     outerRadius={70}
                     dataKey="total"
                     nameKey="gravite"
-                    label={({ gravite, total }) => `${gravite}: ${total}`}
+                    label={({ payload }) => `${payload.gravite}: ${payload.total}`}
                     labelLine={false}
                   >
                     {data.sanctionsDistribution.map((_, i) => (

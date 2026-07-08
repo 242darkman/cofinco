@@ -466,7 +466,7 @@ export function CaisseDashboardWidgets({
                   outerRadius={70}
                   paddingAngle={2}
                   dataKey="value"
-                  label={({ cx, cy, midAngle, outerRadius: or, percent, fill }) => {
+                  label={({ cx, cy, midAngle = 0, outerRadius: or, percent = 0, fill }) => {
                     if (percent < 0.05) return null;
                     const RADIAN = Math.PI / 180;
                     const labelR = or + 16;
@@ -478,7 +478,7 @@ export function CaisseDashboardWidgets({
                       </text>
                     );
                   }}
-                  labelLine={({ cx, cy, midAngle, outerRadius: or, percent }) => {
+                  labelLine={({ cx, cy, midAngle = 0, outerRadius: or, percent = 0 }) => {
                     if (!percent || percent < 0.05) return <line />;
                     const RADIAN = Math.PI / 180;
                     const x1 = cx + (or + 2) * Math.cos(-midAngle * RADIAN);

@@ -362,8 +362,8 @@ export default function ComparativeAnalytics({ agenceId }: { agenceId?: string }
               <Tooltip
                 contentStyle={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-default)', borderRadius: '8px', fontSize: '11px' }}
                 labelStyle={{ color: 'var(--text-muted)' }}
-                formatter={(val: number, name: string) => [
-                  forecastMetric === 'clients' ? val.toLocaleString(locale) : formatMoney(val),
+                formatter={(val, name) => [
+                  forecastMetric === 'clients' ? Number(val).toLocaleString(locale) : formatMoney(Number(val)),
                   name === 'value' ? t('reelLabel') : t('previsionLabel')
                 ]}
               />
