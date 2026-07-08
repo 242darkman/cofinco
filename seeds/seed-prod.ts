@@ -22,8 +22,18 @@ import { ensureCustomFunctions } from '../apps/api/db';
 import { createLogger } from '../apps/api/lib/logger';
 import { loadTenantConfig } from '../apps/api/config/tenant-config';
 
-// Branding du déploiement — provient du fichier de config tenant (jamais de valeurs client en dur)
-const TENANT = loadTenantConfig();
+// Branding du déploiement — provient du fichier de config tenant (jamais de valeurs client en dur).
+// Repli sûr : si le fichier référencé par TENANT_CONFIG_PATH n'existe pas dans le
+// contexte d'init (l'image init n'a pas de dist/), on seed avec le branding standard ;
+// le serveur runtime, lui, valide strictement sa configuration au démarrage.
+const TENANT = (() => {
+  try {
+    return loadTenantConfig();
+  } catch (error) {
+    console.warn(`[SEED] Config tenant illisible (${error instanceof Error ? error.message : error}) — branding standard utilisé`);
+    return loadTenantConfig({});
+  }
+})();
 const APP_NAME = TENANT.name;
 const APP_NAME_HTML = APP_NAME.replace(/&/g, '&amp;');
 const APP_SENDER_ID = (APP_NAME.replace(/[^A-Za-z0-9]/g, '').toUpperCase() || 'MICROFLEX').slice(0, 11);
