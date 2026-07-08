@@ -9,15 +9,26 @@ import { logAudit } from "../audit";
 import {
   clearFeatureOverride,
   describeFeatures,
-  getEffectiveFeatures,
   isTenantFeatureKey,
   setFeatureOverride,
 } from "../services/tenant-feature-service";
+import {
+  clearBrandingOverride,
+  describeBranding,
+  getEffectiveTenantConfig,
+  isTenantBrandingKey,
+  setBrandingOverride,
+} from "../services/tenant-config-service";
 
 const logger = createLogger("Routes:Tenant");
 
 const overrideBodySchema = z.object({
   enabled: z.boolean(),
+  reason: z.string().min(3).max(500),
+}).strict();
+
+const brandingBodySchema = z.object({
+  value: z.string().min(1).max(512),
   reason: z.string().min(3).max(500),
 }).strict();
 
@@ -31,12 +42,15 @@ export function registerTenantRoutes(app: Express) {
     try {
       res.setHeader("Cache-Control", "private, max-age=60");
       res.setHeader("Vary", "Host");
-      const config = getTenantConfig();
-      const features = await getEffectiveFeatures();
-      res.json({ ...config, features });
+      res.json(await getEffectiveTenantConfig());
     } catch (error) {
       logger.error({ err: error }, "Erreur lors du chargement de la config tenant");
-      res.status(500).json({ code: "TENANT_CONFIG_UNAVAILABLE" });
+      // Repli sûr : configuration statique validée au démarrage.
+      try {
+        res.json(getTenantConfig());
+      } catch {
+        res.status(500).json({ code: "TENANT_CONFIG_UNAVAILABLE" });
+      }
     }
   });
 
@@ -82,6 +96,75 @@ export function registerTenantRoutes(app: Express) {
     } catch (error) {
       logger.error({ err: error, feature }, "Erreur lors de la surcharge du flag");
       res.status(500).json({ code: "TENANT_FEATURE_UPDATE_FAILED" });
+    }
+  });
+
+  /**
+   * GET /api/admin/tenant-branding — état effectif du branding et sa provenance.
+   */
+  app.get("/api/admin/tenant-branding", ...adminGuards, async (_req, res) => {
+    try {
+      res.json({ branding: await describeBranding() });
+    } catch (error) {
+      logger.error({ err: error }, "Erreur lors de la lecture du branding tenant");
+      res.status(500).json({ code: "TENANT_BRANDING_UNAVAILABLE" });
+    }
+  });
+
+  /**
+   * PUT /api/admin/tenant-branding/:key — surcharge dynamique du branding
+   * (name, primaryColor, secondaryColor, logoUrl, faviconUrl). Auditée,
+   * motivée, sans redémarrage (prise en compte ≤ 30 s).
+   */
+  app.put("/api/admin/tenant-branding/:key", ...adminGuards, async (req, res) => {
+    const { key } = req.params;
+    if (!isTenantBrandingKey(key)) {
+      res.status(400).json({ code: "UNKNOWN_BRANDING_KEY", message: `Clé inconnue: ${key}` });
+      return;
+    }
+
+    const parsed = brandingBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ code: "INVALID_BODY", issues: parsed.error.issues });
+      return;
+    }
+
+    try {
+      await setBrandingOverride(key, parsed.data.value, parsed.data.reason, req.session?.userId);
+      await logAudit(req, "TENANT_BRANDING_OVERRIDE", "tenant_branding_overrides", key, {
+        value: parsed.data.value,
+        reason: parsed.data.reason,
+      }, "success", "medium");
+      logger.info({ key }, "Surcharge de branding tenant appliquée");
+      res.json({ branding: await describeBranding() });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ code: "INVALID_VALUE", issues: error.issues });
+        return;
+      }
+      logger.error({ err: error, key }, "Erreur lors de la surcharge du branding");
+      res.status(500).json({ code: "TENANT_BRANDING_UPDATE_FAILED" });
+    }
+  });
+
+  /**
+   * DELETE /api/admin/tenant-branding/:key — retour à la configuration statique.
+   */
+  app.delete("/api/admin/tenant-branding/:key", ...adminGuards, async (req, res) => {
+    const { key } = req.params;
+    if (!isTenantBrandingKey(key)) {
+      res.status(400).json({ code: "UNKNOWN_BRANDING_KEY", message: `Clé inconnue: ${key}` });
+      return;
+    }
+
+    try {
+      await clearBrandingOverride(key);
+      await logAudit(req, "TENANT_BRANDING_OVERRIDE_CLEARED", "tenant_branding_overrides", key, {}, "success", "medium");
+      logger.info({ key }, "Surcharge de branding tenant supprimée");
+      res.json({ branding: await describeBranding() });
+    } catch (error) {
+      logger.error({ err: error, key }, "Erreur lors de la suppression de la surcharge de branding");
+      res.status(500).json({ code: "TENANT_BRANDING_UPDATE_FAILED" });
     }
   });
 

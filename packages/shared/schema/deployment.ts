@@ -38,3 +38,20 @@ export const tenantFeatureOverrides = pgTable("tenant_feature_overrides", {
 });
 
 export type TenantFeatureOverride = typeof tenantFeatureOverrides.$inferSelect;
+
+/**
+ * Surcharges dynamiques du branding tenant (nom, couleurs, logos).
+ * Même modèle que tenant_feature_overrides : la config statique (fichier +
+ * env) est le défaut de démarrage, la base surcharge à chaud. L'identifiant
+ * du tenant n'est jamais surchargeable (voir deployment_identity).
+ */
+export const tenantBrandingOverrides = pgTable("tenant_branding_overrides", {
+  /** Une des clés de tenantBrandingKeys (ex: primaryColor). */
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  reason: text("reason"),
+  updatedBy: uuid("updated_by").references(() => users.id),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type TenantBrandingOverride = typeof tenantBrandingOverrides.$inferSelect;

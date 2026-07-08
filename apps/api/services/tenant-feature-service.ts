@@ -50,8 +50,16 @@ export function resetTenantFeatureCacheForTests(): void {
   cache = undefined;
 }
 
-function staticOnly(env: NodeJS.ProcessEnv): boolean {
-  return env.TENANT_FEATURES_STATIC_ONLY === "true";
+/**
+ * Kill switch commun aux surcharges dynamiques (flags + branding) :
+ * TENANT_OVERRIDES_STATIC_ONLY=true fige la configuration statique seule.
+ * L'ancien nom TENANT_FEATURES_STATIC_ONLY reste accepté par compatibilité.
+ */
+export function staticOnly(env: NodeJS.ProcessEnv): boolean {
+  return (
+    env.TENANT_OVERRIDES_STATIC_ONLY === "true" ||
+    env.TENANT_FEATURES_STATIC_ONLY === "true"
+  );
 }
 
 /**
