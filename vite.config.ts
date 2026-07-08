@@ -300,10 +300,8 @@ export default defineConfig({
             return 'offline-storage';
           }
 
-          // Radix UI components
-          if (id.includes('@radix-ui')) {
-            return 'radix-ui';
-          }
+          // Radix UI reste dans vendor : un chunk dédié crée un cycle
+          // (vaul → @radix-ui/react-dialog → react-remove-scroll → vendor)
 
           // Lucide icons
           if (id.includes('lucide-react')) {
