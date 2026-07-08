@@ -186,7 +186,7 @@ export default function AgentTerrainForm({ onClose, onSuccess, agent }: AgentTer
                 icon={Mail}
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="agent@cofin.cd"
+                placeholder="agent@microflex.cd"
              />
           </div>
         </Card>

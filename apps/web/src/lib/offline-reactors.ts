@@ -197,7 +197,7 @@ function registerSyncReactor(): UnsubscribeFn {
         if (isNetworkUsable()) {
           await context.syncService!.syncJournal();
         } else {
-          await context.syncService!.requestBackgroundSync('cofin-journal-sync');
+          await context.syncService!.requestBackgroundSync('microflex-journal-sync');
         }
       } catch {
         // Non-blocking: sync will retry later

@@ -59,7 +59,7 @@ const translations: Translations = {
   english: { fr: 'Anglais', en: 'English' },
 
   // Default app name — overridden at runtime by BrandingContext via brandedOverrides below
-  cofinPlatform: { fr: 'COFIN&CO-M', en: 'COFIN&CO-M' },
+  microflexPlatform: { fr: 'MicroFlex', en: 'MicroFlex' },
   platformeMicrofinance: { fr: 'Plateforme Microfinance', en: 'Microfinance Platform' },
 
   // Dashboard
@@ -434,7 +434,7 @@ const translations: Translations = {
   
   // Welcome message
   // Default welcome message — overridden at runtime by BrandingContext via brandedOverrides below
-  bienvenueCofin: { fr: 'Bienvenue sur COFIN&CO-M', en: 'Welcome to COFIN&CO-M' },
+  bienvenueMicroflex: { fr: 'Bienvenue sur MicroFlex', en: 'Welcome to MicroFlex' },
   gestionMicrofinance: { fr: 'Gestion complète de microfinance', en: 'Complete microfinance management' },
   
   // Agences
@@ -590,8 +590,8 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
   // Dynamic branding overrides for translation keys that contain the app name
   const brandedOverrides = useMemo<Translations>(() => ({
-    cofinPlatform: { fr: branding.appName, en: branding.appName },
-    bienvenueCofin: { fr: `Bienvenue sur ${branding.appName}`, en: `Welcome to ${branding.appName}` },
+    microflexPlatform: { fr: branding.appName, en: branding.appName },
+    bienvenueMicroflex: { fr: `Bienvenue sur ${branding.appName}`, en: `Welcome to ${branding.appName}` },
   }), [branding.appName]);
 
   const t = (key: string): string => {

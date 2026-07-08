@@ -41,7 +41,7 @@ const AmountRow: React.FC<AmountRowProps> = ({ label, amount, bold }) => (
 
 // ── Logo Fallback ───────────────────────────────────────────────
 
-const LogoImage: React.FC<{ appName?: string }> = ({ appName = 'COFIN&CO-M' }) => {
+const LogoImage: React.FC<{ appName?: string }> = ({ appName = 'MicroFlex' }) => {
   const [hasError, setHasError] = React.useState(false);
 
   if (hasError || !LOGO_BASE64) {

@@ -93,7 +93,7 @@ export const emailProviderSettings = pgTable("email_provider_settings", {
   username: text("username"),
   password: text("password"),
   fromEmail: text("from_email").notNull(),
-  fromName: text("from_name").notNull().default("COFIN&CO-M"),
+  fromName: text("from_name").notNull().default("MicroFlex"),
   apiKey: text("api_key"),
   isActive: boolean("is_active").notNull().default(false),
   isPrimary: boolean("is_primary").notNull().default(false),

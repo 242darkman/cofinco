@@ -170,7 +170,7 @@ const StepRemuneration: React.FC<StepRemunerationProps> = ({
       id: 'INTERNAL_WALLET',
       icon: Wallet,
       label: 'Wallet Interne',
-      description: 'Crédit sur compte client COFIN',
+      description: 'Crédit sur compte client MicroFlex',
     });
   }
 

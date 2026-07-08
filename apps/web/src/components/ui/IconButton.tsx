@@ -2,7 +2,7 @@ import React, { forwardRef } from 'react';
 import { LucideIcon } from 'lucide-react';
 
 /**
- * IconButton Component - COFIN Platform
+ * IconButton Component - MicroFlex Platform
  * Mobile-first, theme-aware button for icon-only actions
  *
  * @example

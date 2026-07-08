@@ -2,7 +2,7 @@ import React, { forwardRef } from 'react';
 import { LucideIcon, AlertCircle } from 'lucide-react';
 
 /**
- * FormField Component - COFIN Platform
+ * FormField Component - MicroFlex Platform
  * Mobile-first, theme-aware form input
  *
  * @example

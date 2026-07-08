@@ -142,7 +142,7 @@ interface BufferedMessage {
   retries: number;
 }
 
-const BUFFER_STORAGE_KEY = 'cofin_ws_buffer';
+const BUFFER_STORAGE_KEY = 'microflex_ws_buffer';
 const MAX_BUFFER_SIZE = 100;
 const MAX_RETRIES = 3;
 const MAX_RECONNECT_ATTEMPTS = 10;

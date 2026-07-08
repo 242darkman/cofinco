@@ -49,7 +49,7 @@ function getInitials(name: string): string {
 // ID spécial pour la racine virtuelle (entreprise)
 const VIRTUAL_ROOT_ID = '__company_root__';
 
-function transformApiDataToOrgChart(apiData: any[], appName: string = 'COFIN&CO-M'): OrgChartNode[] {
+function transformApiDataToOrgChart(apiData: any[], appName: string = 'MicroFlex'): OrgChartNode[] {
   if (!apiData || apiData.length === 0) return [];
 
   const nodes: OrgChartNode[] = [];

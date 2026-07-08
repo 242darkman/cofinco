@@ -1,5 +1,5 @@
 /**
- * UI Component Library - COFIN Platform
+ * UI Component Library - MicroFlex Platform
  * Barrel export for all reusable UI components
  */
 

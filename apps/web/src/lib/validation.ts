@@ -1,5 +1,5 @@
 /**
- * Validation Utilities for COFIN Platform
+ * Validation Utilities for MicroFlex Platform
  * Production-ready input validation with comprehensive rules
  */
 

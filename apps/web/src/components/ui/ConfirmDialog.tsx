@@ -4,7 +4,7 @@ import Modal from './Modal';
 import Button from './Button';
 
 /**
- * ConfirmDialog Component - COFIN Platform
+ * ConfirmDialog Component - MicroFlex Platform
  * Mobile-first confirmation dialog for critical actions
  *
  * @example

@@ -20,7 +20,7 @@ function generateAgenceCode(): string {
 // System Settings table
 export const systemSettings = pgTable("system_settings", {
   id: uuid("id").primaryKey().defaultRandom(),
-  appName: text("app_name").default("COFIN&CO-M"),
+  appName: text("app_name").default("MicroFlex"),
   agenceCode: text("agence_code").$defaultFn(generateAgenceCode).unique(),
   devise: text("devise").default(DEFAULT_CURRENCY.code),
   pays: text("pays").default("République du Congo"),

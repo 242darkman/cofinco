@@ -19,7 +19,7 @@ export function registerBrandingRoutes(app: Express) {
     try {
       const [settings] = await db.select().from(systemSettings);
 
-      const appName = settings?.appName || "COFIN&CO-M";
+      const appName = settings?.appName || "MicroFlex";
 
       res.setHeader("Content-Type", "application/manifest+json");
       res.setHeader("Cache-Control", "public, max-age=60");
@@ -156,8 +156,8 @@ export function registerBrandingRoutes(app: Express) {
       // Return defaults on error
       res.setHeader("Content-Type", "application/manifest+json");
       res.json({
-        name: "COFIN&CO-M - Plateforme Microfinance",
-        short_name: "COFIN&CO-M",
+        name: "MicroFlex - Plateforme Microfinance",
+        short_name: "MicroFlex",
         start_url: "/",
         display: "standalone",
         background_color: "#0f172a",
@@ -191,7 +191,7 @@ export function registerBrandingRoutes(app: Express) {
 
       res.setHeader("Cache-Control", "public, max-age=60");
       res.json({
-        appName: settings?.appName || "COFIN&CO-M",
+        appName: settings?.appName || "MicroFlex",
         logoUrl: settings?.logoUrl || null,
         primaryColor: ui?.primaryColor || "#0f766e",
         accentColor: ui?.accentColor || "#c2410c",
@@ -211,7 +211,7 @@ export function registerBrandingRoutes(app: Express) {
       logger.error({ err: error }, "Error fetching branding");
       // Return defaults on error
       res.json({
-        appName: "COFIN&CO-M",
+        appName: "MicroFlex",
         logoUrl: null,
         primaryColor: "#0f766e",
         accentColor: "#c2410c",
@@ -282,7 +282,7 @@ export function registerBrandingRoutes(app: Express) {
           const [settings] = await db.select().from(systemSettings);
           const [ui] = await db.select().from(uiCustomization);
           const payload = {
-            appName: settings?.appName || "COFIN&CO-M",
+            appName: settings?.appName || "MicroFlex",
             logoUrl: settings?.logoUrl || null,
             primaryColor: ui?.primaryColor || "#0f766e",
             accentColor: ui?.accentColor || "#c2410c",

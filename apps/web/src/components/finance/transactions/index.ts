@@ -1,5 +1,5 @@
 /**
- * Transaction Components - COFIN Platform
+ * Transaction Components - MicroFlex Platform
  * Mobile-first transaction list, detail drawer, and history page
  */
 

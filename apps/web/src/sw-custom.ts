@@ -2,7 +2,7 @@
  * Custom Service Worker Extensions
  *
  * Ce fichier contient la logique personnalisée du service worker
- * pour les fonctionnalités offline avancées de COFIN&CO-M
+ * pour les fonctionnalités offline avancées de MicroFlex
  */
 
 /// <reference lib="webworker" />
@@ -25,12 +25,12 @@ import { BackgroundSyncPlugin, Queue } from 'workbox-background-sync';
 // ========== CONSTANTS ==========
 
 const CACHE_NAMES = {
-  STATIC: 'cofin-static-v1',
-  API: 'cofin-api-v1',
-  IMAGES: 'cofin-images-v1',
-  MAPS: 'cofin-maps-v1',
-  DOCUMENTS: 'cofin-docs-v1',
-  OFFLINE: 'cofin-offline-v1'
+  STATIC: 'microflex-static-v1',
+  API: 'microflex-api-v1',
+  IMAGES: 'microflex-images-v1',
+  MAPS: 'microflex-maps-v1',
+  DOCUMENTS: 'microflex-docs-v1',
+  OFFLINE: 'microflex-offline-v1'
 } as const;
 
 const OFFLINE_FALLBACK_PAGE = '/offline.html';
@@ -287,7 +287,7 @@ self.addEventListener('push', (event) => {
     try {
       data = event.data.json();
     } catch (e) {
-      data = { title: 'COFIN&CO-M', body: event.data.text() };
+      data = { title: 'MicroFlex', body: event.data.text() };
     }
   }
 
@@ -297,7 +297,7 @@ self.addEventListener('push', (event) => {
     badge: data.badge || '/icons/badge-72x72.png',
     image: data.image,
     vibrate: [200, 100, 200],
-    tag: data.tag || 'cofin-notification',
+    tag: data.tag || 'microflex-notification',
     requireInteraction: data.requireInteraction || false,
     renotify: true,
     data: {
@@ -312,7 +312,7 @@ self.addEventListener('push', (event) => {
   };
 
   event.waitUntil(
-    self.registration.showNotification(data.title || 'COFIN&CO-M', options)
+    self.registration.showNotification(data.title || 'MicroFlex', options)
   );
 });
 
@@ -421,7 +421,7 @@ self.addEventListener('message', async (event) => {
       const cacheNames = await caches.keys();
       await Promise.all(
         cacheNames
-          .filter(name => name.startsWith('cofin-'))
+          .filter(name => name.startsWith('microflex-'))
           .map(name => caches.delete(name))
       );
       break;

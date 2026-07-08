@@ -2,7 +2,7 @@ import React from 'react';
 import { LucideIcon } from 'lucide-react';
 
 /**
- * StatCard Component - COFIN Platform
+ * StatCard Component - MicroFlex Platform
  * Mobile-first, clean & minimal card for displaying statistics
  *
  * @example

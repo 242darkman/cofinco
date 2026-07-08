@@ -39,7 +39,7 @@ interface AgenceContextType {
   isAdmin: boolean;
 }
 
-const STORAGE_KEY = 'cofin_selected_agence_id';
+const STORAGE_KEY = 'microflex_selected_agence_id';
 
 const AgenceContext = createContext<AgenceContextType | undefined>(undefined);
 

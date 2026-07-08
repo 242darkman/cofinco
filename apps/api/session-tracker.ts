@@ -12,8 +12,8 @@ const logger = createLogger('SessionTracker');
 // REDIS SESSION MANAGEMENT
 // ============================================
 
-const REDIS_SESSION_PREFIX = 'cofin:sess:';
-const REDIS_USER_SESSIONS_PREFIX = 'cofin:usess:';
+const REDIS_SESSION_PREFIX = 'microflex:sess:';
+const REDIS_USER_SESSIONS_PREFIX = 'microflex:usess:';
 
 /**
  * Détruit une clé de session Redis immédiatement.

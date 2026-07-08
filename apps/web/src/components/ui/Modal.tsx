@@ -4,7 +4,7 @@ import { X } from 'lucide-react';
 import { IconButton } from './';
 
 /**
- * Modal Component - COFIN Platform
+ * Modal Component - MicroFlex Platform
  * Mobile-first, theme-aware modal dialog
  *
  * @example

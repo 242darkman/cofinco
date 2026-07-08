@@ -145,7 +145,7 @@ export default function Header({
                         {user?.name || 'Utilisateur'}
                       </p>
                       <p className="text-xs text-content-muted">
-                        {user?.email || 'email@cofin.cg'}
+                        {user?.email || 'email@microflex.cg'}
                       </p>
                       <span className={`inline-block mt-1 px-2 py-0.5 text-xs font-medium rounded-md border ${getRoleBadgeColor(user?.role || '')}`}>
                         {getRoleLabel(user?.role || '')}

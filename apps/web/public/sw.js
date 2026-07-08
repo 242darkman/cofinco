@@ -6,7 +6,7 @@ self.addEventListener('push', event => {
     try {
       data = event.data.json();
     } catch (e) {
-      data = { title: 'COFIN&CO-M', body: event.data.text() };
+      data = { title: 'MicroFlex', body: event.data.text() };
     }
   }
   
@@ -16,7 +16,7 @@ self.addEventListener('push', event => {
     badge: data.badge || '/badge-72x72.png',
     image: data.image,
     vibrate: [200, 100, 200],
-    tag: data.tag || 'cofin-notification',
+    tag: data.tag || 'microflex-notification',
     requireInteraction: data.requireInteraction || false,
     renotify: true,
     data: {
@@ -31,7 +31,7 @@ self.addEventListener('push', event => {
   };
   
   event.waitUntil(
-    self.registration.showNotification(data.title || 'COFIN&CO-M', options)
+    self.registration.showNotification(data.title || 'MicroFlex', options)
   );
 });
 

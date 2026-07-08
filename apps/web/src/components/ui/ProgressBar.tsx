@@ -1,7 +1,7 @@
 import React from 'react';
 
 /**
- * ProgressBar Component - COFIN Platform
+ * ProgressBar Component - MicroFlex Platform
  * Mobile-first progress bar with label and percentage display
  *
  * @example

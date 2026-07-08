@@ -15,7 +15,7 @@ const logger = createLogger('Push');
 // VAPID keys - should be set in environment variables
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || "";
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || "";
-const VAPID_SUBJECT = process.env.VAPID_SUBJECT || "mailto:contact@cofin.co";
+const VAPID_SUBJECT = process.env.VAPID_SUBJECT || "mailto:contact@example.com";
 
 // Configure web-push if VAPID keys are available
 let pushConfigured = false;

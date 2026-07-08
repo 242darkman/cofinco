@@ -208,7 +208,7 @@ function buildBordereau(period: string, entries: TransferEntry[], totalAmount: n
     ...bankLines,
     "",
     "=".repeat(40),
-    "Document généré automatiquement par COFIN&CO-M",
+    "Document généré automatiquement par MicroFlex",
   ].join("\n");
 }
 

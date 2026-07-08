@@ -258,7 +258,7 @@ export function setupWebSocket(server: Server) {
 
       const cookies = parseCookie(cookieHeader);
       // Need to match the logic in auth.ts
-      const cookieName = isProduction ? '__Host-cofin_sess' : 'cofin_sess';
+      const cookieName = isProduction ? '__Host-microflex_sess' : 'microflex_sess';
       const signedSessionId = cookies[cookieName];
 
       if (!signedSessionId) {

@@ -66,7 +66,7 @@ export class SmtpEmailProvider implements EmailProvider {
         username,
         password,
         fromEmail: process.env.SMTP_FROM_EMAIL || username || '',
-        fromName: process.env.SMTP_FROM_NAME || "COFIN&CO-M",
+        fromName: process.env.SMTP_FROM_NAME || "MicroFlex",
       };
     }
 

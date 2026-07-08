@@ -16,7 +16,7 @@ interface AppRouterProps {
 
 /**
  * Router centralisé avec support RBAC et sous-routes
- * Remplace le switch/case dans COFINPlatform
+ * Remplace le switch/case dans MicroflexPlatform
  */
 export default function AppRouter({
   currentModule,

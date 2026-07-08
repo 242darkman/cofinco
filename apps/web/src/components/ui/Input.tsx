@@ -1,7 +1,7 @@
 import React, { forwardRef } from 'react';
 
 /**
- * Input Component - COFIN Platform
+ * Input Component - MicroFlex Platform
  * Basic theme-aware input component
  */
 

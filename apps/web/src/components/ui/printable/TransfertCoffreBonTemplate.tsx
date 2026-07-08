@@ -117,7 +117,7 @@ export const TransfertCoffreBonTemplate = React.forwardRef<HTMLDivElement, Props
         {/* En-tête */}
         <div className="flex items-start justify-between mb-6">
           <div>
-            <div className="text-[18px] font-bold uppercase">{branding.appName || 'COFIN&CO-M'}</div>
+            <div className="text-[18px] font-bold uppercase">{branding.appName || 'MicroFlex'}</div>
             <div className="text-[10px] text-gray-600">Brazzaville, République du Congo</div>
           </div>
           <div className="text-right">
@@ -349,7 +349,7 @@ export const TransfertCoffreBonTemplate = React.forwardRef<HTMLDivElement, Props
 
         {/* Footer */}
         <div className="mt-6 text-center text-[9px] text-gray-500">
-          Document généré automatiquement — {branding.appName || 'COFIN&CO-M'} — {formatDateTime(new Date())}
+          Document généré automatiquement — {branding.appName || 'MicroFlex'} — {formatDateTime(new Date())}
         </div>
       </div>
     );

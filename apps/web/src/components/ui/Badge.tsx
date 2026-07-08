@@ -2,7 +2,7 @@ import React from 'react';
 import { getStatusLabel, ALL_STATUS_LABELS } from '@/lib/status-labels';
 
 /**
- * Badge Component - COFIN Platform
+ * Badge Component - MicroFlex Platform
  * Mobile-first badge for status indicators with auto color detection
  *
  * Supporte les codes ANGLAIS (ACTIVE, PENDING, etc.) et les labels FR legacy

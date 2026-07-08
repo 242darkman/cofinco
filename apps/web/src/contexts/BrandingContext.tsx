@@ -20,7 +20,7 @@ export interface BrandingConfig {
 }
 
 const DEFAULT_BRANDING: BrandingConfig = {
-  appName: 'COFIN&CO-M',
+  appName: 'MicroFlex',
   logoUrl: null,
   primaryColor: '#0f766e',
   accentColor: '#c2410c',

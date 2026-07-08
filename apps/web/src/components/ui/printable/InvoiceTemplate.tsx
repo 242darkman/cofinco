@@ -8,7 +8,7 @@ import { currencySymbol } from '@shared/config/currency';
 
 // Default Company Info
 const COMPANY = {
-  nom: 'COFIN&CO-M',
+  nom: 'MicroFlex',
   slogan: 'Microfinance & Services Financiers',
   adresse: 'Brazzaville, République du Congo',
   telephone: '+242 06 123 4567',

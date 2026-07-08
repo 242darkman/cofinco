@@ -2,7 +2,7 @@ import React, { forwardRef } from 'react';
 import { LucideIcon } from 'lucide-react';
 
 /**
- * Button Component - COFIN Platform
+ * Button Component - MicroFlex Platform
  * Mobile-first, accessible, theme-aware button component
  *
  * @example

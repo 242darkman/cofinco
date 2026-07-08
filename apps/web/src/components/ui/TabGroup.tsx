@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { LucideIcon, Lock, ChevronLeft, ChevronRight } from 'lucide-react';
 
 /**
- * TabGroup Component - COFIN Platform
+ * TabGroup Component - MicroFlex Platform
  * Mobile-first tab navigation with pills or underline style
  * Hidden scrollbar with gradient fade + arrow indicators
  */

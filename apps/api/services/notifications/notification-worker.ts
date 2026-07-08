@@ -130,7 +130,7 @@ async function processNotificationJobs(): Promise<number> {
               .values({
                 notificationJobId: job.id,
                 requestId: result.requestId,
-                senderAddress: "tel:+242COFIN",
+                senderAddress: "tel:+242MicroFlex",
                 receiverAddress: job.recipient,
                 status: "PENDING",
                 rawResponse: result.rawResponse,

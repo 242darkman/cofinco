@@ -45,7 +45,7 @@ interface TransferHistoryPrintTemplateProps {
 }
 
 const DEFAULT_COMPANY_INFO = {
-  nom: 'COFIN&CO',
+  nom: 'MicroFlex',
   adresse: 'Brazzaville, République du Congo',
   telephone: '+242 06 123 4567',
   email: 'contact@microflex-m.com',

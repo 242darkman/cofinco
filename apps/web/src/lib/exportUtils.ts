@@ -165,7 +165,7 @@ export const exportToPDF = async (data: any[], filename: string, title: string, 
         </tbody>
       </table>
       <div class="footer">
-        Généré par ${options?.appName || 'COFIN'} Platform - République du Congo<br>
+        Généré par ${options?.appName || 'MicroFlex'} Platform - République du Congo<br>
         Document confidentiel - Ne pas diffuser
       </div>
     </body>

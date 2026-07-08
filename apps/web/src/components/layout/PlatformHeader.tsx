@@ -56,7 +56,7 @@ export default function PlatformHeader({
         <div className="flex items-center gap-4 border-l border-edge pl-4">
           <div>
             <h2 className="text-2xl font-black tracking-tight bg-gradient-to-r from-accent via-blue-500 to-status-info bg-clip-text text-transparent">
-              {t('cofinPlatform')}
+              {t('microflexPlatform')}
             </h2>
             <div className="flex items-center gap-2">
               <span className="text-[10px] uppercase font-bold tracking-[0.15em] text-content-muted/80">

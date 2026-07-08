@@ -99,7 +99,7 @@ export interface SyncOptions {
 
 // ========== CONSTANTS ==========
 
-const BACKGROUND_SYNC_TAG = 'cofin-sync';
+const BACKGROUND_SYNC_TAG = 'microflex-sync';
 const PERIODIC_SYNC_TAG = 'sync-pending-operations';
 const BATCH_SIZE = 10;
 const RETRY_DELAY_MS = 5000;

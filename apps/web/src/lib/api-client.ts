@@ -1,4 +1,4 @@
-// API Client for COFIN&CO-M Backend
+// API Client for MicroFlex Backend
 // Security-enhanced with automatic 401 detection and session invalidation
 // Multi-agency support with automatic X-Agence-Id header injection
 // Cross-tab logout synchronization via BroadcastChannel

@@ -27,9 +27,9 @@ export default function AgentReportsGenerator({ agentId: propAgentId }: { agentI
   useEffect(() => {
     // Fallback to localStorage if no prop provided
     if (!propAgentId) {
-      const cofinUserStr = localStorage.getItem('cofin_user');
-      if (cofinUserStr) {
-        const user = JSON.parse(cofinUserStr);
+      const microflexUserStr = localStorage.getItem('microflex_user');
+      if (microflexUserStr) {
+        const user = JSON.parse(microflexUserStr);
         setAgentId(user.id);
       }
     }

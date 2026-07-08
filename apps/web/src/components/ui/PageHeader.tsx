@@ -10,7 +10,7 @@ export interface PageHeaderProps {
 }
 
 /**
- * PageHeader Component - COFIN Platform
+ * PageHeader Component - MicroFlex Platform
  * Standardized header for module pages with title, icon, description, and actions.
  */
 export default function PageHeader({

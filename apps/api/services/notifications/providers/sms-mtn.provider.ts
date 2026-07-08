@@ -136,7 +136,7 @@ export class MtnSmsProvider implements SmsProvider {
       let token = await this.getAccessToken();
 
       const senderAddress =
-        options?.senderAddress || "tel:+242COFIN";
+        options?.senderAddress || "tel:+242MicroFlex";
       const clientCorrelator = (options?.correlationId || "").substring(0, 36);
 
       const body = {

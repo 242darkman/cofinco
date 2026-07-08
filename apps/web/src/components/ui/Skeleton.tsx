@@ -1,7 +1,7 @@
 import React from 'react';
 
 /**
- * Skeleton Loading Component for COFIN Platform
+ * Skeleton Loading Component for MicroFlex Platform
  * Production-ready loading placeholders with accessibility
  */
 

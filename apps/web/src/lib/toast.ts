@@ -1,5 +1,5 @@
 /**
- * Toast Notification System for COFIN Platform
+ * Toast Notification System for MicroFlex Platform
  * Wrapper around Sonner for consistent API across the app
  */
 

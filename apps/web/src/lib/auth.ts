@@ -125,8 +125,8 @@ class AuthService {
     teardownDeviceKey();
 
     // Nettoyer l'ancien localStorage (migration)
-    localStorage.removeItem('cofin_user');
-    localStorage.removeItem('cofin_user_id');
+    localStorage.removeItem('microflex_user');
+    localStorage.removeItem('microflex_user_id');
   }
 
   /**

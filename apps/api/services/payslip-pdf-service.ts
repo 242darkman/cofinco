@@ -135,7 +135,7 @@ export async function generatePayslipPdf(data: PayslipPdfData): Promise<Buffer> 
     try {
       doc.addImage(logoBase64, 'PNG', ML, 3, 18, 18);
     } catch (err) {
-      logger.debug('Logo embedding failed, using text fallback');
+      logger.debug({ err }, 'Logo embedding failed, using text fallback');
     }
   }
 
@@ -143,7 +143,7 @@ export async function generatePayslipPdf(data: PayslipPdfData): Promise<Buffer> 
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.text(company?.appName || 'COFIN&CO-M', 32, 12);
+  doc.text(company?.appName || 'MicroFlex', 32, 12);
   doc.setFontSize(7);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(180, 190, 200);
@@ -394,7 +394,7 @@ export async function generatePayslipPdf(data: PayslipPdfData): Promise<Buffer> 
   doc.setTextColor(148, 163, 184);
   const genDate = new Date(bulletin.createdAt).toLocaleDateString('fr-FR');
   doc.text(`Document genere le ${genDate} — Confidentiel`, W / 2, H - 8, { align: 'center' });
-  doc.text('COFIN&CO-M — La Finance Autrement', W / 2, H - 5, { align: 'center' });
+  doc.text('MicroFlex — La Finance Autrement', W / 2, H - 5, { align: 'center' });
 
   // Convert to Buffer
   const arrayBuffer = doc.output('arraybuffer');

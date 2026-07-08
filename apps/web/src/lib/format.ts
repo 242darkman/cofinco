@@ -1,5 +1,5 @@
 /**
- * Formatting Utilities for COFIN Platform
+ * Formatting Utilities for MicroFlex Platform
  * Centralized formatting functions for consistency
  *
  * Currency formatting is delegated to shared/config/currency.ts

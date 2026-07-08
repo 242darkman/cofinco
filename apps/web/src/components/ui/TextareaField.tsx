@@ -1,7 +1,7 @@
 import React, { forwardRef } from 'react';
 
 /**
- * TextareaField Component - COFIN Platform
+ * TextareaField Component - MicroFlex Platform
  * Mobile-first textarea with label, error, and character count
  *
  * @example

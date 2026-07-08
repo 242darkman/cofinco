@@ -181,7 +181,7 @@ export async function handleCreditRequestCreated(data: CreditRequestCreatedData)
     clientName: client.name,
     amount: data.montantDemande.toLocaleString("fr-FR"),
     creditNumber: data.numeroDemande,
-    appName: "COFIN&CO-M",
+    appName: "MicroFlex",
   };
 
   await emitNotificationEvent("CREDIT_REQUEST_CREATED", data, {

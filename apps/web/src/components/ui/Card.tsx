@@ -1,7 +1,7 @@
 import React from 'react';
 
 /**
- * Card Component - COFIN Platform
+ * Card Component - MicroFlex Platform
  * Mobile-first, theme-aware card container
  *
  * @example

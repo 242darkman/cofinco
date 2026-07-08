@@ -29,7 +29,7 @@ import { OfflineProvider } from './contexts/OfflineContext';
 import { TenantProvider } from './contexts/TenantContext';
 
 // Lazy load heavy components
-const COFINPlatform = lazy(() => import('./COFINPlatform'));
+const MicroflexPlatform = lazy(() => import('./MicroflexPlatform'));
 const AgentCaisseInterface = lazy(() => import('./components/agent/AgentCaisseInterface'));
 const SeasonalWelcome = lazy(() => import('./components/shared/SeasonalWelcome'));
 
@@ -337,7 +337,7 @@ function App() {
                             onLogout={handleLogout}
                           />
                         ) : (
-                          <COFINPlatform currentUser={currentUser} onLogout={handleLogout} onUserUpdate={refreshCurrentUser} />
+                          <MicroflexPlatform currentUser={currentUser} onLogout={handleLogout} onUserUpdate={refreshCurrentUser} />
                         )}
                       </Suspense>
                     </div>

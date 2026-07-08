@@ -40,10 +40,10 @@ export default function AgentTeamLeaderboard({ agentId }: Props) {
   const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
-    const cofinUserStr = localStorage.getItem('cofin_user');
-    if (cofinUserStr) {
+    const microflexUserStr = localStorage.getItem('microflex_user');
+    if (microflexUserStr) {
       try {
-        setCurrentUserId(JSON.parse(cofinUserStr).id);
+        setCurrentUserId(JSON.parse(microflexUserStr).id);
       } catch { /* ignore */ }
     }
   }, []);

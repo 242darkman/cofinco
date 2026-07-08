@@ -86,13 +86,13 @@ const ModuleLoadingFallback = ({ moduleName }: { moduleName?: string }) => (
 );
 
 
-interface COFINPlatformProps {
+interface MicroflexPlatformProps {
   currentUser?: any;
   onLogout: () => void;
   onUserUpdate?: () => void;
 }
 
-export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: COFINPlatformProps) {
+export default function MicroflexPlatform({ currentUser, onLogout, onUserUpdate }: MicroflexPlatformProps) {
   const { language, setLanguage, t } = useLanguage();
   const { currentModule, currentSubModule, navigateToModule } = useAppNavigation();
   const [isMobile, setIsMobile] = useState(() =>

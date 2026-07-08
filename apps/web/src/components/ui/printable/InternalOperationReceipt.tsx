@@ -47,7 +47,7 @@ interface InternalOperationReceiptProps {
 }
 
 const DEFAULT_COMPANY = {
-  name: 'COFIN&CO-M',
+  name: 'MicroFlex',
   address: 'Brazzaville, République du Congo',
   phone: '+242 06 123 4567',
 };

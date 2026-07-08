@@ -1,5 +1,5 @@
 /**
- * Design Tokens - COFIN Platform
+ * Design Tokens - MicroFlex Platform
  * Mobile-first design system with consistent spacing, colors, and sizes
  */
 

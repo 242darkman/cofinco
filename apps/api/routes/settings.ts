@@ -52,7 +52,7 @@ export function registerSettingsRoutes(app: Express) {
       if (!result) {
         // Return defaults if no settings exist
         return res.json({
-          app_name: 'COFIN&CO-M',
+          app_name: 'MicroFlex',
           agence_code: 'COF001',
           devise: getActiveCurrency().code,
           pays: 'République du Congo',

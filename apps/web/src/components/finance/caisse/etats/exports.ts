@@ -23,7 +23,7 @@ interface ExportConfig {
 }
 
 const DEFAULT_CONFIG: ExportConfig = {
-  companyName: 'COFIN&CO-M',
+  companyName: 'MicroFlex',
   companySubtitle: 'Coopérative Financière du Congo',
   dateDebut: '',
   dateFin: '',

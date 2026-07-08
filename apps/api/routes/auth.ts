@@ -2156,12 +2156,12 @@ export function registerAuthRoutes(app: Express) {
       if (redis) {
         try {
           let sessionKeyCount = 0;
-          for await (const _ of redis.scanIterator({ MATCH: 'cofin:sess:*', COUNT: 100 })) {
+          for await (const _ of redis.scanIterator({ MATCH: 'microflex:sess:*', COUNT: 100 })) {
             sessionKeyCount++;
           }
 
           let zsetKeyCount = 0;
-          for await (const _ of redis.scanIterator({ MATCH: 'cofin:usess:*', COUNT: 100 })) {
+          for await (const _ of redis.scanIterator({ MATCH: 'microflex:usess:*', COUNT: 100 })) {
             zsetKeyCount++;
           }
 

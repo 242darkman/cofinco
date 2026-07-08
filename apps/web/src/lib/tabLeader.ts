@@ -12,7 +12,7 @@
  * - Leader status is exposed via isLeader() and onChange callbacks
  */
 
-const CHANNEL_NAME = 'cofin-leader';
+const CHANNEL_NAME = 'microflex-leader';
 const HEARTBEAT_INTERVAL_MS = 3000;
 const LEADER_TIMEOUT_MS = 5000;
 

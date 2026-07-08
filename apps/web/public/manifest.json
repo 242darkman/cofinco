@@ -1,6 +1,6 @@
 {
-  "name": "COFIN&CO-M - Plateforme Microfinance",
-  "short_name": "COFIN&CO",
+  "name": "MicroFlex - Plateforme Microfinance",
+  "short_name": "MicroFlex",
   "description": "Application de gestion microfinance - Caisse, Epargne, Crédit, Tontine",
   "start_url": "/",
   "display": "standalone",

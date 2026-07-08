@@ -3,7 +3,7 @@ import { Search, X } from 'lucide-react';
 import { IconButton } from './';
 
 /**
- * SearchInput Component - COFIN Platform
+ * SearchInput Component - MicroFlex Platform
  * Mobile-first search input with clear button
  *
  * @example

@@ -40,7 +40,7 @@ export function generateTechnicalSheetPDF(): Buffer {
   doc.setFontSize(24);
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
-  doc.text('COFIN&CO-M', pageWidth / 2, 20, { align: 'center' });
+  doc.text('MicroFlex', pageWidth / 2, 20, { align: 'center' });
   
   doc.setFontSize(12);
   doc.setFont('helvetica', 'normal');
@@ -54,7 +54,7 @@ export function generateTechnicalSheetPDF(): Buffer {
 
   // Section 1: Présentation
   addSectionTitle('1. PRÉSENTATION GÉNÉRALE');
-  addText('COFIN&CO-M est une plateforme complète de gestion de microfinance conçue pour la République du Congo.');
+  addText('MicroFlex est une plateforme complète de gestion de microfinance conçue pour la République du Congo.');
   addText('Elle offre une solution intégrée pour la gestion des crédits, épargnes, tontines, et opérations de caisse.');
   yPos += 5;
 
@@ -266,13 +266,13 @@ export function generateTechnicalSheetPDF(): Buffer {
     doc.setFontSize(8);
     doc.setTextColor(128, 128, 128);
     doc.text(
-      `COFIN&CO-M - Fiche Technique - Page ${i}/${pageCount}`,
+      `MicroFlex - Fiche Technique - Page ${i}/${pageCount}`,
       pageWidth / 2,
       doc.internal.pageSize.getHeight() - 10,
       { align: 'center' }
     );
     doc.text(
-      `© 2025 COFIN&CO-M. Tous droits réservés.`,
+      `© 2025 MicroFlex. Tous droits réservés.`,
       pageWidth / 2,
       doc.internal.pageSize.getHeight() - 5,
       { align: 'center' }

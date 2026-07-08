@@ -1,5 +1,5 @@
 /**
- * XSS Sanitization Utilities for COFIN Platform
+ * XSS Sanitization Utilities for MicroFlex Platform
  * Production-ready HTML/text sanitization
  */
 

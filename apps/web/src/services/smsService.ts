@@ -46,7 +46,7 @@ export async function sendSMS(params: SendSMSParams): Promise<SendSMSResponse> {
 export async function sendOTPSMS(
   phoneNumber: string,
   otpCode: string,
-  appName: string = 'COFIN&CO-M'
+  appName: string = 'MicroFlex'
 ): Promise<SendSMSResponse> {
   const message = `${appName} - Votre code de validation: ${otpCode}. Valide 5 min. Ne partagez pas ce code.`;
 
@@ -63,7 +63,7 @@ export async function sendTransactionConfirmationSMS(
   phoneNumber: string,
   transactionType: string,
   montant: number,
-  appName: string = 'COFIN&CO-M'
+  appName: string = 'MicroFlex'
 ): Promise<SendSMSResponse> {
   const message = `${appName} - Transaction ${transactionType} de ${montant.toLocaleString()} ${currencySymbol()} confirmée. Merci de votre confiance.`;
 

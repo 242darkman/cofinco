@@ -309,7 +309,7 @@ services:
     ports:
       - "127.0.0.1:5050:80"
     volumes:
-      - cofin_pgadmin_data:/var/lib/pgadmin
+      - microflex_pgadmin_data:/var/lib/pgadmin
     depends_on:
       db:
         condition: service_healthy
@@ -331,5 +331,5 @@ services:
       - microflex_internal
 
 volumes:
-  cofin_pgadmin_data:
+  microflex_pgadmin_data:
   redisinsight_data:

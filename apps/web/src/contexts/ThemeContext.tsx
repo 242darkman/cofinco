@@ -11,7 +11,7 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-const STORAGE_KEY = 'cofin-theme-mode';
+const STORAGE_KEY = 'microflex-theme-mode';
 
 /**
  * Obtenir le thème préféré du système

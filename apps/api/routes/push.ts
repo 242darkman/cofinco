@@ -173,7 +173,7 @@ export function registerPushRoutes(app: Express) {
 
       const result = await sendPushToUser(req.user.id, {
         title: "Test Notification",
-        body: "Cette notification est un test de COFIN&CO-M!",
+        body: "Cette notification est un test de MicroFlex!",
         icon: "/icons/icon-192.png",
         data: {
           type: "test",

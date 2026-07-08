@@ -202,7 +202,7 @@ async function createSessionStore(): Promise<SessionStore> {
 
       return new RedisStore({
         client: redisClient,
-        prefix: 'cofin:sess:',
+        prefix: 'microflex:sess:',
         ttl: SESSION_CONFIG.INACTIVITY_TIMEOUT_SEC,
         // Désactiver les touches pour éviter les race conditions
         disableTouch: false,
@@ -328,7 +328,7 @@ export async function setupAuth(app: Express) {
     resave: false,
     saveUninitialized: false,
     rolling: true, // Refresh session with every request (réinitialise le maxAge)
-    name: isProduction ? '__Host-cofin_sess' : 'cofin_sess',
+    name: isProduction ? '__Host-microflex_sess' : 'microflex_sess',
     proxy: true,
     cookie: {
       secure: isProduction,

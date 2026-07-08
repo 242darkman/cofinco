@@ -3,7 +3,7 @@ import { LucideIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 /**
- * ResponsiveTable Component - COFIN Platform
+ * ResponsiveTable Component - MicroFlex Platform
  * Mobile-first table that displays as cards on mobile and table on desktop
  *
  * @example

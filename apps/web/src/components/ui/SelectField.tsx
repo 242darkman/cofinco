@@ -2,7 +2,7 @@ import React, { forwardRef } from 'react';
 import { ChevronDown, LucideIcon, AlertCircle } from 'lucide-react';
 
 /**
- * SelectField Component - COFIN Platform
+ * SelectField Component - MicroFlex Platform
  * Mobile-first select dropdown with label and error handling
  *
  * @example

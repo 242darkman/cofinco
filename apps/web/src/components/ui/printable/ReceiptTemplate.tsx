@@ -134,7 +134,7 @@ interface ReceiptTemplateProps {
 }
 
 const DEFAULT_COMPANY_INFO: ReceiptCompanyInfo = {
-  name: 'COFIN&CO-M',
+  name: 'MicroFlex',
   address: 'Brazzaville, République du Congo',
   phone: '+242 06 123 4567',
   email: 'contact@microflex-m.com',
