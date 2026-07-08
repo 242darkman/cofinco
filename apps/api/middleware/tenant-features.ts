@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import type { TenantFeatureKey } from "@shared/tenant-config";
 import { getTenantConfig } from "../config/tenant-config";
+import { getEffectiveFeatures } from "../services/tenant-feature-service";
 
 interface FeatureRouteRule {
   feature: TenantFeatureKey;
@@ -43,13 +44,31 @@ export function getRequiredTenantFeature(path: string): TenantFeatureKey | undef
 
 export function enforceTenantFeatures(req: Request, res: Response, next: NextFunction): void {
   const feature = getRequiredTenantFeature(req.path);
-  if (!feature || getTenantConfig().features[feature]) {
+  if (!feature) {
     next();
     return;
   }
 
-  res.status(404).json({
-    code: "FEATURE_DISABLED",
-    message: "Cette fonctionnalité n'est pas disponible pour ce déploiement.",
-  });
+  getEffectiveFeatures()
+    .then((features) => {
+      if (features[feature]) {
+        next();
+        return;
+      }
+      res.status(404).json({
+        code: "FEATURE_DISABLED",
+        message: "Cette fonctionnalité n'est pas disponible pour ce déploiement.",
+      });
+    })
+    .catch(() => {
+      // Repli sûr : configuration statique validée au démarrage.
+      if (getTenantConfig().features[feature]) {
+        next();
+        return;
+      }
+      res.status(404).json({
+        code: "FEATURE_DISABLED",
+        message: "Cette fonctionnalité n'est pas disponible pour ce déploiement.",
+      });
+    });
 }

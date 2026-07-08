@@ -1,4 +1,5 @@
-import { integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { users } from "./auth";
 
 /**
  * Identité du déploiement — table à ligne unique (id = 1).
@@ -18,3 +19,22 @@ export const deploymentIdentity = pgTable("deployment_identity", {
 });
 
 export type DeploymentIdentity = typeof deploymentIdentity.$inferSelect;
+
+/**
+ * Surcharges dynamiques des feature flags tenant.
+ *
+ * La configuration statique (fichier + env) reste la source par défaut ;
+ * une ligne ici la surcharge à chaud, sans redémarrage. En cas d'erreur de
+ * lecture ou si TENANT_FEATURES_STATIC_ONLY=true (kill switch), seule la
+ * configuration statique fait foi.
+ */
+export const tenantFeatureOverrides = pgTable("tenant_feature_overrides", {
+  /** Clé du flag — une des clés de tenantFeatureFlagsSchema (ex: enableSms). */
+  feature: text("feature").primaryKey(),
+  enabled: boolean("enabled").notNull(),
+  reason: text("reason"),
+  updatedBy: uuid("updated_by").references(() => users.id),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type TenantFeatureOverride = typeof tenantFeatureOverrides.$inferSelect;
