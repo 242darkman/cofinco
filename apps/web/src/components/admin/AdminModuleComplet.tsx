@@ -35,6 +35,7 @@ import AdminProductRates from './AdminProductRates';
 import ZoneManagement from './ZoneManagement';
 import AdminCurrencySettings from './AdminCurrencySettings';
 import AdminBrandingSettings from './AdminBrandingSettings';
+import AdminTenantSettings from './AdminTenantSettings';
 import AdminAgencyReset from './AdminAgencyReset';
 import AdminScoring from './AdminScoring';
 import AdminPaymentMethodToggles from './AdminPaymentMethodToggles';
@@ -267,6 +268,7 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
                   {activeTab === 'payment-methods' && <AdminPaymentMethodToggles />}
                   {activeTab === 'currency' && <AdminCurrencySettings />}
                   {activeTab === 'branding' && <AdminBrandingSettings />}
+                  {activeTab === 'tenant' && <AdminTenantSettings />}
                   {activeTab === 'reset-agence' && <AdminAgencyReset />}
                   {activeTab === 'scoring' && <AdminScoring />}
                   {activeTab === 'sync' && <AdminSyncPanel />}

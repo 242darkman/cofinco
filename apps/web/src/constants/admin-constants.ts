@@ -57,6 +57,7 @@ export const ADMIN_TABS = [
   { id: 'payment-methods', label: 'Paiements', icon: 'CreditCard', permission: 'admin.settings' },
   { id: 'currency', label: 'Devise', icon: 'Coins', permission: 'admin.settings' },
   { id: 'branding', label: 'Branding', icon: 'Palette', permission: 'admin.settings' },
+  { id: 'tenant', label: 'Tenant & Modules', icon: 'Settings', permission: 'admin.settings' },
   { id: 'reset-agence', label: 'Reset Agence', icon: 'RotateCcw', permission: 'admin.manage' },
   { id: 'scoring', label: 'Scoring', icon: 'BarChart3', permission: 'loyalty.view' },
   { id: 'sync', label: 'Synchronisation', icon: 'CloudUpload', permission: 'admin.settings' },

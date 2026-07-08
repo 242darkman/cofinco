@@ -369,6 +369,7 @@ export const ROUTES: RouteConfig[] = [
       { path: '/administration/paiements', subModule: 'payment-methods', label: 'Paiements' },
       { path: '/administration/devise', subModule: 'currency', label: 'Devise' },
       { path: '/administration/branding', subModule: 'branding', label: 'Branding' },
+      { path: '/administration/tenant', subModule: 'tenant', label: 'Tenant & Modules' },
       { path: '/administration/reset-agence', subModule: 'reset-agence', label: 'Reset Agence' },
       { path: '/administration/scoring', subModule: 'scoring', label: 'Scoring' },
     ],
