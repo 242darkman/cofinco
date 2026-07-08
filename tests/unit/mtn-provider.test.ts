@@ -271,7 +271,7 @@ describe('MtnSmsProvider', () => {
           }),
         });
 
-      const result = await provider.checkDeliveryStatus('req-123', 'tel:+242COFIN');
+      const result = await provider.checkDeliveryStatus('req-123', 'tel:+242MicroFlex');
 
       expect(result.status).toBe('DeliveredToTerminal');
     });
@@ -287,7 +287,7 @@ describe('MtnSmsProvider', () => {
           json: async () => ({}),
         });
 
-      const result = await provider.checkDeliveryStatus('req-123', 'tel:+242COFIN');
+      const result = await provider.checkDeliveryStatus('req-123', 'tel:+242MicroFlex');
 
       expect(result.status).toBe('UNKNOWN');
     });

@@ -221,12 +221,12 @@ describe("Session secret — No hardcoded fallback in production", () => {
   it("auth.ts should crash if SESSION_SECRET is missing in production", () => {
     const content = readFileSync(join(ROOT, "auth.ts"), "utf-8");
     expect(content).toContain("process.exit(1)");
-    expect(content).not.toContain("cofin-secret-key-change-in-production");
+    expect(content).not.toContain("microflex-secret-key-change-in-production");
   });
 
   it("ws-server.ts should not use the old hardcoded secret", () => {
     const content = readFileSync(join(ROOT, "ws-server.ts"), "utf-8");
-    expect(content).not.toContain("cofin-secret-key-change-in-production");
+    expect(content).not.toContain("microflex-secret-key-change-in-production");
   });
 });
 
