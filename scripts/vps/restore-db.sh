@@ -46,6 +46,14 @@ fi
 # ── Validation ───────────────────────────────────────────
 [ -f "$BACKUP_FILE" ] || { echo "ERROR: File not found: $BACKUP_FILE"; exit 1; }
 command -v pg_restore >/dev/null || { echo "ERROR: pg_restore not found"; exit 1; }
+command -v sha256sum >/dev/null || { echo "ERROR: sha256sum not found"; exit 1; }
+
+CHECKSUM_FILE="$BACKUP_FILE.sha256"
+if [ ! -f "$CHECKSUM_FILE" ]; then
+  echo "ERROR: Checksum file not found: $CHECKSUM_FILE"
+  exit 1
+fi
+sha256sum --check "$CHECKSUM_FILE"
 
 echo "=========================================="
 echo "  RESTORE POSTGRESQL DATABASE"
@@ -63,6 +71,7 @@ if [[ "$BACKUP_FILE" == *.gpg ]]; then
   echo "Decrypting backup..."
   RESTORE_FILE="${BACKUP_FILE%.gpg}"
   gpg --batch --yes --decrypt --output "$RESTORE_FILE" "$BACKUP_FILE"
+  DECRYPTED_FILE="$RESTORE_FILE"
 fi
 
 # ── Confirmation ─────────────────────────────────────────
@@ -102,10 +111,22 @@ pg_restore \
   --if-exists \
   --no-owner \
   --no-privileges \
-  "$RESTORE_FILE" 2>&1 || echo "WARNING: Some restore warnings (check above)"
+  "$RESTORE_FILE"
+
+# Validate that the restored database is usable and contains core tables.
+psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$TARGET_DB" -v ON_ERROR_STOP=1 <<'SQL'
+SELECT 1;
+DO $$
+BEGIN
+  IF to_regclass('public.users') IS NULL OR to_regclass('public.agences') IS NULL THEN
+    RAISE EXCEPTION 'Core MicroFlex tables are missing after restore';
+  END IF;
+END $$;
+SQL
 
 # Cleanup temp file
 [ -n "${TEMP_FILE:-}" ] && rm -f "$TEMP_FILE"
+[ -n "${DECRYPTED_FILE:-}" ] && rm -f "$DECRYPTED_FILE"
 
 echo ""
 echo "=========================================="
