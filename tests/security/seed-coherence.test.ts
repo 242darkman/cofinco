@@ -109,7 +109,7 @@ describe("cohérence RBAC : seeds ↔ mappings ↔ usages", () => {
   for (const perms of Object.values(PERMISSIONS_DATA)) {
     for (const p of perms) seededCodes.add(p.code);
   }
-  const moduleNames = new Set(MODULES_DATA.map((m) => m.name));
+  const moduleNames = new Set<string>(MODULES_DATA.map((m) => m.name));
 
   it("chaque module référencé par PERMISSIONS_DATA existe dans MODULES_DATA", () => {
     const orphans = Object.keys(PERMISSIONS_DATA).filter((m) => !moduleNames.has(m));

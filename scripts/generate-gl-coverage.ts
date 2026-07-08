@@ -152,7 +152,7 @@ interface RuleRow {
   journalCode: string;
   paymentMethod: string | null;
   provider: string | null;
-  priority: number;
+  priority: number | null;
 }
 
 interface AccountRow {
@@ -213,14 +213,14 @@ async function main() {
   // 2. Fetch all plan comptable accounts
   const accountRows = (await db.execute(
     sql`SELECT numero_compte, intitule FROM plan_comptable`
-  )).rows as AccountRow[];
+  )).rows as unknown as AccountRow[];
   const validAccounts = new Set(accountRows.map((a) => a.numero_compte));
   console.log(`Found ${validAccounts.size} plan comptable accounts`);
 
   // 3. Fetch all journals
   const journalRows = (await db.execute(
     sql`SELECT code, intitule FROM journaux_comptables WHERE actif = true`
-  )).rows as JournalRow[];
+  )).rows as unknown as JournalRow[];
   const validJournals = new Set(journalRows.map((j) => j.code));
   console.log(`Found ${validJournals.size} journaux comptables`);
 

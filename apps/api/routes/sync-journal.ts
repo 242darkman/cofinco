@@ -40,7 +40,7 @@ import {
   type SourceModule,
   type SensMouvement,
 } from "../services/ledger";
-import crypto from "crypto";
+import crypto from "node:crypto";
 
 const logger = createLogger('Routes:SyncJournal');
 

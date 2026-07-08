@@ -6,7 +6,7 @@ import { maintenanceApi, creditRefundsApi } from '../../lib/api-client';
 import { PLATFORM_MENU_ITEMS } from '../../constants/menuItems';
 import { ROUTES, canAccessRoute, isRouteEnabledForTenant, type RouteConfig, getRouteByKey } from '../../lib/routes-config';
 import IconButton from '../ui/IconButton';
-import { useBranding } from '../../contexts/BrandingContext';
+
 import { useAbilityContextOptional, useAbility } from '../../contexts/AbilityContext';
 import { Actions, Subjects } from '../../lib/casl';
 import { useValidationsBadge } from '../../hooks/useValidationsBadge';
@@ -36,12 +36,12 @@ export default function PlatformSidebarContent({
   onModuleChange,
   onLogout,
   userRole = 'agent'
-}: PlatformSidebarContentProps) {
+}: Readonly<PlatformSidebarContentProps>) {
   const { t } = useLanguage();
-  const { branding } = useBranding();
+
   useAbilityContextOptional(); // Subscribe to permission changes to force re-render
   const ability = useAbility();
-  const appName = branding.appName;
+
   const { config: tenantConfig } = useTenant();
 
   // Maintenance Status State

@@ -325,7 +325,7 @@ function parseIpAddress(ip: string | undefined): { segments: number[]; isIPv4: b
   const ipv6Parts = cleanIp.split(':').filter(p => p).slice(0, 4);
   if (ipv6Parts.length > 0) {
     return {
-      segments: ipv6Parts.map(p => parseInt(p, 16) || 0),
+      segments: ipv6Parts.map(p => Number.parseInt(p, 16) || 0),
       isIPv4: false,
       raw: cleanIp,
     };

@@ -14,11 +14,10 @@
  *   pnpm seed:prod --force      # Force reset config (dangereux)
  */
 
-import { db, pool } from '../apps/api/db';
+import { db, pool, ensureCustomFunctions } from '../apps/api/db';
 import { eq, count, and, isNull, sql } from 'drizzle-orm';
 import { seedRBAC } from './seed-rbac-logic';
 import { generateMatricule } from '../apps/api/storage/employes';
-import { ensureCustomFunctions } from '../apps/api/db';
 import { createLogger } from '../apps/api/lib/logger';
 import { loadTenantConfig } from '../apps/api/config/tenant-config';
 
@@ -37,8 +36,8 @@ const TENANT = (() => {
 const APP_NAME = TENANT.name;
 const APP_NAME_HTML = APP_NAME.replace(/&/g, '&amp;');
 const APP_SENDER_ID = (APP_NAME.replace(/[^A-Za-z0-9]/g, '').toUpperCase() || 'MICROFLEX').slice(0, 11);
-import { readFileSync } from 'fs';
-import { resolve } from 'path';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 const logger = createLogger('SeedProd');
 import {
@@ -4097,7 +4096,7 @@ async function seedNotificationSystem(context: SeedContext, dryRun: boolean): Pr
 
   // 1. Email Provider Settings — auto-enabled if SMTP env vars are set
   const smtpHost = process.env.SMTP_HOST || '';
-  const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10);
+  const smtpPort = Number.parseInt(process.env.SMTP_PORT || '587', 10);
   const smtpUsername = process.env.SMTP_USERNAME || '';
   const smtpPassword = process.env.SMTP_PASSWORD || '';
   const smtpFromEmail = process.env.SMTP_FROM_EMAIL || 'noreply@example.com';
