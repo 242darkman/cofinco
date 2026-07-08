@@ -6,6 +6,7 @@ import {
   type TenantConfig,
   type TenantFeatureKey,
 } from '@shared/tenant-config';
+import { applyTenantTheme } from '@/lib/tenant-theme';
 
 interface TenantContextType {
   config: TenantConfig;
@@ -19,44 +20,9 @@ const TenantContext = createContext<TenantContextType>({
   error: null,
 });
 
-/**
- * Compute a derived color (lighter or darker) for hover states.
- */
-function adjustColor(hex: string | undefined, amount: number): string | undefined {
-  if (!hex || !hex.startsWith('#')) return undefined; // Simplistic approach: only hex
-  try {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-
-    const clamp = (v: number) => Math.max(0, Math.min(255, v));
-    const nr = clamp(r + amount);
-    const ng = clamp(g + amount);
-    const nb = clamp(b + amount);
-
-    return `#${nr.toString(16).padStart(2, '0')}${ng.toString(16).padStart(2, '0')}${nb.toString(16).padStart(2, '0')}`;
-  } catch (e) {
-    return hex;
-  }
-}
-
-function applyTenantTheme(config: TenantConfig) {
-  const root = document.documentElement;
-  
-  if (config.theme.primaryColor) {
-    // We expect primaryColor to be a valid CSS value (HSL, RGB or Hex)
-    root.style.setProperty('--accent-primary', config.theme.primaryColor);
-    
-    // Attempt hover color if hex
-    const hoverColor = adjustColor(config.theme.primaryColor, -20);
-    if (hoverColor) {
-      root.style.setProperty('--accent-primary-hover', hoverColor);
-    }
-  }
-  
-  if (config.theme.secondaryColor) {
-    root.style.setProperty('--accent-secondary', config.theme.secondaryColor);
-  }
+function applyTenantBranding(config: TenantConfig) {
+  // Charte graphique dérivée du branding (palette :root + .dark)
+  applyTenantTheme(config);
 
   // Titre de l'onglet au nom du tenant
   if (config.name) {
@@ -95,7 +61,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   // Apply CSS variables whenever config changes
   React.useEffect(() => {
     if (config) {
-      applyTenantTheme(config);
+      applyTenantBranding(config);
     }
   }, [config]);
 
