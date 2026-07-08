@@ -29,7 +29,7 @@ function mockSelectChain(result: any) {
   };
 }
 
-vi.mock('server/db', () => ({
+vi.mock('../../apps/api/db', () => ({
   db: {
     select: vi.fn(),
     insert: (...args: any[]) => mockInsert(...args),
@@ -52,11 +52,11 @@ vi.mock('@shared/schema/auth', () => ({
   users: { id: 'id', telephone: 'telephone' },
 }));
 
-import { db } from 'server/db';
+import { db } from '../../apps/api/db';
 import {
   generateCreditReminderSchedule,
   cancelCreditReminders,
-} from 'server/services/notifications/credit-reminder-service';
+} from '../../apps/api/services/notifications/credit-reminder-service';
 
 describe('Credit Reminder Integration', () => {
   beforeEach(() => {

@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { executeScheduledDisbursement, getCreditsWithPendingDisbursement } from 'server/services/scheduled-disbursements-service';
-import { db } from 'server/db';
-import * as dbModule from 'server/db';
+import { executeScheduledDisbursement, getCreditsWithPendingDisbursement } from '../../apps/api/services/scheduled-disbursements-service';
+import { db } from '../../apps/api/db';
+import * as dbModule from '../../apps/api/db';
 
 // Mock the db module
-vi.mock('server/db', () => ({
+vi.mock('../../apps/api/db', () => ({
   db: {
     select: vi.fn(),
     update: vi.fn(),
@@ -13,11 +13,11 @@ vi.mock('server/db', () => ({
 }));
 
 // Mock storage/finance
-vi.mock('server/storage/finance', () => ({
+vi.mock('../../apps/api/storage/finance', () => ({
   createDecaissementWithLedger: vi.fn(),
 }));
 
-import { createDecaissementWithLedger } from 'server/storage/finance';
+import { createDecaissementWithLedger } from '../../apps/api/storage/finance';
 
 describe('Scheduled Disbursements Service', () => {
   describe('executeScheduledDisbursement - Validation Tests', () => {

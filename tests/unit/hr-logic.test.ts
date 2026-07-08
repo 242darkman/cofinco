@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { generateMonthlyPaie, checkOut, getOrganigramme } from 'server/storage/hr';
-import { db } from 'server/db';
+import { generateMonthlyPaie, checkOut, getOrganigramme } from '../../apps/api/storage/hr';
+import { db } from '../../apps/api/db';
 import { InsertBulletinPaie } from '@shared/schema';
 
 // Mock DB
-vi.mock('server/db', () => ({
+vi.mock('../../apps/api/db', () => ({
   db: {
     select: vi.fn(),
     insert: vi.fn(),

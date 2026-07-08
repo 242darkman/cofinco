@@ -51,7 +51,7 @@ apps/api ─┘
 - `apps/web` ne dépend jamais de fichiers internes de `apps/api`. Il communique avec l'API par des contrats explicites.
 - `apps/api` ne dépend jamais de composants ou d'utilitaires propres au navigateur.
 - Le code partagé doit être réellement portable et ne contenir ni secret, ni accès réseau, ni accès direct à la base.
-- Utiliser `@/` pour le frontend et `@shared/` pour le partagé. L'alias historique `server/` est toléré dans les tests existants, mais ne doit pas être introduit dans du nouveau code.
+- Utiliser `@/` pour le frontend et `@shared/` pour le partagé. L'alias historique `server/` a été supprimé : utiliser des chemins relatifs vers `apps/api` dans les tests.
 - Éviter les chemins relatifs profonds et les imports contournant l'API publique d'un module.
 - Toute nouvelle dépendance doit avoir un besoin clair. Réutiliser une dépendance existante quand elle convient.
 

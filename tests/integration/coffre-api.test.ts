@@ -1,13 +1,13 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createMocks } from 'node-mocks-http';
-import { coffreRouter } from 'server/routes/coffre';
+import { coffreRouter } from '../../apps/api/routes/coffre';
 // Mock authentication and db if necessary
 
 // Since we cannot easily spin up a full express app with DB in this environment without setup,
 // we will mock the service layer to test the route logic (controller test).
 
-vi.mock('server/services/coffre/transfert-service', () => {
+vi.mock('../../apps/api/services/coffre/transfert-service', () => {
   return {
     TransfertCoffreService: class {
       createTransfert = vi.fn().mockResolvedValue({ success: true, transfert: { id: '123', status: 'Demandé' } });

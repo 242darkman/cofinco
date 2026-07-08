@@ -10,7 +10,7 @@ const { mockTx } = vi.hoisted(() => ({
 }));
 
 // Mock the db module
-vi.mock('server/db', () => ({
+vi.mock('../../apps/api/db', () => ({
   db: {
     select: vi.fn(),
     update: vi.fn(),
@@ -20,20 +20,20 @@ vi.mock('server/db', () => ({
 }));
 
 // Mock logger (imported at module level)
-vi.mock('server/lib/logger', () => ({
+vi.mock('../../apps/api/lib/logger', () => ({
   createLogger: () => ({
     info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn()
   })
 }));
 
 // Mock accounting-posting-service (used inside transaction)
-vi.mock('server/services/accounting-posting-service', () => ({
+vi.mock('../../apps/api/services/accounting-posting-service', () => ({
   postGlForMouvement: vi.fn().mockResolvedValue(null),
   AccountingRuleNotFoundError: class extends Error {},
 }));
 
-import { calculateNextTransferDate, executeAutomaticTransfer } from 'server/services/automatic-transfers-service';
-import { db } from 'server/db';
+import { calculateNextTransferDate, executeAutomaticTransfer } from '../../apps/api/services/automatic-transfers-service';
+import { db } from '../../apps/api/db';
 
 describe('Automatic Transfers Service', () => {
   beforeEach(() => {

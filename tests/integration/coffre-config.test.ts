@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
-import { coffreRouter } from 'server/routes/coffre';
-import { db } from 'server/db'; // Correct top-level import
+import { coffreRouter } from '../../apps/api/routes/coffre';
+import { db } from '../../apps/api/db'; // Correct top-level import
 
 // Mock dependencies
-vi.mock('server/db', () => ({
+vi.mock('../../apps/api/db', () => ({
   db: {
     select: vi.fn(),
     update: vi.fn(),
@@ -22,7 +22,7 @@ vi.mock('@shared/schema', () => ({
   transfertsCoffreAuditLogs: {},
 }));
 
-vi.mock('server/services/coffre/transfert-service', () => {
+vi.mock('../../apps/api/services/coffre/transfert-service', () => {
   return {
     TransfertCoffreService: class {
       listTransferts = vi.fn();
@@ -31,12 +31,12 @@ vi.mock('server/services/coffre/transfert-service', () => {
 });
 
 // MOCK AUTH (coffreRouter.use(requireAuth))
-vi.mock('server/auth', () => ({
+vi.mock('../../apps/api/auth', () => ({
   requireAuth: (req: any, res: any, next: any) => next()
 }));
 
 // MOCK AUTHORIZATION (routes use attachAbility/requireAbility)
-vi.mock('server/authorization', () => ({
+vi.mock('../../apps/api/authorization', () => ({
   attachAbility: (req: any, res: any, next: any) => {
     req.ability = { can: () => true };
     next();
@@ -51,22 +51,22 @@ vi.mock('server/authorization', () => ({
 }));
 
 // MOCK domain events
-vi.mock('server/services/notifications/domain-events/event-registry', () => ({
+vi.mock('../../apps/api/services/notifications/domain-events/event-registry', () => ({
   dispatchDomainEvent: vi.fn(),
 }));
 
 // MOCK idempotency middleware
-vi.mock('server/middleware/idempotency', () => ({
+vi.mock('../../apps/api/middleware/idempotency', () => ({
   idempotencyMiddleware: () => (req: any, res: any, next: any) => next()
 }));
 
 // MOCK storage
-vi.mock('server/storage', () => ({
+vi.mock('../../apps/api/storage', () => ({
   storage: {}
 }));
 
 // MOCK logger
-vi.mock('server/lib/logger', () => ({
+vi.mock('../../apps/api/lib/logger', () => ({
   createLogger: () => ({
     info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn()
   })

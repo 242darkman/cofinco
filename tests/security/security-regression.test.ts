@@ -11,8 +11,8 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync, statSync } from "fs";
 import { join, resolve } from "path";
-import { createLogger } from "server/lib/logger";
-import { D, roundMoney, roundFCFA, roundRate, splitEvenly, isEffectivelyZero } from "server/lib/money";
+import { createLogger } from "../../apps/api/lib/logger";
+import { D, roundMoney, roundFCFA, roundRate, splitEvenly, isEffectivelyZero } from "../../apps/api/lib/money";
 
 const logger = createLogger('SecurityTest');
 

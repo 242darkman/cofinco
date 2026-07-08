@@ -19,7 +19,7 @@ const createMockBuilder = (result: any = []) => {
   return builder;
 };
 
-vi.mock('server/db', () => ({
+vi.mock('../../apps/api/db', () => ({
   db: {
     select: (...args: any[]) => mockSelect(...args),
     insert: (...args: any[]) => mockInsert(...args),
@@ -27,15 +27,15 @@ vi.mock('server/db', () => ({
   },
 }));
 
-vi.mock('server/services/notifications/notification-service', () => ({
+vi.mock('../../apps/api/services/notifications/notification-service', () => ({
   enqueueNotification: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('server/services/notifications/policy/routing-policy', () => ({
+vi.mock('../../apps/api/services/notifications/policy/routing-policy', () => ({
   resolveOtpChannel: vi.fn().mockResolvedValue('SMS'),
 }));
 
-vi.mock('server/services/notifications/audit/notification-audit', () => ({
+vi.mock('../../apps/api/services/notifications/audit/notification-audit', () => ({
   logNotificationEvent: vi.fn(),
 }));
 
@@ -48,7 +48,7 @@ import {
   requestOtp,
   verifyOtp,
   OtpRateLimitError,
-} from 'server/services/notifications/otp/otp-service';
+} from '../../apps/api/services/notifications/otp/otp-service';
 
 describe('OTP Service', () => {
   beforeEach(() => {

@@ -4,7 +4,7 @@ import request from 'supertest';
 import express from 'express';
 
 // MOCK MIDDLEWARE
-vi.mock('server/middleware', () => ({
+vi.mock('../../apps/api/middleware', () => ({
   getAuthUser: (req: any, res: any, next: any) => {
     req.user = { id: 'test-user', role: 'admin' };
     next();
@@ -12,7 +12,7 @@ vi.mock('server/middleware', () => ({
 }));
 
 // MOCK DB
-vi.mock('server/db', () => ({
+vi.mock('../../apps/api/db', () => ({
   db: {
     select: vi.fn(),
     insert: vi.fn(),
@@ -22,26 +22,26 @@ vi.mock('server/db', () => ({
 }));
 
 // MOCK STORAGE
-vi.mock('server/storage', () => ({
+vi.mock('../../apps/api/storage', () => ({
   storage: {}
 }));
 
 // MOCK AUTHORIZATION
-vi.mock('server/authorization', () => ({
+vi.mock('../../apps/api/authorization', () => ({
   attachAbility: (req: any, res: any, next: any) => next(),
   requireAbility: () => (req: any, res: any, next: any) => next()
 }));
 
 // MOCK WS SERVER
-vi.mock('server/ws-server', () => ({
+vi.mock('../../apps/api/ws-server', () => ({
   getWsInstance: () => ({ broadcast: vi.fn() })
 }));
 
 // MOCK deep dependencies
-vi.mock('server/services/notifications/domain-events/event-registry', () => ({
+vi.mock('../../apps/api/services/notifications/domain-events/event-registry', () => ({
   dispatchDomainEvent: vi.fn(),
 }));
-vi.mock('server/services/hr-service', () => ({
+vi.mock('../../apps/api/services/hr-service', () => ({
   hrService: {
     generateMonthlyPayroll: vi.fn(),
     logAction: vi.fn().mockResolvedValue(undefined),
@@ -52,24 +52,24 @@ vi.mock('server/services/hr-service', () => ({
   },
   HrService: class {},
 }));
-vi.mock('server/services/hiring-approval-service', () => ({ hiringApprovalService: {} }));
-vi.mock('server/services/sanction-escalation-service', () => ({ sanctionEscalationService: {} }));
-vi.mock('server/services/onboarding-service', () => ({ onboardingService: {} }));
-vi.mock('server/services/hr-accounting-service', () => ({
+vi.mock('../../apps/api/services/hiring-approval-service', () => ({ hiringApprovalService: {} }));
+vi.mock('../../apps/api/services/sanction-escalation-service', () => ({ sanctionEscalationService: {} }));
+vi.mock('../../apps/api/services/onboarding-service', () => ({ onboardingService: {} }));
+vi.mock('../../apps/api/services/hr-accounting-service', () => ({
   postPayrollEngagement: vi.fn(), postPayrollPayment: vi.fn(),
   postAdvancePayment: vi.fn(), postAdvanceDeduction: vi.fn(),
 }));
-vi.mock('server/services/hr-import-service', () => ({ importEmployees: vi.fn(), parseCsv: vi.fn() }));
-vi.mock('server/services/storage-service', () => ({
+vi.mock('../../apps/api/services/hr-import-service', () => ({ importEmployees: vi.fn(), parseCsv: vi.fn() }));
+vi.mock('../../apps/api/services/storage-service', () => ({
   StorageService: { getPresignedDownloadUrl: vi.fn(), uploadFile: vi.fn() }
 }));
-vi.mock('server/services/payroll-engine', () => ({
+vi.mock('../../apps/api/services/payroll-engine', () => ({
   generatePayrollRun: vi.fn(),
 }));
 
-import { hrRouter } from 'server/routes/hr';
-import { db } from 'server/db';
-import { generatePayrollRun } from 'server/services/payroll-engine';
+import { hrRouter } from '../../apps/api/routes/hr';
+import { db } from '../../apps/api/db';
+import { generatePayrollRun } from '../../apps/api/services/payroll-engine';
 
 const app = express();
 app.use(express.json());

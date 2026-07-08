@@ -12,14 +12,14 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { db, pool } from "server/db";
+import { db, pool } from "../../apps/api/db";
 import { comptes, mouvementsFinanciers, users, clients, accountingRules, agences } from "@shared/schema";
 import { glPostingLinks, ecritures } from "@shared/schema/accounting";
 import { eq, sql } from "drizzle-orm";
 import { faker } from "@faker-js/faker";
-import { executeWithLedger } from "server/services/ledger";
-import { postGlForMouvement } from "server/services/accounting-posting-service";
-import { isGLStrictMode } from "server/services/accounting-validation";
+import { executeWithLedger } from "../../apps/api/services/ledger";
+import { postGlForMouvement } from "../../apps/api/services/accounting-posting-service";
+import { isGLStrictMode } from "../../apps/api/services/accounting-validation";
 import * as fs from "fs";
 import * as path from "path";
 

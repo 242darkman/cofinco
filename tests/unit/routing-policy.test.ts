@@ -13,7 +13,7 @@ const createMockBuilder = (result: any = []) => {
   return builder;
 };
 
-vi.mock('server/db', () => ({
+vi.mock('../../apps/api/db', () => ({
   db: {
     select: (...args: any[]) => mockSelect(...args),
   },
@@ -22,7 +22,7 @@ vi.mock('server/db', () => ({
 import {
   resolveChannels,
   resolveOtpChannel,
-} from 'server/services/notifications/policy/routing-policy';
+} from '../../apps/api/services/notifications/policy/routing-policy';
 
 describe('Routing Policy', () => {
   beforeEach(() => {
