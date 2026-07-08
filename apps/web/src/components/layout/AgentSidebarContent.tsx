@@ -4,7 +4,6 @@ import { Menu, X, LogOut, ArrowDownCircle, ArrowUpCircle, CreditCard, Banknote }
 import IconButton from '../ui/IconButton';
 import Button from '../ui/Button';
 import { useBranding } from '../../contexts/BrandingContext';
-import { useTenant } from '../../contexts/TenantContext';
 
 interface AgentSidebarContentProps {
   sidebarOpen: boolean;
@@ -31,7 +30,6 @@ export default function AgentSidebarContent({
   agent
 }: AgentSidebarContentProps) {
   const { branding } = useBranding();
-  const { config: tenantConfig } = useTenant();
 
   const getTabLabel = (tab: 'versement' | 'retrait' | 'remboursement' | 'epargne') => {
     switch (tab) {

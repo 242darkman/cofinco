@@ -26,7 +26,7 @@ import SessionExpirationWarning from './components/shared/SessionExpirationWarni
 import { useOfflineBus } from './hooks/useOfflineBus';
 import { useBranding } from './contexts/BrandingContext';
 import { OfflineProvider } from './contexts/OfflineContext';
-import { useTenant, TenantProvider } from './contexts/TenantContext';
+import { TenantProvider } from './contexts/TenantContext';
 
 // Lazy load heavy components
 const COFINPlatform = lazy(() => import('./COFINPlatform'));
@@ -45,7 +45,6 @@ function App() {
   const { isServerReachable, isChecking, checkHealth } = useServerHealth();
   const { status: networkStatus, isOffline, isApiDown, forceRetry } = useNetwork();
   const { branding } = useBranding();
-  const { config: tenantConfig } = useTenant();
   const [location, setLocation] = useLocation();
   const queryClient = useQueryClient();
 
