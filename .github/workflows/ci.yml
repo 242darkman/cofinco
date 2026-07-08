@@ -63,6 +63,9 @@ jobs:
       - name: Architecture boundaries
         run: npx vitest run tests/architecture
 
+      - name: Configurations tenant valides
+        run: node --import tsx scripts/validate-tenant-configs.ts
+
       - name: Unit tests (no DB)
         run: npx vitest run --exclude 'tests/contracts/**' --exclude 'tests/e2e/**' --exclude 'tests/integration/**' --exclude 'tests/robustness/**'
 

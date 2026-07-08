@@ -227,6 +227,87 @@ jobs:
           exit-code: '1'
 
   # ==========================================
+  # Step 2b: Images dédiées par client
+  # Une image par fichier config/tenants/*.json (hors microflex, l'image
+  # standard). Chaque image embarque UNIQUEMENT la config de son client.
+  # ==========================================
+  tenants:
+    name: Détecter les tenants dédiés
+    needs: [prepare]
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.list.outputs.matrix }}
+      count: ${{ steps.list.outputs.count }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Valider les configurations tenant
+        run: |
+          npm ci --ignore-scripts
+          node --import tsx scripts/validate-tenant-configs.ts
+
+      - name: Lister les tenants dédiés
+        id: list
+        run: |
+          TENANTS=$(ls config/tenants/*.json | xargs -n1 basename | sed 's/\.json$//' | grep -v '^microflex$' | jq -R . | jq -sc .)
+          echo "matrix=$TENANTS" >> $GITHUB_OUTPUT
+          echo "count=$(echo "$TENANTS" | jq length)" >> $GITHUB_OUTPUT
+          echo "Tenants dédiés: $TENANTS"
+
+  build-client-images:
+    name: Image client (${{ matrix.tenant }})
+    needs: [prepare, test, gl-audit, tenants]
+    if: needs.tenants.outputs.count != '0'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        tenant: ${{ fromJson(needs.tenants.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push image client
+        id: build-client
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: runtime
+          push: true
+          build-args: |
+            TENANT_CONFIG_FILE=config/tenants/${{ matrix.tenant }}.json
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.prepare.outputs.image_tag }}-${{ matrix.tenant }}
+          cache-from: type=gha
+
+      - name: Attest image provenance (client)
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.build-client.outputs.digest }}
+          push-to-registry: true
+
+      - name: Scan image client (Trivy)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.prepare.outputs.image_tag }}-${{ matrix.tenant }}
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
+          exit-code: '1'
+
+  # ==========================================
   # Step 3: Deploy to VPS
   # ==========================================
   deploy:
