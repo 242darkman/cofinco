@@ -14,12 +14,12 @@
  *   pnpm seed:prod --force      # Force reset config (dangereux)
  */
 
-import { db, pool } from '../server/db';
+import { db, pool } from '../apps/api/db';
 import { eq, count, and, isNull, sql } from 'drizzle-orm';
 import { seedRBAC } from './seed-rbac-logic';
-import { generateMatricule } from '../server/storage/employes';
-import { ensureCustomFunctions } from '../server/db';
-import { createLogger } from '../server/lib/logger';
+import { generateMatricule } from '../apps/api/storage/employes';
+import { ensureCustomFunctions } from '../apps/api/db';
+import { createLogger } from '../apps/api/lib/logger';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
@@ -84,7 +84,7 @@ import { currencyPresets } from '@shared/schema/settings';
 import { mmFeeSchedules } from '@shared/schema/mm-fee-schedules';
 import { sectors, professions, activityTypes, professionSectors, professionActivityTypes, sectorActivityTypes } from '@shared/schema/catalog';
 import { ACTIVITY_TYPES_DATA, SECTORS_DATA, PROFESSIONS_DATA } from './seed-catalog';
-import { hashPassword } from '../server/auth';
+import { hashPassword } from '../apps/api/auth';
 import { SystemRole } from '@shared/types/roles';
 import { StatutUser, StatutCoffre, TypeAgence, StatutCaisse, StatutAgence } from '@shared/enum/status-constants';
 import { MODULES_DATA } from '@shared/config/rbac';

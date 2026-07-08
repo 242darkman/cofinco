@@ -7,7 +7,7 @@
  * Usage: pnpm db:validate
  */
 
-import { db } from '../server/db';
+import { db } from '../apps/api/db';
 import { eq, count, and, isNull } from 'drizzle-orm';
 import {
   users,

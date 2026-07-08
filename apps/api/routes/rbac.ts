@@ -919,7 +919,7 @@ export function registerRbacRoutes(app: Express) {
   app.post("/api/rbac/reseed", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.RBAC), async (req, res) => {
     try {
       // Import dynamically to avoid circular dependencies
-      const { seedRBAC } = await import('../../seeds/seed-rbac-logic');
+      const { seedRBAC } = await import('../../../seeds/seed-rbac-logic');
 
       logger.info('Admin triggered RBAC reseed');
       await seedRBAC();

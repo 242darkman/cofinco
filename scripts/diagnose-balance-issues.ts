@@ -3,7 +3,7 @@
  * Script de diagnostic des écarts de balance coffre/caisse
  */
 
-import { db } from '../server/db.ts';
+import { db } from '../apps/api/db.ts';
 import { coffresForts, caisses, mouvementsFinanciers, lignesEcritures, planComptable, accountingRules } from '@shared/schema';
 import { eq, sql, and } from 'drizzle-orm';
 

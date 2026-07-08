@@ -9,7 +9,7 @@
  *   npm run db:clean-dead-letters -- --force   # Skip confirmation
  */
 
-import { pool } from "../server/db";
+import { pool } from "../apps/api/db";
 
 const RED = "\x1b[31m";
 const YELLOW = "\x1b[33m";

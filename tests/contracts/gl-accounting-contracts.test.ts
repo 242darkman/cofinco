@@ -469,24 +469,24 @@ describe("Contract 6: No Direct Balance Updates (Static Scan)", () => {
 
   // Files allowed to update balances (ledger internals, seeds, DB functions, tests)
   const ALLOWLIST = [
-    "server/services/ledger.ts",
-    "server/db.ts",
+    "apps/api/services/ledger.ts",
+    "apps/api/db.ts",
     "seeds/seed-prod.ts",
     // Legacy violations — each must be refactored to use executeWithLedger
     // Adding a file here is TEMPORARY and must be tracked for cleanup
-    "server/services/compte-transfers.ts",
-    "server/services/scheduled-transfers-service.ts",
-    "server/services/automatic-transfers-service.ts",
-    "server/routes/finance.ts",
-    "server/services/caisse-agent/approval-service.ts",
-    "server/services/tontine-production-service.ts",
-    "server/services/tontine-logic.ts",
-    "server/storage/finance.ts",
-    "server/routes/settings.ts",
+    "apps/api/services/compte-transfers.ts",
+    "apps/api/services/scheduled-transfers-service.ts",
+    "apps/api/services/automatic-transfers-service.ts",
+    "apps/api/routes/finance.ts",
+    "apps/api/services/caisse-agent/approval-service.ts",
+    "apps/api/services/tontine-production-service.ts",
+    "apps/api/services/tontine-logic.ts",
+    "apps/api/storage/finance.ts",
+    "apps/api/routes/settings.ts",
   ];
 
   it("should have no NEW direct balance updates outside allowlist", () => {
-    const serverDir = path.resolve(process.cwd(), "server");
+    const serverDir = path.resolve(process.cwd(), "apps/api");
     const violations: Array<{ file: string; line: number; content: string }> = [];
 
     function scanDir(dir: string) {
@@ -537,7 +537,7 @@ describe("Contract 6: No Direct Balance Updates (Static Scan)", () => {
     // Current known legacy violations: 8 files.
     // If you add a file, update this count AND create a cleanup ticket.
     const LEGACY_FILES = ALLOWLIST.filter(
-      (f) => !["server/services/ledger.ts", "server/db.ts", "seeds/seed-prod.ts"].includes(f)
+      (f) => !["apps/api/services/ledger.ts", "apps/api/db.ts", "seeds/seed-prod.ts"].includes(f)
     );
     expect(LEGACY_FILES.length).toBeLessThanOrEqual(9);
   });

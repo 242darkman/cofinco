@@ -13,7 +13,7 @@
  *   docker exec microflex-app node --import tsx scripts/generate-gl-coverage.ts
  */
 
-import { db, pool } from "../server/db";
+import { db, pool } from "../apps/api/db";
 import { accountingRules } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
 import * as fs from "fs";

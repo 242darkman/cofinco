@@ -19,9 +19,9 @@
  *   docker compose exec app node --env-file=.env --import tsx seeds/seed-geography-world.ts --dry-run
  */
 
-import { db, pool } from '../server/db';
+import { db, pool } from '../apps/api/db';
 import { eq, and, isNull, isNotNull, count, sql } from 'drizzle-orm';
-import { createLogger } from '../server/lib/logger';
+import { createLogger } from '../apps/api/lib/logger';
 import { readFileSync, existsSync, createReadStream } from 'fs';
 import { createInterface } from 'readline';
 import { resolve } from 'path';

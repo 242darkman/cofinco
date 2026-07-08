@@ -9,10 +9,10 @@
  * so afterAll cleanup is not needed.
  */
 
-import { db } from '../../server/db';
-import { users, userRoles } from '../../shared/schema/auth';
-import { clients } from '../../shared/schema/clients';
-import { agences } from '../../shared/schema/agences';
+import { db } from '../../apps/api/db';
+import { users, userRoles } from '../../packages/shared/schema/auth';
+import { clients } from '../../packages/shared/schema/clients';
+import { agences } from '../../packages/shared/schema/agences';
 import { v4 as uuidv4 } from 'uuid';
 import * as bcrypt from 'bcrypt';
 

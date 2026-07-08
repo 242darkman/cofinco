@@ -17,7 +17,7 @@ import { D, roundMoney, roundFCFA, roundRate, splitEvenly, isEffectivelyZero } f
 const logger = createLogger('SecurityTest');
 
 const PROJECT_ROOT = resolve(__dirname, "../..");
-const ROOT = resolve(PROJECT_ROOT, "server");
+const ROOT = resolve(PROJECT_ROOT, "apps/api");
 
 /**
  * Recursively collect all .ts files under a directory (excluding node_modules, __tests__, .d.ts)
@@ -317,7 +317,7 @@ describe("XSS prevention — dangerouslySetInnerHTML uses DOMPurify", () => {
 
   it("NotificationPreview should sanitize HTML with DOMPurify", () => {
     const content = readFileSync(
-      resolve(PROJECT_ROOT, "client/src/components/admin/notifications/NotificationPreview.tsx"),
+      resolve(PROJECT_ROOT, "apps/web/src/components/admin/notifications/NotificationPreview.tsx"),
       "utf-8"
     );
     expect(content).toContain("DOMPurify");
@@ -413,7 +413,7 @@ describe("Password policy — Minimum length >= 12", () => {
   });
 
   it("seed securitySettings should have passwordMinLength >= 12", () => {
-    const content = readFileSync(resolve(ROOT, "../seeds/seed-prod.ts"), "utf-8");
+    const content = readFileSync(resolve(ROOT, "../../seeds/seed-prod.ts"), "utf-8");
     const matches = content.match(/passwordMinLength:\s*(\d+)/g);
     expect(matches).toBeTruthy();
     for (const m of matches!) {
@@ -547,7 +547,7 @@ describe("Math.random() elimination — Client-side security code", () => {
   ];
 
   it("should not use Math.random() for passwords, codes, references, or tokens", () => {
-    const clientRoot = resolve(PROJECT_ROOT, "client/src");
+    const clientRoot = resolve(PROJECT_ROOT, "apps/web/src");
     const violations: string[] = [];
     for (const relPath of CLIENT_CRITICAL_FILES) {
       const content = readFileSync(join(clientRoot, relPath), "utf-8");
@@ -570,7 +570,7 @@ describe("Math.random() elimination — Client-side security code", () => {
 describe("Schema — Agency code generation uses crypto", () => {
 
   it("settings.ts should use crypto.randomInt for agency code", () => {
-    const content = readFileSync(resolve(PROJECT_ROOT, "shared/schema/settings.ts"), "utf-8");
+    const content = readFileSync(resolve(PROJECT_ROOT, "packages/shared/schema/settings.ts"), "utf-8");
     const genFn = content.substring(content.indexOf("generateAgenceCode"), content.indexOf("generateAgenceCode") + 300);
     expect(genFn).toContain("crypto.randomInt");
     expect(genFn).not.toContain("Math.random");

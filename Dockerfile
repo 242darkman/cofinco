@@ -16,7 +16,7 @@ RUN apk add --no-cache tini
 WORKDIR /app
 EXPOSE 5000 5173
 ENTRYPOINT ["tini", "--"]
-CMD ["npx", "tsx", "watch", "--clear-screen=false", "server/index.ts"]
+CMD ["npx", "tsx", "watch", "--clear-screen=false", "apps/api/index.ts"]
 
 # ============================================
 # Stage: INIT — one-shot DB schema push + seed
