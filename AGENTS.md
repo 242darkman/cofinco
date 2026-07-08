@@ -207,12 +207,22 @@ npm run test:e2e           # parcours utilisateur critique
 
 - Préserver les modifications existantes de l'utilisateur et les fichiers sans rapport avec la tâche.
 - Faire des changements ciblés, faciles à relire et à revenir en arrière.
-- Utiliser des commits conventionnels en français : `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`.
+- Rédiger obligatoirement tous les messages de commit en français. Les préfixes normalisés de Conventional Commits restent en anglais : `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`.
+- Après le préfixe, utiliser une formulation française concise et descriptive, par exemple `feat: ajouter la validation des plafonds de caisse` ou `fix: empêcher le double décaissement`.
+- Ne pas utiliser de message vague comme `update`, `fix bug`, `changes` ou `wip`, et ne pas ajouter de corps de commit en anglais.
 - Ne pas mélanger refactorisation, fonctionnalité et nettoyage opportuniste dans un même commit.
 - Ne jamais réécrire l'historique, supprimer une branche ou utiliser une commande Git destructive sans demande explicite.
 - Ne pas committer de secret, logs, artefacts de build ou fichiers locaux.
 
-## 15. Définition de terminé
+## 15. Skills multi-agents
+
+- Maintenir les skills MicroFlex canoniques dans `.agents/skills` selon le standard Agent Skills.
+- Gemini charge directement `.agents/skills`; `.gemini/skills` fournit un chemin de compatibilité explicite.
+- Claude charge les mêmes skills via `.claude/skills`.
+- Utiliser des liens symboliques ou de petits wrappers pointant vers `.agents/skills` au lieu de copier les instructions, afin d'éviter toute divergence entre Codex, Gemini et Claude.
+- Toute création ou modification d'un skill doit être validée sur sa source canonique, puis vérifiée depuis les chemins de compatibilité.
+
+## 16. Définition de terminé
 
 Une tâche n'est terminée que si :
 
