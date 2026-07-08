@@ -22,19 +22,26 @@ const FEATURE_ROUTE_RULES: FeatureRouteRule[] = [
     feature: "enableMobileMoney",
     paths: [
       /^\/api\/mobile-money(?:\/|$)/,
-      /^\/api\/payments(?:\/|$)/,
+      /^\/api\/payments(?:-test)?(?:\/|$)/,
       /^\/api\/webhooks\/pawapay(?:\/|$)/,
+      /^\/api\/monitoring\/pawapay-[^/]+(?:\/|$)/,
     ],
   },
   {
     feature: "enableFieldAgents",
     paths: [
       /^\/api\/(?:agents-terrain|agents|agent-[^/]+|tracking|prospections|visites-terrain|paiements-terrain|zones|objectifs-mensuels|agent-geolocations)(?:\/|$)/,
+      /^\/api\/supervision\/prospection[^/]*(?:\/|$)/,
+      /^\/api\/prospection-prime[^/]*(?:\/|$)/,
     ],
   },
   {
     feature: "enableSms",
-    paths: [/^\/api\/sms(?:\/|$)/],
+    paths: [
+      /^\/api\/sms(?:\/|$)/,
+      /^\/api\/settings\/sms-templates(?:\/|$)/,
+      /^\/api\/webhooks\/mtn\/sms-[^/]+(?:\/|$)/,
+    ],
   },
 ];
 
