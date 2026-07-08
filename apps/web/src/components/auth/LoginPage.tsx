@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { TenantLogo } from '@/components/branding/TenantLogo';
 import {
   Lock,
   User,
@@ -206,11 +207,7 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
                   '0 16px 32px -12px rgba(27, 42, 74, 0.35), 0 0 0 1px rgba(45, 139, 87, 0.1)'
               }}
             >
-              <img
-                src={tenantConfig?.theme?.logoUrl || "/microflex-logo.png"}
-                alt={appName}
-                className="h-10 w-10 object-contain"
-              />
+              <TenantLogo alt={appName} className="h-10 w-10 object-contain" />
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-lg font-bold text-content-primary">
@@ -254,8 +251,7 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
                       '0 25px 50px -12px rgba(27, 42, 74, 0.35), 0 0 0 1px rgba(45, 139, 87, 0.1)'
                   }}
                 >
-                  <img
-                    src={tenantConfig?.theme?.logoUrl || "/microflex-logo.png"}
+                  <TenantLogo
                     alt={`${appName} Logo`}
                     className="w-32 h-32 xl:w-36 xl:h-36 object-contain"
                     data-testid="img-logo"

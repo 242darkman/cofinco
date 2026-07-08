@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { TenantLogo } from '@/components/branding/TenantLogo';
 import { Sparkles, PartyPopper } from 'lucide-react';
 import { useBranding } from '../../contexts/BrandingContext';
 import { useTenant } from '../../contexts/TenantContext';
@@ -43,12 +44,18 @@ export default function SeasonalWelcome({ userName = 'Utilisateur', onComplete }
 
     // Config animations based on type
     const count = 50;
+    const getRandom = () => {
+      const array = new Uint32Array(1);
+      window.crypto.getRandomValues(array);
+      return array[0] / (0xffffffff + 1);
+    };
+
     const newParticles = Array.from({ length: count }, (_, i) => ({
       id: i,
-      left: Math.random() * 100,
-      delay: Math.random() * 5,
-      duration: 3 + Math.random() * 4,
-      color: type === 'newyear' ? ['#FFD700', '#FF0000', '#00FF00', '#0000FF', '#FF00FF'][Math.floor(Math.random() * 5)] : undefined
+      left: getRandom() * 100,
+      delay: getRandom() * 5,
+      duration: 3 + getRandom() * 4,
+      color: type === 'newyear' ? ['#FFD700', '#FF0000', '#00FF00', '#0000FF', '#FF00FF'][Math.floor(getRandom() * 5)] : undefined
     }));
     setParticles(newParticles);
 
@@ -64,7 +71,7 @@ export default function SeasonalWelcome({ userName = 'Utilisateur', onComplete }
   if (!visible || !eventType) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-surface-base/90 backdrop-blur-md animate-fadeIn overflow-hidden">
+    <div className="fixed inset-0 z-100 flex items-center justify-center bg-surface-base/90 backdrop-blur-md animate-fadeIn overflow-hidden">
       {/* Background Particles */}
       {particles.map((p) => (
         <div
@@ -88,7 +95,7 @@ export default function SeasonalWelcome({ userName = 'Utilisateur', onComplete }
           <div className={`absolute inset-0 rounded-2xl blur-xl ${eventType === 'christmas' ? 'bg-status-success-bg' : 'bg-status-info-bg'}`} />
           
           <div className="relative w-full h-full bg-white rounded-2xl flex items-center justify-center shadow-2xl">
-            <img src={tenantConfig?.theme?.logoUrl || "/microflex-logo.png"} alt="Logo" className="w-12 h-12 md:w-16 md:h-16 object-contain" />
+            <TenantLogo className="w-12 h-12 md:w-16 md:h-16 object-contain" />
             <div className="absolute -top-2 -right-2 text-2xl md:text-3xl animate-bounce">
               {eventType === 'christmas' ? '🎅' : '🥳'}
             </div>

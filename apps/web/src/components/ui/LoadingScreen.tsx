@@ -1,4 +1,5 @@
 import React from 'react';
+import { TenantLogo } from '@/components/branding/TenantLogo';
 import { useBranding } from '../../contexts/BrandingContext';
 import { useTenant } from '../../contexts/TenantContext';
 
@@ -128,11 +129,7 @@ export default function LoadingScreen({ message = 'Chargement...', fullScreen = 
               {/* Main logo container with 3D effect */}
               <div className="relative w-24 h-24 mx-auto bg-white rounded-2xl flex items-center justify-center"
                    style={{ boxShadow: '0 20px 40px -10px rgba(27, 42, 74, 0.35), 0 0 0 1px rgba(45, 139, 87, 0.1)' }}>
-                <img
-                  src={tenantConfig?.theme?.logoUrl || "/microflex-logo.png"}
-                  alt={`${tenantConfig?.name || branding.appName} Logo`}
-                  className="w-20 h-20 object-contain"
-                />
+                <TenantLogo className="w-20 h-20 object-contain" />
               </div>
             </div>
           )}

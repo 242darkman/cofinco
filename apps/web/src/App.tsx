@@ -1,4 +1,5 @@
 import { useState, useEffect, lazy, Suspense, useCallback } from 'react';
+import { TenantLogo } from '@/components/branding/TenantLogo';
 import { useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast, Toaster } from 'sonner';
@@ -248,11 +249,7 @@ function App() {
           header={(
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 bg-surface rounded-lg flex items-center justify-center p-1">
-                <img
-                  src={tenantConfig?.theme?.logoUrl || "/microflex-logo.png"}
-                  alt={`${(tenantConfig?.name || branding?.appName) ?? 'App'} Logo`}
-                  className="w-full h-full object-contain"
-                />
+                <TenantLogo className="w-full h-full object-contain" />
               </div>
               <div>
                 <h1 className="text-lg font-bold text-content-primary">Connexion réussie</h1>

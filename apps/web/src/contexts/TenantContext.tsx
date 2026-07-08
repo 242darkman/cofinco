@@ -57,6 +57,22 @@ function applyTenantTheme(config: TenantConfig) {
   if (config.theme.secondaryColor) {
     root.style.setProperty('--accent-secondary', config.theme.secondaryColor);
   }
+
+  // Titre de l'onglet au nom du tenant
+  if (config.name) {
+    document.title = config.name;
+  }
+
+  // Favicon dynamique
+  if (config.theme.faviconUrl) {
+    let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'icon';
+      document.head.appendChild(link);
+    }
+    link.href = config.theme.faviconUrl;
+  }
 }
 
 export function TenantProvider({ children }: { children: ReactNode }) {
@@ -67,8 +83,11 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       if (!res.ok) throw new Error('Failed to fetch tenant config');
       return tenantConfigSchema.parse(await res.json());
     },
-    // We can assume tenant config rarely changes during a session (requires restart/redeploy)
-    staleTime: 5 * 60 * 1000,
+    // Branding et flags sont surchargeables à chaud en base (cache serveur 30 s) :
+    // on rafraîchit régulièrement pour propager sans rechargement complet.
+    staleTime: 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+    refetchOnWindowFocus: true,
     initialData: defaultTenantConfig,
     initialDataUpdatedAt: 0,
   });

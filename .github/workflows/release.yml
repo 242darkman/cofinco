@@ -358,14 +358,9 @@ jobs:
           PORT=5000
           APP_VERSION=${{ needs.prepare.outputs.image_tag }}
 
-          # Tenant
+          # Tenant — la config métier vient du fichier embarqué dans l'image
+          # (TENANT_CONFIG_FILE au build) + surcharges en base, jamais d'env.
           TENANT_CONFIG_PATH=dist/tenant-config.json
-          TENANT_ID=${{ vars.TENANT_ID }}
-          TENANT_NAME=${{ vars.TENANT_NAME }}
-          TENANT_FEATURE_SMS=${{ vars.TENANT_FEATURE_SMS }}
-          TENANT_FEATURE_TONTINE=${{ vars.TENANT_FEATURE_TONTINE }}
-          TENANT_FEATURE_MOBILE_MONEY=${{ vars.TENANT_FEATURE_MOBILE_MONEY }}
-          TENANT_FEATURE_FIELD_AGENTS=${{ vars.TENANT_FEATURE_FIELD_AGENTS }}
 
           # Registry
           REGISTRY=${{ env.REGISTRY }}

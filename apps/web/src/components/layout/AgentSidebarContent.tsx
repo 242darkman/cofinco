@@ -1,4 +1,5 @@
 import React from 'react';
+import { TenantLogo } from '@/components/branding/TenantLogo';
 import { Menu, X, LogOut, ArrowDownCircle, ArrowUpCircle, CreditCard, Banknote } from 'lucide-react';
 import IconButton from '../ui/IconButton';
 import Button from '../ui/Button';
@@ -75,11 +76,7 @@ export default function AgentSidebarContent({
         {sidebarOpen && (
           <div className="relative flex flex-col items-center py-2">
             <div className="relative w-16 h-16 bg-surface rounded-2xl flex items-center justify-center">
-              <img
-                src={tenantConfig?.theme?.logoUrl || "/microflex-logo.png"}
-                alt={`${tenantConfig?.name || branding.appName} Logo`}
-                className="w-12 h-12 object-contain"
-              />
+              <TenantLogo className="w-12 h-12 object-contain" />
             </div>
             <div className="mt-2 text-center">
               <p className="text-sm font-semibold text-content-primary">{agent?.nomComplet || 'Agent'}</p>
