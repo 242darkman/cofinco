@@ -19,6 +19,7 @@
 10. [Maintenance](#maintenance)
 11. [Troubleshooting](#troubleshooting)
 12. [Reference rapide](#reference-rapide)
+13. [Livraison enterprise](#livraison-enterprise)
 
 ---
 
@@ -830,3 +831,10 @@ Classification :
 |---|---|---|---|
 | `v*` | production | `vX.Y.Z` + `latest` + `sha-xxx` | VPS via SSH |
 | `rc-*` | preprod | `rc-vX.Y.Z` + `sha-xxx` | VPS via SSH |
+---
+
+## Livraison enterprise
+
+Identité du déploiement (protection anti-mélange de bases entre clients), feature flags dynamiques avec audit, images Docker dédiées par client, signature cosign et SBOM : voir [docs/operations/livraison-enterprise.md](docs/operations/livraison-enterprise.md).
+
+Variables associées : `TENANT_IDENTITY_REBIND` (réassignation exceptionnelle, un seul démarrage) et `TENANT_FEATURES_STATIC_ONLY` (kill switch des surcharges de flags). Les deux sont documentées dans les fichiers `.env.*.example`.

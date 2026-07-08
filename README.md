@@ -215,6 +215,12 @@ npm run build            # Build production (esbuild + Vite)
 npm run start            # Lancement production
 npm run check            # Type check TypeScript
 
+# Turborepo (cache et builds ciblés)
+npm run turbo:check      # Type check avec cache
+npm run turbo:test       # Tests unitaires + sécurité avec cache
+npm run turbo:affected   # Uniquement ce qui est impacté par le diff
+npm run build:apps       # Builds par workspace
+
 # Base de donnees
 npm run db:push          # Sync schema -> DB (Drizzle Kit)
 npm run db:seed          # Seeds de reference (production)

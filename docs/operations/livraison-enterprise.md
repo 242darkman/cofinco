@@ -35,6 +35,13 @@ Le nom, les couleurs et les logos sont également surchargeables à chaud dans `
 
 L'**identifiant du tenant (`id`) n'est jamais surchargeable** : c'est l'ancre d'identité du déploiement (voir `deployment_identity`). `GET /api/tenant/config` renvoie la configuration effective (branding + flags fusionnés) consommée par le frontend.
 
+Côté frontend, l'injection est centralisée :
+
+- `<TenantLogo>` / `useTenantBranding()` (`apps/web/src/components/branding/TenantLogo.tsx`) — source unique du logo et du nom ; ne jamais coder un chemin de logo en dur ;
+- `apps/web/src/lib/tenant-theme.ts` — la **charte graphique complète** (accents, hover, focus, sidebar active, halo de connexion) est dérivée de `primaryColor`/`secondaryColor` pour les thèmes clair **et** sombre (contraste préservé), sans toucher aux tokens sémantiques (succès, danger, statuts) ;
+- titre d'onglet et favicon suivent automatiquement le tenant ;
+- la configuration est rafraîchie périodiquement : une surcharge en base se propage sans redéploiement ni rechargement.
+
 Kill switch commun aux surcharges dynamiques :
 
 ```bash
