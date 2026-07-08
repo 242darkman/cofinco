@@ -92,7 +92,7 @@ describe("flags effectifs", () => {
     mockRows = [{ feature: "enableSms", enabled: false }];
 
     const features = await getEffectiveFeatures({
-      TENANT_FEATURES_STATIC_ONLY: "true",
+      TENANT_OVERRIDES_STATIC_ONLY: "true",
     } as NodeJS.ProcessEnv);
 
     expect(features.enableSms).toBe(true);

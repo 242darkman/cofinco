@@ -414,6 +414,9 @@ export interface TrackingSession {
 
 // ========== DATABASE CLASS ==========
 
+/** Nom de la base offline. */
+export const OFFLINE_DB_NAME = 'MicroflexOfflineDB';
+
 /**
  * Unified Dexie database for offline-first functionality
  */
@@ -454,10 +457,7 @@ class OfflineDatabase extends Dexie {
   offlineLimits!: Table<OfflineLimits>;
 
   constructor() {
-    // NE PAS RENOMMER : identifiant interne IndexedDB historique. Le renommer
-    // créerait une base vierge et orphelinerait les écritures offline non
-    // synchronisées des déploiements existants. Invisible pour l'utilisateur.
-    super('COFINOfflineDB');
+    super(OFFLINE_DB_NAME);
 
     // Version 4: Enhanced GPS tracking with sessions, geocode cache
     this.version(4).stores({

@@ -306,7 +306,7 @@
     async function checkPendingOperations() {
       try {
         if ('indexedDB' in window) {
-          const request = indexedDB.open('COFINOfflineDB');
+          const request = indexedDB.open('MicroflexOfflineDB');
           request.onsuccess = (event) => {
             const db = event.target.result;
             if (db.objectStoreNames.contains('operations')) {

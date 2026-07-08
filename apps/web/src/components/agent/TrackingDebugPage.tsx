@@ -559,7 +559,7 @@ export default function TrackingDebugPage() {
             </span>
           </div>
           <div>
-            IndexedDB: COFINOfflineDB v4 (gpsTrackPoints + geocodeCache + trackingSessions)
+            IndexedDB: MicroflexOfflineDB v4 (gpsTrackPoints + geocodeCache + trackingSessions)
           </div>
           <div className="mt-2 rounded border border-edge-subtle bg-surface-subtle p-2 text-content-muted">
             <strong>Limites navigateur:</strong> En arriere-plan (onglet inactif),

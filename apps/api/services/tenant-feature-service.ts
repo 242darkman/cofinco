@@ -53,13 +53,9 @@ export function resetTenantFeatureCacheForTests(): void {
 /**
  * Kill switch commun aux surcharges dynamiques (flags + branding) :
  * TENANT_OVERRIDES_STATIC_ONLY=true fige la configuration statique seule.
- * L'ancien nom TENANT_FEATURES_STATIC_ONLY reste accepté par compatibilité.
  */
 export function staticOnly(env: NodeJS.ProcessEnv): boolean {
-  return (
-    env.TENANT_OVERRIDES_STATIC_ONLY === "true" ||
-    env.TENANT_FEATURES_STATIC_ONLY === "true"
-  );
+  return env.TENANT_OVERRIDES_STATIC_ONLY === "true";
 }
 
 /**
@@ -69,7 +65,7 @@ export function staticOnly(env: NodeJS.ProcessEnv): boolean {
  * Comportement sûr par défaut : en cas d'erreur de lecture des surcharges
  * (base indisponible, migration absente), la configuration statique validée
  * au démarrage fait foi — jamais de blocage du serveur pour un flag.
- * Kill switch : TENANT_FEATURES_STATIC_ONLY=true ignore la base.
+ * Kill switch : TENANT_OVERRIDES_STATIC_ONLY=true ignore la base.
  */
 export async function getEffectiveFeatures(
   env: NodeJS.ProcessEnv = process.env,

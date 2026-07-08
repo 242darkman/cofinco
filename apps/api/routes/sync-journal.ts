@@ -647,22 +647,21 @@ syncJournalRouter.get('/audit/offline-day', async (req, res) => {
 const EVENT_TYPE_MAPPING: Record<string, {
   sourceModule: SourceModule;
   sens: SensMouvement;
-  typePaiement: string;
   /**
-   * Événement GL seedé (accounting_rules). Pour DEPOSIT/WITHDRAWAL le suffixe
-   * dépend du type de compte et est résolu par resolveGlEventType().
-   * Le typePaiement français est conservé pour l'affichage historique.
+   * Événement GL seedé (accounting_rules), utilisé aussi comme typePaiement.
+   * Pour DEPOSIT/WITHDRAWAL le suffixe dépend du type de compte et est
+   * résolu par resolveGlEventType().
    */
   glEventType: string;
   requiresGl: boolean;
 } | null> = {
-  DEPOSIT: { sourceModule: 'EPARGNE', sens: 'CREDIT', typePaiement: 'DEPOT_ESPECES', glEventType: 'DEPOSIT', requiresGl: true },
-  WITHDRAWAL: { sourceModule: 'EPARGNE', sens: 'DEBIT', typePaiement: 'RETRAIT_ESPECES', glEventType: 'WITHDRAWAL', requiresGl: true },
-  LOAN_REPAYMENT: { sourceModule: 'CREDIT', sens: 'CREDIT', typePaiement: 'REMBOURSEMENT_CREDIT', glEventType: 'LOAN_REPAYMENT', requiresGl: true },
-  LOAN_DISBURSEMENT: { sourceModule: 'CREDIT', sens: 'DEBIT', typePaiement: 'DECAISSEMENT_CREDIT', glEventType: 'LOAN_DISBURSEMENT', requiresGl: true },
-  TONTINE_CONTRIBUTION: { sourceModule: 'TONTINE', sens: 'CREDIT', typePaiement: 'COTISATION_TONTINE', glEventType: 'TONTINE_CONTRIBUTION', requiresGl: true },
-  TONTINE_DISTRIBUTION: { sourceModule: 'TONTINE', sens: 'DEBIT', typePaiement: 'DISTRIBUTION_TONTINE', glEventType: 'TONTINE_DISTRIBUTION', requiresGl: true },
-  SETTLEMENT: { sourceModule: 'CAISSE_AGENT', sens: 'CREDIT', typePaiement: 'VERSEMENT_CAISSE', glEventType: 'SETTLEMENT_CASH', requiresGl: true },
+  DEPOSIT: { sourceModule: 'EPARGNE', sens: 'CREDIT', glEventType: 'DEPOSIT', requiresGl: true },
+  WITHDRAWAL: { sourceModule: 'EPARGNE', sens: 'DEBIT', glEventType: 'WITHDRAWAL', requiresGl: true },
+  LOAN_REPAYMENT: { sourceModule: 'CREDIT', sens: 'CREDIT', glEventType: 'LOAN_REPAYMENT', requiresGl: true },
+  LOAN_DISBURSEMENT: { sourceModule: 'CREDIT', sens: 'DEBIT', glEventType: 'LOAN_DISBURSEMENT', requiresGl: true },
+  TONTINE_CONTRIBUTION: { sourceModule: 'TONTINE', sens: 'CREDIT', glEventType: 'TONTINE_CONTRIBUTION', requiresGl: true },
+  TONTINE_DISTRIBUTION: { sourceModule: 'TONTINE', sens: 'DEBIT', glEventType: 'TONTINE_DISTRIBUTION', requiresGl: true },
+  SETTLEMENT: { sourceModule: 'CAISSE_AGENT', sens: 'CREDIT', glEventType: 'SETTLEMENT_CASH', requiresGl: true },
   // Non-financial event types — no ledger operation
   CLIENT_CREATE: null,
   CLIENT_UPDATE: null,
@@ -716,7 +715,7 @@ async function executeJournalBusinessOperation(
     {
       montant: String(amount),
       sens: mapping.sens,
-      typePaiement: mapping.typePaiement,
+      typePaiement: glEventType,
       methodePaiement: 'ESPECES',
       clientId: payload.clientId || undefined,
       compteId: payload.compteId || undefined,
@@ -733,8 +732,6 @@ async function executeJournalBusinessOperation(
         deviceId: entry.deviceId,
         clientTimestamp: entry.localTimestamp,
         sessionId: entry.sessionId,
-        // Événement GL seedé — le typePaiement français reste pour l'affichage
-        glEventType,
       },
     },
     async (tx, mouvement) => {

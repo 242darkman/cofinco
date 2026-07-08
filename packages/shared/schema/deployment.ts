@@ -25,7 +25,7 @@ export type DeploymentIdentity = typeof deploymentIdentity.$inferSelect;
  *
  * La configuration statique (fichier + env) reste la source par défaut ;
  * une ligne ici la surcharge à chaud, sans redémarrage. En cas d'erreur de
- * lecture ou si TENANT_FEATURES_STATIC_ONLY=true (kill switch), seule la
+ * lecture ou si TENANT_OVERRIDES_STATIC_ONLY=true (kill switch), seule la
  * configuration statique fait foi.
  */
 export const tenantFeatureOverrides = pgTable("tenant_feature_overrides", {
