@@ -1,5 +1,5 @@
 {
-  "include": ["apps/web/src/**/*", "packages/shared/**/*", "apps/api/**/*", "tests/**/*"],
+  "include": ["apps/web/src/**/*", "packages/shared/**/*", "apps/api/**/*", "tests/**/*", "seeds/**/*.ts", "scripts/**/*.ts"],
   "exclude": ["node_modules", "build", "dist"],
   "compilerOptions": {
     "incremental": true,
