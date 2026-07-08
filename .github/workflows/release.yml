@@ -194,6 +194,7 @@ jobs:
 
       # --- Init image (schema push + seeds) ---
       - name: Build & push init image
+        id: build-init
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -209,12 +210,41 @@ jobs:
           subject-digest: ${{ steps.build-runtime.outputs.digest }}
           push-to-registry: true
 
+      # --- Signature cosign (keyless, OIDC GitHub) ---
+      # Vérifiable côté client avec :
+      #   cosign verify --certificate-identity-regexp <repo> \
+      #     --certificate-oidc-issuer https://token.actions.githubusercontent.com <image>@<digest>
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign images (cosign keyless)
+        run: |
+          cosign sign --yes ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build-runtime.outputs.digest }}
+          cosign sign --yes ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build-init.outputs.digest }}
+
       - name: Generate SBOM
         uses: anchore/sbom-action@v0
         with:
           image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.prepare.outputs.image_tag }}
           format: spdx-json
           output-file: sbom.spdx.json
+
+      # --- Attestation SBOM liée à l'image (Sigstore) ---
+      - name: Attest SBOM
+        uses: actions/attest-sbom@v2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.build-runtime.outputs.digest }}
+          sbom-path: sbom.spdx.json
+          push-to-registry: true
+
+      # --- SBOM archivé comme artefact de release (livrable client) ---
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ needs.prepare.outputs.image_tag }}
+          path: sbom.spdx.json
+          retention-days: 90
 
       # --- Security scan ---
       - name: Scan Docker image (Trivy)
