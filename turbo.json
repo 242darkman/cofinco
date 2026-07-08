@@ -1,0 +1,38 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "ui": "stream",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "//#check": {
+      "inputs": [
+        "apps/**/*.ts",
+        "apps/**/*.tsx",
+        "packages/**/*.ts",
+        "tests/**/*.ts",
+        "scripts/**/*.ts",
+        "seeds/**/*.ts",
+        "tsconfig.json"
+      ]
+    },
+    "//#test:unit": {
+      "inputs": [
+        "apps/**/*.ts",
+        "apps/**/*.tsx",
+        "packages/**/*.ts",
+        "tests/unit/**",
+        "vitest.config.ts"
+      ]
+    },
+    "//#test:security": {
+      "inputs": [
+        "apps/api/**/*.ts",
+        "packages/**/*.ts",
+        "tests/security/**",
+        "vitest.config.ts"
+      ]
+    }
+  }
+}

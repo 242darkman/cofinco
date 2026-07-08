@@ -48,8 +48,17 @@ jobs:
 
       - run: npm ci
 
+      # Cache Turborepo — évite de rejouer typecheck/tests si les inputs n'ont pas changé
+      - name: Turborepo cache
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-
+
       - name: Type check
-        run: npm run check
+        run: npx turbo run //#check
 
       - name: Architecture boundaries
         run: npx vitest run tests/architecture
