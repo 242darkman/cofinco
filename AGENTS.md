@@ -16,7 +16,7 @@ Ne jamais sacrifier ces invariants pour livrer plus vite. Une solution simple, e
 
 ## 2. Stack et structure de référence
 
-- Monorepo npm workspaces, TypeScript strict, Node.js 20+.
+- Monorepo npm workspaces, TypeScript strict, Node.js 24+ (LTS).
 - Frontend : React 19, Vite, TanStack Query et Tailwind CSS.
 - Backend : Express, PostgreSQL, Drizzle ORM et WebSocket.
 - Autorisation : CASL avec RBAC/ABAC côté serveur.

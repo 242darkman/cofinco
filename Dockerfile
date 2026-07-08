@@ -1,7 +1,7 @@
 # ============================================
 # Stage 1: Install dependencies
 # ============================================
-FROM node:20-alpine AS deps
+FROM node:24-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY apps/web/package.json ./apps/web/package.json
@@ -48,7 +48,7 @@ CMD ["vitest", "run"]
 # ============================================
 # Usage: docker compose run --rm test-e2e
 # Uses Debian (not Alpine) because Playwright browsers need glibc
-FROM node:20-bookworm-slim AS test-e2e
+FROM node:24-bookworm-slim AS test-e2e
 WORKDIR /app
 COPY package.json ./
 RUN npm install && npx playwright install --with-deps chromium
@@ -59,7 +59,7 @@ CMD ["playwright", "test"]
 # ============================================
 # Stage 2: Build application
 # ============================================
-FROM node:20-alpine AS build
+FROM node:24-alpine AS build
 WORKDIR /app
 ARG TENANT_CONFIG_FILE=config/tenants/microflex.json
 COPY --from=deps /app/node_modules ./node_modules
@@ -70,7 +70,7 @@ RUN test -f "$TENANT_CONFIG_FILE" && cp "$TENANT_CONFIG_FILE" dist/tenant-config
 # ============================================
 # Stage 3: Production runtime
 # ============================================
-FROM node:20-alpine AS runtime
+FROM node:24-alpine AS runtime
 
 # OCI labels
 LABEL org.opencontainers.image.source="https://github.com/owner/microflex"
