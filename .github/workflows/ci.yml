@@ -73,7 +73,9 @@ jobs:
         run: node --import tsx scripts/check-file-sizes.ts
 
       - name: Unit tests (no DB)
-        run: npx vitest run --exclude 'tests/contracts/**' --exclude 'tests/e2e/**' --exclude 'tests/integration/**' --exclude 'tests/robustness/**'
+        # balance-consistency & conversations sont des tests d'intégration (accès DB réel)
+        # mal rangés sous tests/unit/ : exclus du job « no DB » (ils exigent DATABASE_URL).
+        run: npx vitest run --exclude 'tests/contracts/**' --exclude 'tests/e2e/**' --exclude 'tests/integration/**' --exclude 'tests/robustness/**' --exclude 'tests/unit/balance-consistency.test.ts' --exclude 'tests/unit/conversations.test.ts'
 
       - name: Dependency audit
         run: npm run security:audit
