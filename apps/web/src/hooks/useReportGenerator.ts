@@ -4,7 +4,8 @@ import { useBranding } from '../contexts/BrandingContext';
 import { requestListAll, api } from '../lib/api-client';
 import { addPdfLogoHeader, addPdfLogoFooter } from '../lib/pdf-logo';
 // P4.1: Lazy-load heavy export libraries (saves ~650KB on initial bundle)
-import { loadPDFLibraries, loadExcelLibrary } from '../lib/lazy-export';
+import { loadPDFLibraries } from '../lib/lazy-export';
+import type { SheetSpec } from '@/lib/excel-export';
 
 // ============================================================================
 // TYPES
@@ -489,8 +490,7 @@ export function useReportGenerator() {
     if (!reportType) return;
     setLoading(true);
     try {
-      // P4.1: Lazy-load Excel library on demand
-      const XLSX = await loadExcelLibrary();
+      const { downloadWorkbook } = await import('@/lib/excel-export');
 
       const data = await fetchReportData();
       const config = getReportConfig();
@@ -502,14 +502,14 @@ export function useReportGenerator() {
         return row;
       });
 
-      const ws = XLSX.utils.json_to_sheet(rows);
-      ws['!cols'] = config.columns.map(col => {
+      const columnWidths = config.columns.map(col => {
         const max = rows.reduce((m, r) => Math.max(m, String(r[col] ?? '').length), col.length);
-        return { wch: Math.min(max + 2, 40) };
+        return Math.min(max + 2, 40);
       });
 
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, config.title.substring(0, 31));
+      const sheets: SheetSpec[] = [
+        { name: config.title.substring(0, 31), rows, columnWidths },
+      ];
 
       if (filters.includeStats) {
         const summaryRows = config.getSummary(data).map(s => ({ Indicateur: s.label, Valeur: s.value }));
@@ -517,12 +517,10 @@ export function useReportGenerator() {
           { Indicateur: 'Période', Valeur: `${fmtDateRange(dateRange.start)} — ${fmtDateRange(dateRange.end)}` },
           { Indicateur: 'Généré le', Valeur: new Date().toLocaleDateString('fr-FR') },
         );
-        const sws = XLSX.utils.json_to_sheet(summaryRows);
-        sws['!cols'] = [{ wch: 30 }, { wch: 30 }];
-        XLSX.utils.book_append_sheet(wb, sws, 'Résumé');
+        sheets.push({ name: 'Résumé', rows: summaryRows, columnWidths: [30, 30] });
       }
 
-      XLSX.writeFile(wb, `rapport_${reportType}_${dateRange.start}_${dateRange.end}.xlsx`);
+      await downloadWorkbook(`rapport_${reportType}_${dateRange.start}_${dateRange.end}.xlsx`, sheets);
     } finally { setLoading(false); }
   };
 

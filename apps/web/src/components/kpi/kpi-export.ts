@@ -14,7 +14,7 @@
  * 8. Clients
  * 9. Données brutes (full JSON)
  */
-import { loadExcelLibrary } from '@/lib/lazy-export';
+import type { SheetSpec } from '@/lib/excel-export';
 import { formatMoney } from '@shared/config/currency';
 import type { KpiPayload } from '@shared/schema/kpi';
 
@@ -40,8 +40,8 @@ function fmtCur(n: number | null | undefined): string {
 }
 
 export async function exportKpiToExcel(payload: KpiPayload, options: ExportOptions) {
-  const XLSX = await loadExcelLibrary();
-  const wb = XLSX.utils.book_new();
+  const { downloadWorkbook } = await import('@/lib/excel-export');
+  const sheets: SheetSpec[] = [];
 
   const { periodType, periodKey, agencyName } = options;
   const periodLabel = periodType === 'monthly' ? `Mois ${periodKey}` : `Annee ${periodKey}`;
@@ -84,9 +84,7 @@ export async function exportKpiToExcel(payload: KpiPayload, options: ExportOptio
     ['Clients / agent', fmtNum(payload.rhProductivite.clientsParAgent)],
     ['Masse salariale', fmtCur(payload.rhProductivite.masseSalariale)],
   ];
-  const wsDash = XLSX.utils.aoa_to_sheet(dashboardData);
-  wsDash['!cols'] = [{ wch: 25 }, { wch: 25 }];
-  XLSX.utils.book_append_sheet(wb, wsDash, 'Dashboard');
+  sheets.push({ name: 'Dashboard', aoa: dashboardData, columnWidths: [25, 25] });
 
   // ---------------------------------------------------------------
   // 2. Crédit
@@ -112,9 +110,7 @@ export async function exportKpiToExcel(payload: KpiPayload, options: ExportOptio
       fmtCur(p.encours),
     ]),
   ];
-  const wsCredit = XLSX.utils.aoa_to_sheet(creditData);
-  wsCredit['!cols'] = [{ wch: 25 }, { wch: 15 }, { wch: 22 }, { wch: 22 }];
-  XLSX.utils.book_append_sheet(wb, wsCredit, 'Credit');
+  sheets.push({ name: 'Credit', aoa: creditData, columnWidths: [25, 15, 22, 22] });
 
   // ---------------------------------------------------------------
   // 3. Risque
@@ -133,9 +129,7 @@ export async function exportKpiToExcel(payload: KpiPayload, options: ExportOptio
     ['Credits en souffrance', fmtNum(payload.risque.creditsEnSouffrance)],
     ['Montant en souffrance', fmtCur(payload.risque.montantEnSouffrance)],
   ];
-  const wsRisque = XLSX.utils.aoa_to_sheet(risqueData);
-  wsRisque['!cols'] = [{ wch: 25 }, { wch: 22 }];
-  XLSX.utils.book_append_sheet(wb, wsRisque, 'Risque');
+  sheets.push({ name: 'Risque', aoa: risqueData, columnWidths: [25, 22] });
 
   // ---------------------------------------------------------------
   // 4. Tontines & Épargne
@@ -153,9 +147,7 @@ export async function exportKpiToExcel(payload: KpiPayload, options: ExportOptio
     ['Volumes retires', fmtCur(payload.tontinesEpargne.volumesRetires)],
     ['Cotisations tontines', fmtCur(payload.tontinesEpargne.cotisationsTontines)],
   ];
-  const wsTontine = XLSX.utils.aoa_to_sheet(tontineData);
-  wsTontine['!cols'] = [{ wch: 25 }, { wch: 22 }];
-  XLSX.utils.book_append_sheet(wb, wsTontine, 'Tontines Epargne');
+  sheets.push({ name: 'Tontines Epargne', aoa: tontineData, columnWidths: [25, 22] });
 
   // ---------------------------------------------------------------
   // 5. Rentabilité
@@ -173,9 +165,7 @@ export async function exportKpiToExcel(payload: KpiPayload, options: ExportOptio
     ['Resultat net', fmtCur(payload.rentabilite.resultatNet)],
     ['Ratio charges / encours', fmtPct(payload.rentabilite.ratioChargesEncours)],
   ];
-  const wsRent = XLSX.utils.aoa_to_sheet(rentData);
-  wsRent['!cols'] = [{ wch: 25 }, { wch: 22 }];
-  XLSX.utils.book_append_sheet(wb, wsRent, 'Rentabilite');
+  sheets.push({ name: 'Rentabilite', aoa: rentData, columnWidths: [25, 22] });
 
   // ---------------------------------------------------------------
   // 6. Trésorerie
@@ -194,9 +184,7 @@ export async function exportKpiToExcel(payload: KpiPayload, options: ExportOptio
     ['Ratio de liquidite', fmtPct(payload.tresorerie.ratioLiquidite)],
     ['Ecarts de caisse', fmtCur(payload.tresorerie.ecartsCaisses)],
   ];
-  const wsTreso = XLSX.utils.aoa_to_sheet(tresoData);
-  wsTreso['!cols'] = [{ wch: 25 }, { wch: 22 }];
-  XLSX.utils.book_append_sheet(wb, wsTreso, 'Tresorerie');
+  sheets.push({ name: 'Tresorerie', aoa: tresoData, columnWidths: [25, 22] });
 
   // ---------------------------------------------------------------
   // 7. RH & Productivité
@@ -224,9 +212,7 @@ export async function exportKpiToExcel(payload: KpiPayload, options: ExportOptio
       a.prenom, a.nom, fmtNum(a.clients), fmtNum(a.decaissements), fmtCur(a.montant),
     ]),
   ];
-  const wsRh = XLSX.utils.aoa_to_sheet(rhData);
-  wsRh['!cols'] = [{ wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 15 }, { wch: 22 }];
-  XLSX.utils.book_append_sheet(wb, wsRh, 'RH Productivite');
+  sheets.push({ name: 'RH Productivite', aoa: rhData, columnWidths: [15, 15, 12, 15, 22] });
 
   // ---------------------------------------------------------------
   // 8. Clients
@@ -245,9 +231,7 @@ export async function exportKpiToExcel(payload: KpiPayload, options: ExportOptio
     ['Segment', 'Nombre'],
     ...segmentEntries.map(([seg, count]) => [seg, fmtNum(count)]),
   ];
-  const wsClients = XLSX.utils.aoa_to_sheet(clientsData);
-  wsClients['!cols'] = [{ wch: 25 }, { wch: 22 }];
-  XLSX.utils.book_append_sheet(wb, wsClients, 'Clients');
+  sheets.push({ name: 'Clients', aoa: clientsData, columnWidths: [25, 22] });
 
   // ---------------------------------------------------------------
   // 9. Données brutes (full JSON)
@@ -275,13 +259,11 @@ export async function exportKpiToExcel(payload: KpiPayload, options: ExportOptio
     }
   }
 
-  const wsRaw = XLSX.utils.aoa_to_sheet(rawData);
-  wsRaw['!cols'] = [{ wch: 20 }, { wch: 25 }, { wch: 30 }];
-  XLSX.utils.book_append_sheet(wb, wsRaw, 'Donnees brutes');
+  sheets.push({ name: 'Donnees brutes', aoa: rawData, columnWidths: [20, 25, 30] });
 
   // ---------------------------------------------------------------
   // Download
   // ---------------------------------------------------------------
   const filename = `KPI_${scope.replace(/\s+/g, '_')}_${periodKey}.xlsx`;
-  XLSX.writeFile(wb, filename);
+  await downloadWorkbook(filename, sheets);
 }

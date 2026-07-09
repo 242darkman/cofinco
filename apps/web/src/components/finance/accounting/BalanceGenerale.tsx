@@ -5,7 +5,7 @@ import { addPdfLogoHeader } from '../../../lib/pdf-logo';
 import { useBranding } from '../../../contexts/BrandingContext';
 import { useBalanceGenerale, useAccountingWebSocket } from '../../../hooks/accounting/useAccounting';
 // P4.1: Lazy-load heavy export libraries
-import { loadExportLibraries } from '../../../lib/lazy-export';
+import { loadPDFLibraries } from '../../../lib/lazy-export';
 
 interface BalanceCompte {
   compteId: string;
@@ -74,8 +74,7 @@ export default function BalanceGenerale() {
       return;
     }
     try {
-      // P4.1: Lazy-load export library
-      const { XLSX } = await loadExportLibraries();
+      const { downloadWorkbook } = await import('@/lib/excel-export');
 
       const data = filteredBalance.map(compte => ({
         'N Compte': compte.numeroCompte || '',
@@ -97,10 +96,9 @@ export default function BalanceGenerale() {
         'Solde Crediteur': totaux.solde_crediteur
       });
 
-      const ws = XLSX.utils.json_to_sheet(data);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Balance Générale');
-      XLSX.writeFile(wb, `Balance_Generale_OHADA_${new Date().toISOString().split('T')[0]}.xlsx`);
+      await downloadWorkbook(`Balance_Generale_OHADA_${new Date().toISOString().split('T')[0]}.xlsx`, [
+        { name: 'Balance Générale', rows: data },
+      ]);
       toast.success('Export Excel réussi');
     } catch (error) {
       toast.error(handleApiError(error, "Erreur lors de l'export Excel"));
@@ -114,7 +112,7 @@ export default function BalanceGenerale() {
     }
     try {
       // P4.1: Lazy-load PDF library
-      const { jsPDF } = await loadExportLibraries();
+      const { jsPDF } = await loadPDFLibraries();
       const doc = new jsPDF('landscape');
 
       const startY = addPdfLogoHeader(doc, {

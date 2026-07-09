@@ -257,8 +257,8 @@ export async function generateTransferXlsx(
 
   const [run] = await db.select().from(payrollRuns).where(eq(payrollRuns.id, runId));
 
-  // Build XLSX using xlsx library
-  const XLSX = await import("xlsx");
+  // Fichier de virements construit avec ExcelJS
+  const { default: ExcelJS } = await import("exceljs");
 
   const headers = ["Employé", "Banque", "Code Banque", "Code Guichet", "N° Compte", "Clé RIB", "Montant Net (FCFA)", "Référence"];
   const rows = preview.valid.map(e => [
@@ -272,23 +272,16 @@ export async function generateTransferXlsx(
     e.reference,
   ]);
 
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-
-  // Set column widths
-  ws["!cols"] = [
-    { wch: 30 }, // Employé
-    { wch: 20 }, // Banque
-    { wch: 12 }, // Code Banque
-    { wch: 12 }, // Code Guichet
-    { wch: 18 }, // N° Compte
-    { wch: 8 },  // Clé RIB
-    { wch: 15 }, // Montant
-    { wch: 35 }, // Référence
-  ];
-
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Virements");
-  const xlsxBuffer = Buffer.from(XLSX.write(wb, { type: "buffer", bookType: "xlsx" }));
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet("Virements");
+  worksheet.addRow(headers);
+  worksheet.getRow(1).font = { bold: true };
+  for (const row of rows) worksheet.addRow(row);
+  const columnWidths = [30, 20, 12, 12, 18, 8, 15, 35];
+  columnWidths.forEach((width, index) => {
+    worksheet.getColumn(index + 1).width = width;
+  });
+  const xlsxBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
 
   // Bordereau
   const bordereauContent = buildBordereau(run!.period, preview.valid, preview.totalAmount);

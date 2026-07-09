@@ -17,7 +17,7 @@ import RapportsOHADA from './RapportsOHADA';
 import CoffreOperationsPanel from './CoffreOperationsPanel';
 import PayrollSummaryPanel from './PayrollSummaryPanel';
 import TabGroup from '../../ui/TabGroup';
-// P4.1: jsPDF and XLSX are lazy-loaded via lazy-export.ts in child components
+// jsPDF et ExcelJS sont lazy-loadés dans les composants enfants
 import Card from '../../ui/Card';
 import Badge from '../../ui/Badge';
 import Button from '../../ui/Button';
@@ -672,7 +672,7 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
   // ============================================
   const handleExportBilanExcel = async () => {
     try {
-      const XLSX = await import('xlsx');
+      const { downloadWorkbook } = await import('@/lib/excel-export');
       const data = [
         [`BILAN OHADA - ${branding.appName}`],
         [`Date: ${new Date().toLocaleDateString('fr-FR')}`],
@@ -692,10 +692,9 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
         ['TOTAL PASSIF', bilanStats?.passif?.total || 0],
       ];
 
-      const ws = XLSX.utils.aoa_to_sheet(data);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Bilan OHADA');
-      XLSX.writeFile(wb, `Bilan_OHADA_${new Date().toISOString().split('T')[0]}.xlsx`);
+      await downloadWorkbook(`Bilan_OHADA_${new Date().toISOString().split('T')[0]}.xlsx`, [
+        { name: 'Bilan OHADA', aoa: data, columnWidths: [40, 20] },
+      ]);
     } catch (error) {
       console.error('Erreur export Excel:', error);
     }

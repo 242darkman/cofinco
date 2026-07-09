@@ -7,7 +7,7 @@ import {
 import { Card, Button, Badge, ResponsiveTable } from '../../ui';
 import { useCompteResultat } from '../../../hooks/accounting/useAccounting';
 // P4.1: Lazy-load heavy export libraries
-import { loadPDFLibraries, loadExcelLibrary } from '@/lib/lazy-export';
+import { loadPDFLibraries } from '@/lib/lazy-export';
 import { useBranding } from '@/contexts/BrandingContext';
 import {
   ResponsiveContainer,
@@ -52,8 +52,7 @@ export default function CompteResultat() {
 
   const handleExportExcel = async () => {
     try {
-      // P4.1: Lazy-load Excel library
-      const XLSX = await loadExcelLibrary();
+      const { downloadWorkbook } = await import('@/lib/excel-export');
 
       // Feuille Charges
       const chargesData = charges.map(c => ({
@@ -79,18 +78,11 @@ export default function CompteResultat() {
         { 'Élément': 'Marge nette (%)', 'Montant': rentabilite.toFixed(2) }
       ];
 
-      const wb = XLSX.utils.book_new();
-
-      const wsCharges = XLSX.utils.json_to_sheet(chargesData);
-      XLSX.utils.book_append_sheet(wb, wsCharges, 'Charges');
-
-      const wsProduits = XLSX.utils.json_to_sheet(produitsData);
-      XLSX.utils.book_append_sheet(wb, wsProduits, 'Produits');
-
-      const wsSynthese = XLSX.utils.json_to_sheet(syntheseData);
-      XLSX.utils.book_append_sheet(wb, wsSynthese, 'Synthèse');
-
-      XLSX.writeFile(wb, `Compte_Resultat_OHADA_${new Date().toISOString().split('T')[0]}.xlsx`);
+      await downloadWorkbook(`Compte_Resultat_OHADA_${new Date().toISOString().split('T')[0]}.xlsx`, [
+        { name: 'Charges', rows: chargesData },
+        { name: 'Produits', rows: produitsData },
+        { name: 'Synthèse', rows: syntheseData },
+      ]);
     } catch (error) {
       console.error('Erreur export Excel:', error);
     }

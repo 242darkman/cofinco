@@ -7,17 +7,15 @@ import { fr } from 'date-fns/locale';
 import { toast } from 'sonner';
 import AccountStatsChart from './AccountStatsChart';
 
-// P3.3: Lazy-loaded export utilities (jsPDF ~500KB, xlsx ~500KB)
+// P3.3: Lazy-loaded export utilities (jsPDF ~500KB)
 const loadExportLibraries = async () => {
-  const [jsPDFModule, autoTableModule, xlsxModule] = await Promise.all([
+  const [jsPDFModule, autoTableModule] = await Promise.all([
     import('jspdf'),
     import('jspdf-autotable'),
-    import('xlsx')
   ]);
   return {
     jsPDF: jsPDFModule.default,
     autoTable: autoTableModule.default,
-    XLSX: xlsxModule
   };
 };
 
@@ -117,7 +115,7 @@ export default function AccountHistory({ compteId, numeroCompte, isOpen, onClose
   const handleExportCSV = async () => {
     setExportingCSV(true);
     try {
-      const { XLSX } = await loadExportLibraries();
+      const { downloadCsv } = await import('@/lib/excel-export');
 
       const data = filteredTransactions.map(t => ({
         Date: safeFormatDate(t.createdAt),
@@ -129,10 +127,7 @@ export default function AccountHistory({ compteId, numeroCompte, isOpen, onClose
         Solde: t.soldeApres || '-'
       }));
 
-      const ws = XLSX.utils.json_to_sheet(data);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Historique");
-      XLSX.writeFile(wb, `historique_compte_${numeroCompte}_${format(new Date(), 'yyyyMMdd')}.csv`);
+      downloadCsv(`historique_compte_${numeroCompte}_${format(new Date(), 'yyyyMMdd')}.csv`, data);
       toast.success('Export CSV terminé');
     } catch (error) {
       console.error('Erreur export CSV:', error);

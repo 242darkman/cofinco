@@ -7,7 +7,7 @@ import { fr } from 'date-fns/locale';
 import { addPdfLogoHeader } from '@/lib/pdf-logo';
 import { useBranding } from '@/contexts/BrandingContext';
 // P4.1: Lazy-load heavy export libraries
-import { loadPDFLibraries, loadExcelLibrary } from '@/lib/lazy-export';
+import { loadPDFLibraries } from '@/lib/lazy-export';
 import { currencySymbol, currencyLabel } from '@shared/config/currency';
 
 interface StatementExportModalProps {
@@ -128,8 +128,7 @@ export default function StatementExportModal({ isOpen, onClose, compte, transact
     setIsGenerating(true);
 
     try {
-      // P4.1: Lazy-load Excel library on demand
-      const XLSX = await loadExcelLibrary();
+      const { downloadWorkbook } = await import('@/lib/excel-export');
 
       // Filter transactions by date range
       const start = new Date(startDate);
@@ -182,23 +181,12 @@ export default function StatementExportModal({ isOpen, onClose, compte, transact
 
       // Build worksheet
       const wsData = [...headerRows, tableHeader, ...tableRows, ...summaryRows];
-      const ws = XLSX.utils.aoa_to_sheet(wsData);
-
-        // Column widths
-        ws['!cols'] = [
-          { wch: 20 }, // Date
-          { wch: 18 }, // Type
-          { wch: 14 }, // Référence
-          { wch: 30 }, // Description
-          { wch: 18 }, // Montant
-          { wch: 18 }, // Solde
-        ];
-
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Relevé');
-
-        const filename = `Releve_${compte.numeroCompte || compte.numeroCompte}_${startDate}_${endDate}.xlsx`;
-        XLSX.writeFile(wb, filename);
+      const filename = `Releve_${compte.numeroCompte || compte.numeroCompte}_${startDate}_${endDate}.xlsx`;
+      await downloadWorkbook(filename, [{
+        name: 'Relevé',
+        aoa: wsData,
+        columnWidths: [20, 18, 14, 30, 18, 18],
+      }]);
 
       setIsGenerating(false);
       onClose();

@@ -17,7 +17,6 @@ const allowlist = new Set([
   "pg",
   "uuid",
   "ws",
-  "xlsx",
   "zod",
 ]);
 

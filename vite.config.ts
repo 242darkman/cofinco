@@ -201,7 +201,6 @@ export default defineConfig({
     alias: {
       "@": path.resolve(import.meta.dirname, "apps/web/src"),
       "@shared": path.resolve(import.meta.dirname, "packages/shared"),
-      "server": path.resolve(import.meta.dirname, "apps/api"),
     },
     dedupe: ['react', 'react-dom'],
   },
@@ -291,7 +290,7 @@ export default defineConfig({
           }
 
           // PDF/Excel generation (lazy loaded on export only)
-          if (id.includes('jspdf') || id.includes('xlsx') || id.includes('html2canvas')) {
+          if (id.includes('jspdf') || id.includes('exceljs') || id.includes('html2canvas')) {
             return 'export-tools';
           }
 

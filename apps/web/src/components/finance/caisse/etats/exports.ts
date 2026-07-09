@@ -5,7 +5,7 @@
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import * as XLSX from 'xlsx';
+import { downloadWorkbook } from '@/lib/excel-export';
 import { SessionCaisse, CaisseTransaction } from '@/types/finance';
 import { computeSessionStatus, getSessionStatusLabel } from '@/lib/format';
 import { addPdfLogoHeader as addSharedLogoHeader, addPdfLogoFooter as addSharedLogoFooter } from '@/lib/pdf-logo';
@@ -368,17 +368,11 @@ export function exportJournalExcel(
     'Solde': entry.soldeProgressif,
   }));
 
-  const ws = XLSX.utils.json_to_sheet(data);
-  const wb = XLSX.utils.book_new();
-
-  // Set column widths
-  ws['!cols'] = [
-    { wch: 18 }, { wch: 12 }, { wch: 20 }, { wch: 35 },
-    { wch: 25 }, { wch: 25 }, { wch: 10 }, { wch: 15 }, { wch: 15 },
-  ];
-
-  XLSX.utils.book_append_sheet(wb, ws, 'Journal de Caisse');
-  XLSX.writeFile(wb, `journal_caisse_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  return downloadWorkbook(`journal_caisse_${new Date().toISOString().slice(0, 10)}.xlsx`, [{
+    name: 'Journal de Caisse',
+    rows: data,
+    columnWidths: [18, 12, 20, 35, 25, 25, 10, 15, 15],
+  }]);
 }
 
 // ============================================================================
@@ -552,8 +546,6 @@ export function exportSyntheseExcel(
   transactions: CaisseTransaction[],
   config: Partial<ExportConfig> = {}
 ) {
-  const wb = XLSX.utils.book_new();
-
   // Sheet 1: KPIs
   const totalEntrees = transactions
     .filter(t => isEntreeOperation(t.typeOperation || ''))
@@ -570,9 +562,6 @@ export function exportSyntheseExcel(
     { 'Indicateur': 'Nombre Opérations', 'Valeur': transactions.length },
   ];
 
-  const wsKPI = XLSX.utils.json_to_sheet(kpiData);
-  XLSX.utils.book_append_sheet(wb, wsKPI, 'KPIs');
-
   // Sheet 2: Par type
   const byType: Record<string, { count: number; total: number }> = {};
   for (const tx of transactions) {
@@ -587,9 +576,6 @@ export function exportSyntheseExcel(
     'Nombre': data.count,
     'Montant Total': data.total,
   }));
-
-  const wsType = XLSX.utils.json_to_sheet(typeData);
-  XLSX.utils.book_append_sheet(wb, wsType, 'Par Type');
 
   // Sheet 3: Par jour
   const byDay: Record<string, { entrees: number; sorties: number; count: number }> = {};
@@ -610,10 +596,11 @@ export function exportSyntheseExcel(
     'Opérations': data.count,
   }));
 
-  const wsDay = XLSX.utils.json_to_sheet(dayData);
-  XLSX.utils.book_append_sheet(wb, wsDay, 'Par Jour');
-
-  XLSX.writeFile(wb, `synthese_financiere_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  return downloadWorkbook(`synthese_financiere_${new Date().toISOString().slice(0, 10)}.xlsx`, [
+    { name: 'KPIs', rows: kpiData },
+    { name: 'Par Type', rows: typeData },
+    { name: 'Par Jour', rows: dayData },
+  ]);
 }
 
 // ============================================================================
@@ -816,14 +803,9 @@ export function exportEcartsExcel(
     'Justification': d.justification || '',
   }));
 
-  const ws = XLSX.utils.json_to_sheet(data);
-  const wb = XLSX.utils.book_new();
-
-  ws['!cols'] = [
-    { wch: 18 }, { wch: 20 }, { wch: 15 }, { wch: 15 },
-    { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 40 },
-  ];
-
-  XLSX.utils.book_append_sheet(wb, ws, 'Rapport Écarts');
-  XLSX.writeFile(wb, `rapport_ecarts_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  return downloadWorkbook(`rapport_ecarts_${new Date().toISOString().slice(0, 10)}.xlsx`, [{
+    name: 'Rapport Écarts',
+    rows: data,
+    columnWidths: [18, 20, 15, 15, 12, 10, 10, 40],
+  }]);
 }

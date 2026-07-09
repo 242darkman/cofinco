@@ -10,7 +10,7 @@ import { addPdfLogoHeader } from '../../../lib/pdf-logo';
 import { useBranding } from '../../../contexts/BrandingContext';
 import { useChartOfAccounts, useGrandLivre, useAccountingWebSocket } from '../../../hooks/accounting/useAccounting';
 // P4.1: Lazy-load heavy export libraries
-import { loadExportLibraries } from '../../../lib/lazy-export';
+import { loadPDFLibraries } from '../../../lib/lazy-export';
 import { currencyCode } from '@shared/config/currency';
 
 interface GrandLivreEntry {
@@ -90,8 +90,7 @@ export default function GrandLivre() {
     }
 
     try {
-      // P4.1: Lazy-load export library
-      const { XLSX } = await loadExportLibraries();
+      const { downloadWorkbook } = await import('@/lib/excel-export');
 
       const data = entries.map(m => ({
         'Date': new Date(m.dateEcriture).toLocaleDateString('fr-FR'),
@@ -114,19 +113,16 @@ export default function GrandLivre() {
         'Solde': soldeFinal
       });
 
-      const ws = XLSX.utils.json_to_sheet(data);
-      const wb = XLSX.utils.book_new();
-
-      // Add header info
-      XLSX.utils.sheet_add_aoa(ws, [
-        [`Grand Livre - Compte ${grandLivreData.numeroCompte} - ${grandLivreData.intitule}`],
-        [`Periode: ${dateDebut} au ${dateFin}`],
-        [`Solde d'ouverture: ${soldeOuverture.toLocaleString('fr-FR')} FCFA`],
-        []
-      ], { origin: 'A1' });
-
-      XLSX.utils.book_append_sheet(wb, ws, 'Grand Livre');
-      XLSX.writeFile(wb, `Grand_Livre_${grandLivreData.numeroCompte}_${new Date().toISOString().split('T')[0]}.xlsx`);
+      await downloadWorkbook(`Grand_Livre_${grandLivreData.numeroCompte}_${new Date().toISOString().split('T')[0]}.xlsx`, [{
+        name: 'Grand Livre',
+        titleRows: [
+          [`Grand Livre - Compte ${grandLivreData.numeroCompte} - ${grandLivreData.intitule}`],
+          [`Periode: ${dateDebut} au ${dateFin}`],
+          [`Solde d'ouverture: ${soldeOuverture.toLocaleString('fr-FR')} FCFA`],
+          [],
+        ],
+        rows: data,
+      }]);
       toast.success('Export Excel reussi');
     } catch (error) {
       toast.error(handleApiError(error, "Erreur lors de l'export Excel"));
@@ -141,7 +137,7 @@ export default function GrandLivre() {
 
     try {
       // P4.1: Lazy-load PDF library
-      const { jsPDF } = await loadExportLibraries();
+      const { jsPDF } = await loadPDFLibraries();
       const doc = new jsPDF('landscape');
 
       // Header with logo

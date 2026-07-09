@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { Card, Button, Badge } from '../../ui';
 // P4.1: Lazy-load heavy export libraries
-import { loadPDFLibraries, loadExcelLibrary } from '@/lib/lazy-export';
+import { loadPDFLibraries } from '@/lib/lazy-export';
 
 interface LigneTAFIRE {
   code: string;
@@ -89,9 +89,7 @@ export default function TAFIRE() {
     if (!data) return;
 
     try {
-      // P4.1: Lazy-load Excel library
-      const XLSX = await loadExcelLibrary();
-      const wb = XLSX.utils.book_new();
+      const { downloadWorkbook } = await import('@/lib/excel-export');
 
       // Feuille principale
       const mainData = [
@@ -120,10 +118,9 @@ export default function TAFIRE() {
         ...data.tresorerie.map(l => [l.code, l.libelle, l.montantN, l.montantN1]),
       ];
 
-      const ws = XLSX.utils.aoa_to_sheet(mainData);
-      XLSX.utils.book_append_sheet(wb, ws, 'TAFIRE');
-
-      XLSX.writeFile(wb, `TAFIRE_OHADA_${exercice}.xlsx`);
+      await downloadWorkbook(`TAFIRE_OHADA_${exercice}.xlsx`, [
+        { name: 'TAFIRE', aoa: mainData, columnWidths: [10, 45, 20, 20] },
+      ]);
     } catch (error) {
       console.error('Erreur export Excel:', error);
     }

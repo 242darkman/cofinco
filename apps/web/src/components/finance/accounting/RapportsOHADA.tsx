@@ -3,7 +3,7 @@ import { Download, Printer, FileText, BookOpen, ClipboardList, RefreshCw, Calend
 import { toast, handleApiError } from '../../../lib/toast';
 import { addPdfLogoHeader, addPdfLogoFooter } from '../../../lib/pdf-logo';
 import { useBranding } from '../../../contexts/BrandingContext';
-import { loadExportLibraries } from '../../../lib/lazy-export';
+import { loadPDFLibraries } from '../../../lib/lazy-export';
 import {
   useJournalCentralisateur,
   useBilanOHADA,
@@ -157,7 +157,7 @@ export default function RapportsOHADA() {
     const d = jcData as JournalCentralisateurData | undefined;
     if (!d || d.entries.length === 0) { toast.warning('Aucune donnée à exporter'); return; }
     try {
-      const { XLSX } = await loadExportLibraries();
+      const { downloadWorkbook } = await import('@/lib/excel-export');
       const rows = d.entries.map(e => ({
         'Code Journal': e.journalCode,
         'Intitulé': e.journalIntitule,
@@ -172,10 +172,9 @@ export default function RapportsOHADA() {
         'Total Débit': d.grandTotalDebit,
         'Total Crédit': d.grandTotalCredit,
       });
-      const ws = XLSX.utils.json_to_sheet(rows);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Journal Centralisateur');
-      XLSX.writeFile(wb, `Journal_Centralisateur_${d.periodLabel.replace(' ', '_')}.xlsx`);
+      await downloadWorkbook(`Journal_Centralisateur_${d.periodLabel.replace(' ', '_')}.xlsx`, [
+        { name: 'Journal Centralisateur', rows },
+      ]);
       toast.success('Export Excel réussi');
     } catch (e) { toast.error(handleApiError(e, 'Erreur export Excel')); }
   }, [jcData]);
@@ -187,7 +186,7 @@ export default function RapportsOHADA() {
     const d = jcData as JournalCentralisateurData | undefined;
     if (!d || d.entries.length === 0) { toast.warning('Aucune donnée à exporter'); return; }
     try {
-      const { jsPDF, autoTable } = await loadExportLibraries();
+      const { jsPDF, autoTable } = await loadPDFLibraries();
       const doc = new jsPDF('landscape');
 
       const startY = addPdfLogoHeader(doc, {
@@ -237,7 +236,7 @@ export default function RapportsOHADA() {
     const d = bilanData as BilanData | undefined;
     if (!d) { toast.warning('Aucune donnée à exporter'); return; }
     try {
-      const { XLSX } = await loadExportLibraries();
+      const { downloadWorkbook } = await import('@/lib/excel-export');
       const actifRows: Record<string, string | number>[] = [];
       for (const sec of d.actif) {
         actifRows.push({ 'Compte': sec.titre, 'Intitulé': '', 'Montant': '' });
@@ -254,10 +253,10 @@ export default function RapportsOHADA() {
       }
       passifRows.push({ 'Compte': '', 'Intitulé': 'TOTAL PASSIF', 'Montant': d.totalPassif });
 
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(actifRows), 'Actif');
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(passifRows), 'Passif');
-      XLSX.writeFile(wb, `Bilan_OHADA_${d.dateArret}.xlsx`);
+      await downloadWorkbook(`Bilan_OHADA_${d.dateArret}.xlsx`, [
+        { name: 'Actif', rows: actifRows },
+        { name: 'Passif', rows: passifRows },
+      ]);
       toast.success('Export Excel réussi');
     } catch (e) { toast.error(handleApiError(e, 'Erreur export Excel')); }
   }, [bilanData]);
@@ -269,7 +268,7 @@ export default function RapportsOHADA() {
     const d = bilanData as BilanData | undefined;
     if (!d) { toast.warning('Aucune donnée à exporter'); return; }
     try {
-      const { jsPDF, autoTable } = await loadExportLibraries();
+      const { jsPDF, autoTable } = await loadPDFLibraries();
       const doc = new jsPDF('portrait');
 
       let y = addPdfLogoHeader(doc, {
@@ -355,7 +354,7 @@ export default function RapportsOHADA() {
     const d = crData as CompteResultatData | undefined;
     if (!d) { toast.warning('Aucune donnée à exporter'); return; }
     try {
-      const { XLSX } = await loadExportLibraries();
+      const { downloadWorkbook } = await import('@/lib/excel-export');
 
       const chargesRows: Record<string, string | number>[] = [];
       for (const sec of d.charges) {
@@ -379,11 +378,11 @@ export default function RapportsOHADA() {
         { 'Élément': 'RÉSULTAT NET', 'Montant': d.resultatNet },
       ];
 
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(chargesRows), 'Charges');
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(produitsRows), 'Produits');
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(synthese), 'Synthèse');
-      XLSX.writeFile(wb, `Compte_Resultat_OHADA_${exercice}.xlsx`);
+      await downloadWorkbook(`Compte_Resultat_OHADA_${exercice}.xlsx`, [
+        { name: 'Charges', rows: chargesRows },
+        { name: 'Produits', rows: produitsRows },
+        { name: 'Synthèse', rows: synthese },
+      ]);
       toast.success('Export Excel réussi');
     } catch (e) { toast.error(handleApiError(e, 'Erreur export Excel')); }
   }, [crData, exercice]);
@@ -395,7 +394,7 @@ export default function RapportsOHADA() {
     const d = crData as CompteResultatData | undefined;
     if (!d) { toast.warning('Aucune donnée à exporter'); return; }
     try {
-      const { jsPDF, autoTable } = await loadExportLibraries();
+      const { jsPDF, autoTable } = await loadPDFLibraries();
       const doc = new jsPDF('portrait');
 
       let y = addPdfLogoHeader(doc, {
@@ -477,7 +476,7 @@ export default function RapportsOHADA() {
     const d = liData as LivreInventaireData | undefined;
     if (!d || d.lignes.length === 0) { toast.warning('Aucune donnée à exporter'); return; }
     try {
-      const { XLSX } = await loadExportLibraries();
+      const { downloadWorkbook } = await import('@/lib/excel-export');
       const rows: Record<string, string | number>[] = d.lignes.filter(l => l.solde !== 0).map(l => ({
         'Compte': l.numeroCompte,
         'Intitulé': l.intitule,
@@ -505,10 +504,9 @@ export default function RapportsOHADA() {
         'Sens Normal': '',
         'Observation': '',
       });
-      const ws = XLSX.utils.json_to_sheet(rows);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Livre d'Inventaire");
-      XLSX.writeFile(wb, `Livre_Inventaire_${d.dateInventaire}.xlsx`);
+      await downloadWorkbook(`Livre_Inventaire_${d.dateInventaire}.xlsx`, [
+        { name: "Livre d'Inventaire", rows },
+      ]);
       toast.success('Export Excel réussi');
     } catch (e) { toast.error(handleApiError(e, 'Erreur export Excel')); }
   }, [liData]);
@@ -520,7 +518,7 @@ export default function RapportsOHADA() {
     const d = liData as LivreInventaireData | undefined;
     if (!d || d.lignes.length === 0) { toast.warning('Aucune donnée à exporter'); return; }
     try {
-      const { jsPDF, autoTable } = await loadExportLibraries();
+      const { jsPDF, autoTable } = await loadPDFLibraries();
       const doc = new jsPDF('landscape');
 
       const startY = addPdfLogoHeader(doc, {

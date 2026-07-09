@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { Card, Button, Badge } from '../../ui';
 // P4.1: Lazy-load heavy export libraries
-import { loadPDFLibraries, loadExcelLibrary } from '@/lib/lazy-export';
+import { loadPDFLibraries } from '@/lib/lazy-export';
 
 // P3.3: Memoized flux row component to prevent unnecessary re-renders
 interface FluxRowProps {
@@ -109,8 +109,7 @@ export default function TableauTresorerie() {
     if (!data) return;
 
     try {
-      // P4.1: Lazy-load Excel library
-      const XLSX = await loadExcelLibrary();
+      const { downloadWorkbook } = await import('@/lib/excel-export');
       const allFlux = [
         ...data.exploitation.map(f => ({ ...f, Section: 'Exploitation' })),
         { Section: 'TOTAL EXPLOITATION', libelle: '', montant: totalExploitation, type: '', categorie: '' },
@@ -131,17 +130,15 @@ export default function TableauTresorerie() {
         'Montant': f.montant
       }));
 
-      const ws = XLSX.utils.json_to_sheet(exportData);
-      const wb = XLSX.utils.book_new();
-
-      XLSX.utils.sheet_add_aoa(ws, [
-        ['TABLEAU DES FLUX DE TRESORERIE - OHADA'],
-        [`Période: ${dateDebut} au ${dateFin}`],
-        []
-      ], { origin: 'A1' });
-
-      XLSX.utils.book_append_sheet(wb, ws, 'Flux Trésorerie');
-      XLSX.writeFile(wb, `Tableau_Tresorerie_OHADA_${new Date().toISOString().split('T')[0]}.xlsx`);
+      await downloadWorkbook(`Tableau_Tresorerie_OHADA_${new Date().toISOString().split('T')[0]}.xlsx`, [{
+        name: 'Flux Trésorerie',
+        titleRows: [
+          ['TABLEAU DES FLUX DE TRESORERIE - OHADA'],
+          [`Période: ${dateDebut} au ${dateFin}`],
+          [],
+        ],
+        rows: exportData,
+      }]);
     } catch (error) {
       console.error('Erreur export Excel:', error);
     }

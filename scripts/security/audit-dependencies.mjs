@@ -3,17 +3,9 @@ import { spawnSync } from "node:child_process";
 const severityRank = { low: 1, moderate: 2, high: 3, critical: 4 };
 const minimumSeverity = severityRank.high;
 
-const exceptions = [
-  {
-    dependency: "xlsx",
-    advisoryUrls: new Set([
-      "https://github.com/advisories/GHSA-4r6h-8v6p-xvw6",
-      "https://github.com/advisories/GHSA-5pgg-2g8v-p4x9",
-    ]),
-    expiresOn: "2026-08-07",
-    trackingDocument: "docs/security/dependency-exceptions.md",
-  },
-];
+// Aucune exception active. `xlsx` (SheetJS) a été entièrement remplacé par
+// `exceljs` (registre npm, MIT). Voir docs/security/dependency-exceptions.md.
+const exceptions = [];
 
 const result = spawnSync("npm", ["audit", "--json"], {
   encoding: "utf8",
