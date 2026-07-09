@@ -8,7 +8,7 @@
  * d'un domaine flaggé doit être couverte par les règles du middleware,
  * sinon ce test échoue.
  */
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { TenantFeatureKey } from "../../packages/shared/tenant-config";
@@ -45,10 +45,18 @@ function expectedFeature(path: string): TenantFeatureKey | undefined {
   return undefined;
 }
 
+function listRouteFiles(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) out.push(...listRouteFiles(full));
+    else if (entry.endsWith(".ts")) out.push(full);
+  }
+  return out;
+}
+
 function collectApiPaths(): string[] {
-  const files = readdirSync(ROUTES_DIR)
-    .filter((f) => f.endsWith(".ts"))
-    .map((f) => join(ROUTES_DIR, f));
+  const files = listRouteFiles(ROUTES_DIR);
   files.push(ROUTES_FILE);
 
   const paths = new Set<string>();
