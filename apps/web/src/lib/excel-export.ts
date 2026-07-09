@@ -1,5 +1,5 @@
 /**
- * Export Excel/CSV — remplace SheetJS (xlsx) par ExcelJS.
+ * Export Excel/CSV (ExcelJS + papaparse).
  *
  * À importer dynamiquement depuis les composants pour préserver le
  * lazy-loading du chunk d'export :
@@ -16,7 +16,7 @@ export interface SheetSpec {
   rows?: Array<Record<string, unknown>>;
   /** Lignes brutes (array of arrays), en-têtes incluses si souhaité. */
   aoa?: unknown[][];
-  /** Largeurs de colonnes en caractères (équivalent wch de SheetJS). */
+  /** Largeurs de colonnes en caractères. */
   columnWidths?: number[];
 }
 

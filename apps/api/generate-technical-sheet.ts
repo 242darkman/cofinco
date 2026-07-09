@@ -170,7 +170,7 @@ export function generateTechnicalSheetPDF(): Buffer {
     ['Build Tool', 'Vite'],
     ['Cartographie', 'Leaflet + OpenStreetMap'],
     ['PDF Export', 'jsPDF + jspdf-autotable'],
-    ['Excel Export', 'xlsx'],
+    ['Excel Export', 'exceljs'],
     ['Mode hors-ligne', 'IndexedDB (Dexie)'],
   ];
 
