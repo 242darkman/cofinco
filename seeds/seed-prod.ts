@@ -583,7 +583,7 @@ const ACCOUNTING_RULES_DATA = [
     sourceType: 'MOUVEMENT',
     eventType: 'AGENT_COMMISSION',
     paymentMethod: 'MOBILE_MONEY',
-    journalCode: 'MM',
+    journalCode: 'MMTN',
     debitAccount: '6615',   // Charges personnel - commissions/primes
     creditAccount: '5781',  // Mobile Money (résolu dynamiquement par opérateur)
     descriptionTemplate: 'Commission agent MM — {employeNom} — {periode}',
@@ -1619,7 +1619,7 @@ const ACCOUNTING_RULES_DATA = [
     sourceType: 'MOUVEMENT',
     eventType: 'OPENING_FEE',
     paymentMethod: 'TRANSFER',
-    journalCode: 'OPD',
+    journalCode: 'OD',
     debitAccount: '4111',    // Dépôts courant (compte source)
     creditAccount: '708500', // Frais d'ouverture de compte
     descriptionTemplate: "Frais ouverture compte (virement) - {clientName}",
@@ -1774,7 +1774,7 @@ const ACCOUNTING_RULES_DATA = [
     eventType: 'CLOSURE_PAYOUT_SAVINGS',
     paymentMethod: 'MOBILE_MONEY',
     provider: 'MTN',
-    journalCode: 'MMO',
+    journalCode: 'MMTN',
     debitAccount: '4112',    // Dépôts clients - Comptes épargne
     creditAccount: '5781',   // Mobile Money MTN
     descriptionTemplate: 'Restitution clôture épargne MTN - {clientName}',
@@ -1789,7 +1789,7 @@ const ACCOUNTING_RULES_DATA = [
     eventType: 'CLOSURE_PAYOUT_SAVINGS',
     paymentMethod: 'MOBILE_MONEY',
     provider: 'AIRTEL',
-    journalCode: 'MMO',
+    journalCode: 'MAIR',
     debitAccount: '4112',    // Dépôts clients - Comptes épargne
     creditAccount: '5782',   // Mobile Money Airtel
     descriptionTemplate: 'Restitution clôture épargne Airtel - {clientName}',
@@ -1804,7 +1804,7 @@ const ACCOUNTING_RULES_DATA = [
     eventType: 'CLOSURE_PAYOUT_CURRENT',
     paymentMethod: 'MOBILE_MONEY',
     provider: 'MTN',
-    journalCode: 'MMO',
+    journalCode: 'MMTN',
     debitAccount: '4111',    // Dépôts clients - Comptes courants
     creditAccount: '5781',   // Mobile Money MTN
     descriptionTemplate: 'Restitution clôture courant MTN - {clientName}',
@@ -1819,7 +1819,7 @@ const ACCOUNTING_RULES_DATA = [
     eventType: 'CLOSURE_PAYOUT_CURRENT',
     paymentMethod: 'MOBILE_MONEY',
     provider: 'AIRTEL',
-    journalCode: 'MMO',
+    journalCode: 'MAIR',
     debitAccount: '4111',    // Dépôts clients - Comptes courants
     creditAccount: '5782',   // Mobile Money Airtel
     descriptionTemplate: 'Restitution clôture courant Airtel - {clientName}',
@@ -1834,7 +1834,7 @@ const ACCOUNTING_RULES_DATA = [
     eventType: 'CLOSURE_PAYOUT_BLOCKED',
     paymentMethod: 'MOBILE_MONEY',
     provider: 'MTN',
-    journalCode: 'MMO',
+    journalCode: 'MMTN',
     debitAccount: '4113',    // Dépôts clients - Comptes bloqués
     creditAccount: '5781',   // Mobile Money MTN
     descriptionTemplate: 'Restitution clôture bloqué MTN - {clientName}',
@@ -1849,7 +1849,7 @@ const ACCOUNTING_RULES_DATA = [
     eventType: 'CLOSURE_PAYOUT_BLOCKED',
     paymentMethod: 'MOBILE_MONEY',
     provider: 'AIRTEL',
-    journalCode: 'MMO',
+    journalCode: 'MAIR',
     debitAccount: '4113',    // Dépôts clients - Comptes bloqués
     creditAccount: '5782',   // Mobile Money Airtel
     descriptionTemplate: 'Restitution clôture bloqué Airtel - {clientName}',
