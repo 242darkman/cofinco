@@ -8,7 +8,7 @@
  * - Seniority bonuses
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 
 // Pure calculation functions (extracted from payroll logic)
 function calculateIPR(income: number, brackets: Array<{min: number, max: number | null, rate: number}>): number {
@@ -119,6 +119,16 @@ describe('Payroll Calculations', () => {
   });
 
   describe('Seniority Bonus', () => {
+    // Horloge gelée : le calcul floor(jours / 365.25) est sensible au nombre
+    // d'années bissextiles écoulées — sans cela le test échoue certains jours.
+    beforeAll(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-03-01T12:00:00Z'));
+    });
+    afterAll(() => {
+      vi.useRealTimers();
+    });
+
     it('should calculate 2% per year capped at 30%', () => {
       const baseSalary = 1000000;
 
