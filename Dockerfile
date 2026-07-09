@@ -94,7 +94,11 @@ COPY package.json package-lock.json ./
 COPY apps/web/package.json ./apps/web/package.json
 COPY apps/api/package.json ./apps/api/package.json
 COPY packages/shared/package.json ./packages/shared/package.json
-RUN npm ci --omit=dev && npm cache clean --force
+RUN npm ci --omit=dev && npm cache clean --force \
+    # npm n'est pas utilisé au runtime (CMD: node dist/index.cjs). On le retire
+    # pour éliminer l'undici vulnérable bundlé dans npm (CVE-2026-12151) et
+    # réduire la surface d'attaque de l'image.
+    && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 # Copy build artifacts
 COPY --from=build /app/dist ./dist
