@@ -89,12 +89,22 @@ describe("Contract 1: No Direct Balance Update", () => {
   afterEach(cleanupTestEntities);
 
   it("should block direct UPDATE on comptes.solde_courant without mouvement", async () => {
-    // Attempt a raw SQL UPDATE outside any mouvement creation
-    await expect(
-      db.execute(
+    // Attempt a raw SQL UPDATE outside any mouvement creation.
+    // drizzle-orm >= 0.44 encapsule l'erreur PG dans DrizzleQueryError
+    // (message "Failed query: …") ; le message de la garde BALANCE_GUARD se
+    // trouve dans la chaîne `.cause`. On inspecte donc toute la chaîne.
+    let error: unknown;
+    try {
+      await db.execute(
         sql`UPDATE comptes SET solde_courant = '999999' WHERE id = ${testCompteId}`
-      )
-    ).rejects.toThrow(/BALANCE_GUARD/);
+      );
+    } catch (e) {
+      error = e;
+    }
+    expect(error, "L'UPDATE direct doit être bloqué par la garde BALANCE_GUARD").toBeDefined();
+    const err = error as { message?: string; cause?: { message?: string; cause?: { message?: string } } };
+    const chain = `${err?.message ?? ""} ${err?.cause?.message ?? ""} ${err?.cause?.cause?.message ?? ""}`;
+    expect(chain).toMatch(/BALANCE_GUARD/);
 
     // Verify balance is unchanged
     const [compte] = await db
