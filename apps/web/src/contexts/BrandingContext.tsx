@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { defaultTenantConfig } from '@shared/tenant-config';
 
 export interface CompanyInfo {
   adresse: string | null;
@@ -21,7 +22,7 @@ export interface BrandingConfig {
 
 const DEFAULT_BRANDING: BrandingConfig = {
   appName: 'MicroFlex',
-  logoUrl: null,
+  logoUrl: defaultTenantConfig.theme.logoUrl ?? null,
   primaryColor: '#0f766e',
   accentColor: '#c2410c',
   theme: 'DARK',
