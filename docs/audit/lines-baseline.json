@@ -13,7 +13,6 @@
   "apps/api/routes/dashboard.ts": 955,
   "apps/api/routes/employes.ts": 1085,
   "apps/api/routes/finance.ts": 6176,
-  "apps/api/routes/hr.ts": 7191,
   "apps/api/routes/monitoring.ts": 499,
   "apps/api/routes/notifications.ts": 866,
   "apps/api/routes/operations.ts": 1068,
