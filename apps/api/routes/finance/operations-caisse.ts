@@ -220,7 +220,7 @@ export function registerOperationsCaisseRoutes(app: Express) {
             try {
                 const isSavingsDeposit = ['DEPOSIT_SAVINGS', 'SAVINGS_DEPOSIT'].includes(parsed.typeOperation);
                 if (parsed.clientId && isSavingsDeposit && parsed.montant) {
-                    const { recordScoreEvent } = await import('../services/scoring-engine');
+                    const { recordScoreEvent } = await import('../../services/scoring-engine');
                     await recordScoreEvent({
                         clientId: parsed.clientId,
                         agenceId: session.agenceId || undefined,

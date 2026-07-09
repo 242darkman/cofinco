@@ -63,7 +63,7 @@ import { registerFacturesRoutes } from "./finance/factures";
 import { registerCaisseTransfertsRoutes } from "./finance/caisse-transferts";
 import { registerMouvementsRoutes } from "./finance/mouvements";
 import { registerComptesRoutes } from "./finance/comptes";
-import { registerFinanceRoutes } from "./finance/finance";
+import { registerFinanceBaseRoutes } from "./finance/finance";
 import { registerFinanceCreditRefundsRoutes } from "./finance/finance-credit-refunds";
 import { registerFinanceCreditRefunds2Routes } from "./finance/finance-credit-refunds-2";
 import { registerSessionsCaisseRequestOpeningRoutes } from "./finance/sessions-caisse-request-opening";
@@ -97,7 +97,7 @@ export function registerFinanceRoutes(app: Express) {
   registerCaisseTransfertsRoutes(app);
   registerMouvementsRoutes(app);
   registerComptesRoutes(app);
-  registerFinanceRoutes(app);
+  registerFinanceBaseRoutes(app);
   registerFinanceCreditRefundsRoutes(app);
   registerFinanceCreditRefunds2Routes(app);
   registerSessionsCaisseRequestOpeningRoutes(app);

@@ -217,7 +217,7 @@ export function registerComptesDetail3Routes(app: Express) {
 
         // Score event: account blocked
         try {
-          const { recordScoreEvent } = await import('../services/scoring-engine');
+          const { recordScoreEvent } = await import('../../services/scoring-engine');
           await recordScoreEvent({
             clientId: compte.clientId,
             agenceId: compte.agenceId || undefined,

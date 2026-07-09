@@ -31,7 +31,7 @@ import { StatutCompte, TypeCompte, MethodePaiement, MotifBlocage, SuspensionReas
 import { dispatchDomainEvent } from "../../services/notifications/domain-events/event-registry";
 import { logger, createCompteSchema } from "./shared";
 
-export function registerComptesRoutes(app: Express) {
+export function registerComptesBaseRoutes(app: Express) {
   // ============================================================================
   // CREATE COMPTE
   // ============================================================================

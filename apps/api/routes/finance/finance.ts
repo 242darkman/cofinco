@@ -23,7 +23,7 @@ import { eq, desc, and, sql, count, inArray } from "drizzle-orm";
 import { SystemRole } from "@shared/types/roles";
 import { logger } from "./shared";
 
-export function registerFinanceRoutes(app: Express) {
+export function registerFinanceBaseRoutes(app: Express) {
   // ============================================================================
   // CREDIT REFUND WORKFLOW API
   // ============================================================================

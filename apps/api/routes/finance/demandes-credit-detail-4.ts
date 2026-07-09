@@ -30,7 +30,7 @@ export function registerDemandesCreditDetail4Routes(app: Express) {
         return res.status(404).json({ message: "Demande non trouvée" });
       }
 
-      const { calculerScoreMicrofinance } = await import('../services/microfinance-scoring');
+      const { calculerScoreMicrofinance } = await import('../../services/microfinance-scoring');
 
       // Convertir la durée en mois
       let dureeMois = demande.dureeValeur || 1;
@@ -70,8 +70,8 @@ export function registerDemandesCreditDetail4Routes(app: Express) {
         return res.status(404).json({ message: "Demande non trouvée" });
       }
 
-      const { calculerScoreMicrofinance } = await import('../services/microfinance-scoring');
-      const { recalculateClientScore } = await import('../services/scoring-engine');
+      const { calculerScoreMicrofinance } = await import('../../services/microfinance-scoring');
+      const { recalculateClientScore } = await import('../../services/scoring-engine');
 
       // Convertir la durée en mois
       let dureeMois = demande.dureeValeur || 1;

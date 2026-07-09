@@ -26,7 +26,7 @@
  *   - comptes/comptes-transferts.ts
  */
 import type { Express } from "express";
-import { registerComptesRoutes } from "./comptes/comptes";
+import { registerComptesBaseRoutes } from "./comptes/comptes";
 import { registerAccountsRoutes } from "./comptes/accounts";
 import { registerComptesPendingActivationRoutes } from "./comptes/comptes-pending-activation";
 import { registerClientsRoutes } from "./comptes/clients";
@@ -46,7 +46,7 @@ import { registerOpeningRequestsRoutes } from "./comptes/opening-requests";
 import { registerComptesTransfertsRoutes } from "./comptes/comptes-transferts";
 
 export function registerComptesRoutes(app: Express) {
-  registerComptesRoutes(app);
+  registerComptesBaseRoutes(app);
   registerAccountsRoutes(app);
   registerComptesPendingActivationRoutes(app);
   registerClientsRoutes(app);

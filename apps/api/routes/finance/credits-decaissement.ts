@@ -279,7 +279,7 @@ export function registerCreditsDecaissementRoutes(app: Express) {
 
               // Score event: INITIAL_SCORE for newly disbursed credit
               try {
-                const { recordScoreEvent } = await import('../services/scoring-engine');
+                const { recordScoreEvent } = await import('../../services/scoring-engine');
                 await recordScoreEvent({
                   clientId: demande.clientId,
                   agenceId: credit.agenceId ?? undefined,

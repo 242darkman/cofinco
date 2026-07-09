@@ -157,7 +157,7 @@ export function registerCaisseRoutes(app: Express) {
             };
 
             // Send push notification
-            const { sendPushToUser } = await import('../services/push-notification-service');
+            const { sendPushToUser } = await import('../../services/push-notification-service');
             await sendPushToUser(data.assignedToUserId, {
               title: '🔑 Code d\'accès caisse',
               body: `Votre code: ${result.code} (valide ${validityLabel})`,
@@ -169,7 +169,7 @@ export function registerCaisseRoutes(app: Express) {
             });
 
             // Send SMS and Email via notification service
-            const { emitNotificationEvent, sendInAppNotification } = await import('../services/notifications/notification-service');
+            const { emitNotificationEvent, sendInAppNotification } = await import('../../services/notifications/notification-service');
 
             const notificationPayload = {
               userName,

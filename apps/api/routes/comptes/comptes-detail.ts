@@ -176,7 +176,7 @@ export function registerComptesDetailRoutes(app: Express) {
 
             // Score event: EPARGNE_DEPOT (direct deposit path)
             try {
-              const { recordScoreEvent } = await import('../services/scoring-engine');
+              const { recordScoreEvent } = await import('../../services/scoring-engine');
               await recordScoreEvent({
                 clientId: compteInfo.clientId,
                 agenceId: compteInfo.agenceId || undefined,

@@ -66,7 +66,7 @@ export function registerRemboursementsRoutes(app: Express) {
         try {
             const credit = await storage.getCredit(data.creditId);
             if (credit?.clientId) {
-                const { recordScoreEvent } = await import('../services/scoring-engine');
+                const { recordScoreEvent } = await import('../../services/scoring-engine');
                 await recordScoreEvent({
                     clientId: credit.clientId,
                     agenceId: userAgence || undefined,
