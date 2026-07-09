@@ -7,34 +7,13 @@ import { fr } from 'date-fns/locale';
 import { toast } from 'sonner';
 import AccountStatsChart from './AccountStatsChart';
 
-// P3.3: Lazy-loaded export utilities (jsPDF ~500KB)
-const loadExportLibraries = async () => {
-  const [jsPDFModule, autoTableModule] = await Promise.all([
-    import('jspdf'),
-    import('jspdf-autotable'),
-  ]);
-  return {
-    jsPDF: jsPDFModule.default,
-    autoTable: autoTableModule.default,
-  };
-};
+import {
+  exportAccountHistoryCSV,
+  exportAccountHistoryPDF,
+  TransactionExport
+} from './exports/accountHistoryExports';
 
-interface Transaction {
-  id: string;
-  createdAt: string; 
-  montant: string | number;
-  sens: 'CREDIT' | 'DEBIT';
-  type: string;
-  description?: string;
-  observations?: string;
-  recuNumero?: string;
-  referenceExterne?: string;
-  soldeApres?: string | number;
-  typePaiement?: string;
-  methodePaiement?: string;
-  displayDescription?: string;
-  displayRef?: string;
-}
+interface Transaction extends TransactionExport {}
 
 interface AccountHistoryProps {
   compteId: string;
@@ -113,73 +92,12 @@ export default function AccountHistory({ compteId, numeroCompte, isOpen, onClose
 
   // P3.3: Lazy-loaded CSV export
   const handleExportCSV = async () => {
-    setExportingCSV(true);
-    try {
-      const { downloadCsv } = await import('@/lib/excel-export');
-
-      const data = filteredTransactions.map(t => ({
-        Date: safeFormatDate(t.createdAt),
-        Description: t.displayDescription,
-        Type: ALL_STATUS_LABELS[t.typePaiement || t.type || ''] || t.typePaiement || t.type,
-        Reference: t.displayRef,
-        Sens: t.sens,
-        Montant: t.montant,
-        Solde: t.soldeApres || '-'
-      }));
-
-      downloadCsv(`historique_compte_${numeroCompte}_${format(new Date(), 'yyyyMMdd')}.csv`, data);
-      toast.success('Export CSV terminé');
-    } catch (error) {
-      console.error('Erreur export CSV:', error);
-      toast.error('Erreur lors de l\'export CSV');
-    } finally {
-      setExportingCSV(false);
-    }
+    await exportAccountHistoryCSV(filteredTransactions, numeroCompte, setExportingCSV);
   };
 
   // P3.3: Lazy-loaded PDF export
   const handleExportPDF = async () => {
-    setExportingPDF(true);
-    try {
-      const { jsPDF, autoTable } = await loadExportLibraries();
-
-      const doc = new jsPDF();
-      doc.setFontSize(18);
-      doc.text('Historique de Compte', 14, 22);
-
-      doc.setFontSize(11);
-      doc.setTextColor(100);
-      doc.text(`N° Compte: ${numeroCompte}`, 14, 30);
-      doc.text(`Date impression: ${format(new Date(), 'dd/MM/yyyy HH:mm', { locale: fr })}`, 14, 36);
-
-      const tableColumn = ["Date", "Description", "Ref", "Sens", "Montant", "Solde"];
-      const tableRows = filteredTransactions.map(t => [
-        safeFormatDate(t.createdAt),
-        t.displayDescription,
-        t.displayRef,
-        t.sens === 'CREDIT' ? 'Dépôt' : 'Retrait',
-        `${formatMoney(t.montant)} FCFA`,
-        t.soldeApres ? `${formatMoney(t.soldeApres)} FCFA` : '-'
-      ]);
-
-      autoTable(doc, {
-        head: [tableColumn],
-        body: tableRows,
-        startY: 44,
-        styles: { fontSize: 9 },
-        headStyles: { fillColor: [22, 163, 74] },
-        alternateRowStyles: { fillColor: [240, 253, 244] },
-        columnStyles: { 4: { halign: 'right' }, 5: { halign: 'right' } }
-      });
-
-      doc.save(`historique_compte_${numeroCompte}_${format(new Date(), 'yyyyMMdd')}.pdf`);
-      toast.success('Export PDF terminé');
-    } catch (error) {
-      console.error('Erreur export PDF:', error);
-      toast.error('Erreur lors de l\'export PDF');
-    } finally {
-      setExportingPDF(false);
-    }
+    await exportAccountHistoryPDF(filteredTransactions, numeroCompte, setExportingPDF);
   };
 
 

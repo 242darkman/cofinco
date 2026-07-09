@@ -1,25 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Activity, Download, Printer, ArrowUpRight, ArrowDownRight,
-  TrendingUp, TrendingDown, RefreshCw, Layers, PlusCircle, MinusCircle
+  Activity, Download, Printer, RefreshCw, Layers, PlusCircle, MinusCircle
 } from 'lucide-react';
-import { Card, Button, Badge } from '../../ui';
-// P4.1: Lazy-load heavy export libraries
-import { loadPDFLibraries } from '@/lib/lazy-export';
+import { Card } from '../../ui';
 
-interface LigneTAFIRE {
-  code: string;
-  libelle: string;
-  montantN: number;
-  montantN1: number;
-}
+import {
+  exportTAFIREExcel,
+  exportTAFIREPDF,
+  LigneTAFIREExport,
+  TAFIREDataExport
+} from './exports/tafireExports';
 
-interface TAFIREData {
-  ressourcesDurables: LigneTAFIRE[];
-  emploisDurables: LigneTAFIRE[];
-  variationBFR: LigneTAFIRE[];
-  tresorerie: LigneTAFIRE[];
-}
+interface LigneTAFIRE extends LigneTAFIREExport {}
+
+interface TAFIREData extends TAFIREDataExport {}
 
 export default function TAFIRE() {
   const [data, setData] = useState<TAFIREData | null>(null);
@@ -87,143 +81,28 @@ export default function TAFIRE() {
 
   const handleExportExcel = async () => {
     if (!data) return;
-
-    try {
-      const { downloadWorkbook } = await import('@/lib/excel-export');
-
-      // Feuille principale
-      const mainData = [
-        ['TAFIRE - Tableau Financier des Ressources et Emplois'],
-        [`Exercice ${exercice}`],
-        [],
-        ['I - RESSOURCES DURABLES'],
-        ['Code', 'Libellé', `Exercice N (${exercice})`, `Exercice N-1 (${exercice - 1})`],
-        ...data.ressourcesDurables.map(l => [l.code, l.libelle, l.montantN, l.montantN1]),
-        ['', 'TOTAL RESSOURCES', totalRessources, calcTotal(data.ressourcesDurables, 'montantN1')],
-        [],
-        ['II - EMPLOIS DURABLES'],
-        ['Code', 'Libellé', `Exercice N (${exercice})`, `Exercice N-1 (${exercice - 1})`],
-        ...data.emploisDurables.map(l => [l.code, l.libelle, l.montantN, l.montantN1]),
-        ['', 'TOTAL EMPLOIS', totalEmplois, calcTotal(data.emploisDurables, 'montantN1')],
-        [],
-        ['', 'EXCEDENT DE RESSOURCES (I - II)', excedentRessources, ''],
-        [],
-        ['III - VARIATION DU BFR'],
-        ...data.variationBFR.map(l => [l.code, l.libelle, l.montantN, l.montantN1]),
-        ['', 'TOTAL VARIATION BFR', variationBFR, calcTotal(data.variationBFR, 'montantN1')],
-        [],
-        ['', 'VARIATION DE TRESORERIE', variationTresorerie, ''],
-        [],
-        ['IV - TRESORERIE'],
-        ...data.tresorerie.map(l => [l.code, l.libelle, l.montantN, l.montantN1]),
-      ];
-
-      await downloadWorkbook(`TAFIRE_OHADA_${exercice}.xlsx`, [
-        { name: 'TAFIRE', aoa: mainData, columnWidths: [10, 45, 20, 20] },
-      ]);
-    } catch (error) {
-      console.error('Erreur export Excel:', error);
-    }
+    await exportTAFIREExcel(
+      data,
+      exercice,
+      totalRessources,
+      totalEmplois,
+      excedentRessources,
+      variationBFR,
+      variationTresorerie
+    );
   };
 
   const handleExportPDF = async () => {
     if (!data) return;
-
-    try {
-      // P4.1: Lazy-load PDF library
-      const { jsPDF } = await loadPDFLibraries();
-      const doc = new jsPDF('portrait');
-
-      // Header
-      doc.setFontSize(16);
-      doc.setTextColor(30, 58, 138);
-      doc.text('TAFIRE', 105, 15, { align: 'center' });
-      doc.setFontSize(10);
-      doc.text('Tableau Financier des Ressources et Emplois', 105, 22, { align: 'center' });
-
-      doc.setFontSize(9);
-      doc.setTextColor(100);
-      doc.text(`Exercice ${exercice} - Normes OHADA`, 105, 29, { align: 'center' });
-
-      doc.setDrawColor(30, 58, 138);
-      doc.line(15, 33, 195, 33);
-
-      let y = 40;
-
-      const renderSection = (title: string, lignes: LigneTAFIRE[], total: number, color: number[]) => {
-        doc.setFillColor(color[0], color[1], color[2]);
-        doc.rect(15, y, 180, 7, 'F');
-        doc.setTextColor(255);
-        doc.setFontSize(9);
-        doc.text(title, 20, y + 5);
-        y += 10;
-
-        doc.setTextColor(0);
-        doc.setFontSize(8);
-
-        // En-têtes colonnes
-        doc.setTextColor(100);
-        doc.text('Code', 20, y);
-        doc.text('Libellé', 35, y);
-        doc.text(`N (${exercice})`, 145, y, { align: 'right' });
-        doc.text(`N-1`, 175, y, { align: 'right' });
-        y += 5;
-
-        doc.setTextColor(0);
-        lignes.forEach(l => {
-          doc.text(l.code, 20, y);
-          doc.text(l.libelle.substring(0, 55), 35, y);
-          doc.text(l.montantN.toLocaleString('fr-FR'), 145, y, { align: 'right' });
-          doc.text(l.montantN1.toLocaleString('fr-FR'), 175, y, { align: 'right' });
-          y += 5;
-        });
-
-        // Total
-        doc.setFontSize(9);
-        doc.setTextColor(color[0], color[1], color[2]);
-        doc.text('TOTAL', 35, y);
-        doc.text(total.toLocaleString('fr-FR') + ' FCFA', 145, y, { align: 'right' });
-        y += 10;
-      };
-
-      renderSection('I - RESSOURCES DURABLES', data.ressourcesDurables, totalRessources, [34, 197, 94]);
-      renderSection('II - EMPLOIS DURABLES', data.emploisDurables, totalEmplois, [239, 68, 68]);
-
-      // Excédent
-      const excColor = excedentRessources >= 0 ? [34, 197, 94] : [239, 68, 68];
-      doc.setFillColor(excColor[0], excColor[1], excColor[2]);
-      doc.rect(15, y, 180, 8, 'F');
-      doc.setTextColor(255);
-      doc.setFontSize(10);
-      doc.text('EXCEDENT DE RESSOURCES (I - II)', 20, y + 6);
-      doc.text(`${excedentRessources >= 0 ? '+' : ''}${excedentRessources.toLocaleString('fr-FR')} FCFA`, 175, y + 6, { align: 'right' });
-      y += 15;
-
-      renderSection('III - VARIATION DU BFR', data.variationBFR, variationBFR, [59, 130, 246]);
-
-      // Variation Trésorerie finale
-      y += 5;
-      const varColor = variationTresorerie >= 0 ? [34, 197, 94] : [239, 68, 68];
-      doc.setFillColor(varColor[0], varColor[1], varColor[2]);
-      doc.rect(15, y, 180, 10, 'F');
-      doc.setTextColor(255);
-      doc.setFontSize(11);
-      doc.text('VARIATION DE TRESORERIE', 20, y + 7);
-      doc.text(`${variationTresorerie >= 0 ? '+' : ''}${variationTresorerie.toLocaleString('fr-FR')} FCFA`, 175, y + 7, { align: 'right' });
-
-      y += 18;
-      doc.setFontSize(9);
-      doc.setTextColor(0);
-      data.tresorerie.forEach(t => {
-        doc.text(t.libelle, 20, y);
-        doc.text(t.montantN.toLocaleString('fr-FR') + ' FCFA', 175, y, { align: 'right' });
-        y += 6;
-      });
-
-      doc.save(`TAFIRE_OHADA_${exercice}.pdf`);
-    } catch (error) {
-      console.error('Erreur export PDF:', error);
-    }
+    await exportTAFIREPDF(
+      data,
+      exercice,
+      totalRessources,
+      totalEmplois,
+      excedentRessources,
+      variationBFR,
+      variationTresorerie
+    );
   };
 
   const renderLignesSection = (
@@ -245,8 +124,8 @@ export default function TAFIRE() {
         </span>
       </div>
       <div className="space-y-1">
-        {lignes.map((l, i) => (
-          <div key={i} className="flex justify-between items-center py-1.5 px-2 hover:bg-surface-elevated/30 rounded text-xs">
+        {lignes.map((l) => (
+          <div key={l.code} className="flex justify-between items-center py-1.5 px-2 hover:bg-surface-elevated/30 rounded text-xs">
             <div className="flex items-center gap-2">
               <span className="text-accent font-mono text-[10px] w-6">{l.code}</span>
               <span className="text-content-secondary">{l.libelle}</span>
@@ -261,10 +140,134 @@ export default function TAFIRE() {
     </Card>
   );
 
+  const renderContent = () => {
+    if (loading) {
+      return (
+        <div className="text-center py-12">
+          <RefreshCw className="animate-spin w-8 h-8 text-status-warning mx-auto mb-3" />
+          <p className="text-content-muted text-sm">Calcul du TAFIRE...</p>
+        </div>
+      );
+    }
+
+    if (!data) {
+      return (
+        <Card variant="default" padding="lg" className="text-center">
+          <Activity className="w-12 h-12 mx-auto mb-3 text-content-muted" />
+          <p className="text-content-muted">Aucune donnée TAFIRE disponible</p>
+        </Card>
+      );
+    }
+
+    return (
+      <>
+        {/* Synthèse */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <Card variant="default" padding="sm" className="bg-status-success-bg border-status-success/30">
+            <div className="flex items-center gap-1 mb-1">
+              <PlusCircle size={12} className="text-status-success" />
+              <span className="text-[10px] text-content-muted">Ressources</span>
+            </div>
+            <div className="text-lg font-bold text-status-success">{totalRessources.toLocaleString()}</div>
+          </Card>
+          <Card variant="default" padding="sm" className="bg-status-danger-bg border-status-danger/30">
+            <div className="flex items-center gap-1 mb-1">
+              <MinusCircle size={12} className="text-status-danger" />
+              <span className="text-[10px] text-content-muted">Emplois</span>
+            </div>
+            <div className="text-lg font-bold text-status-danger">{totalEmplois.toLocaleString()}</div>
+          </Card>
+          <Card variant="default" padding="sm" className="bg-status-info-bg border-status-info/30">
+            <div className="flex items-center gap-1 mb-1">
+              <Layers size={12} className="text-status-info" />
+              <span className="text-[10px] text-content-muted">Variation BFR</span>
+            </div>
+            <div className={`text-lg font-bold ${variationBFR >= 0 ? 'text-status-info' : 'text-status-warning'}`}>
+              {variationBFR >= 0 ? '+' : ''}{variationBFR.toLocaleString()}
+            </div>
+          </Card>
+          <Card variant="default" padding="sm" className={excedentRessources >= 0 ? 'bg-status-success-bg border-status-success/50' : 'bg-status-danger-bg border-status-danger/50'}>
+            <div className="flex items-center gap-1 mb-1">
+              <Activity size={12} className={excedentRessources >= 0 ? 'text-status-success' : 'text-status-danger'} />
+              <span className="text-[10px] text-content-muted">Excédent</span>
+            </div>
+            <div className={`text-lg font-bold ${excedentRessources >= 0 ? 'text-status-success' : 'text-status-danger'}`}>
+              {excedentRessources >= 0 ? '+' : ''}{excedentRessources.toLocaleString()}
+            </div>
+          </Card>
+        </div>
+
+        {/* Légende colonnes */}
+        <div className="flex justify-end gap-4 text-[10px] text-content-muted px-2">
+          <span>Exercice N ({exercice})</span>
+          <span className="hidden md:inline">Exercice N-1 ({exercice - 1})</span>
+        </div>
+
+        {/* Détails */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          {renderLignesSection(
+            'I - Ressources Durables',
+            data.ressourcesDurables,
+            totalRessources,
+            'bg-gradient-to-r from-status-success to-status-success',
+            <PlusCircle size={14} className="text-white" />,
+            'ressource'
+          )}
+          {renderLignesSection(
+            'II - Emplois Durables',
+            data.emploisDurables,
+            totalEmplois,
+            'bg-gradient-to-r from-status-danger to-status-danger',
+            <MinusCircle size={14} className="text-white" />,
+            'emploi'
+          )}
+        </div>
+
+        {/* Excédent */}
+        <Card variant="default" padding="sm" className={excedentRessources >= 0 ? 'bg-status-success-bg border-status-success/30' : 'bg-status-danger-bg border-status-danger/30'}>
+          <div className="flex justify-between items-center">
+            <span className="text-sm font-bold text-content-primary">Excédent de Ressources (I - II)</span>
+            <span className={`text-lg font-bold ${excedentRessources >= 0 ? 'text-status-success' : 'text-status-danger'}`}>
+              {excedentRessources >= 0 ? '+' : ''}{excedentRessources.toLocaleString()} FCFA
+            </span>
+          </div>
+        </Card>
+
+        {/* Variation BFR */}
+        {renderLignesSection(
+          'III - Variation du BFR',
+          data.variationBFR,
+          variationBFR,
+          'bg-gradient-to-r from-status-info to-status-info',
+          <Layers size={14} className="text-white" />,
+          'ressource'
+        )}
+
+        {/* Variation Trésorerie finale */}
+        <Card variant="default" padding="sm" className={variationTresorerie >= 0 ? 'bg-status-success-bg border-status-success/50' : 'bg-status-danger-bg border-status-danger/50'}>
+          <div className="flex justify-between items-center py-2">
+            <span className="text-sm font-bold text-content-primary">VARIATION DE TRESORERIE</span>
+            <span className={`text-xl font-bold ${variationTresorerie >= 0 ? 'text-status-success' : 'text-status-danger'}`}>
+              {variationTresorerie >= 0 ? '+' : ''}{variationTresorerie.toLocaleString()} FCFA
+            </span>
+          </div>
+          <div className="border-t border-edge pt-2 mt-2 space-y-1">
+            {data.tresorerie.map((t) => (
+              <div key={t.code} className="flex justify-between text-xs">
+                <span className="text-content-muted">{t.libelle}</span>
+                <span className="text-content-primary font-mono">{t.montantN.toLocaleString()} FCFA</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </>
+    );
+  };
+
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="bg-gradient-to-r from-status-warning to-status-danger rounded-xl p-3">
+      <div className="bg-linear-to-r from-status-warning to-status-danger rounded-xl p-3">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-2">
             <Activity className="w-5 h-5 text-white" />
@@ -276,10 +279,10 @@ export default function TAFIRE() {
           <div className="flex gap-2">
             <select
               value={exercice}
-              onChange={(e) => setExercice(parseInt(e.target.value))}
+              onChange={(e) => setExercice(Number.parseInt(e.target.value))}
               className="bg-white/20 text-white text-xs px-3 py-1.5 rounded-lg border-transparent focus:outline-none"
             >
-              {[...Array(5)].map((_, i) => {
+              {Array.from({ length: 5 }).map((_, i) => {
                 const year = new Date().getFullYear() - i;
                 return <option key={year} value={year} className="text-black">{year}</option>;
               })}
@@ -296,119 +299,7 @@ export default function TAFIRE() {
         </div>
       </div>
 
-      {loading ? (
-        <div className="text-center py-12">
-          <RefreshCw className="animate-spin w-8 h-8 text-status-warning mx-auto mb-3" />
-          <p className="text-content-muted text-sm">Calcul du TAFIRE...</p>
-        </div>
-      ) : data ? (
-        <>
-          {/* Synthèse */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Card variant="default" padding="sm" className="bg-status-success-bg border-status-success/30">
-              <div className="flex items-center gap-1 mb-1">
-                <PlusCircle size={12} className="text-status-success" />
-                <span className="text-[10px] text-content-muted">Ressources</span>
-              </div>
-              <div className="text-lg font-bold text-status-success">{totalRessources.toLocaleString()}</div>
-            </Card>
-            <Card variant="default" padding="sm" className="bg-status-danger-bg border-status-danger/30">
-              <div className="flex items-center gap-1 mb-1">
-                <MinusCircle size={12} className="text-status-danger" />
-                <span className="text-[10px] text-content-muted">Emplois</span>
-              </div>
-              <div className="text-lg font-bold text-status-danger">{totalEmplois.toLocaleString()}</div>
-            </Card>
-            <Card variant="default" padding="sm" className="bg-status-info-bg border-status-info/30">
-              <div className="flex items-center gap-1 mb-1">
-                <Layers size={12} className="text-status-info" />
-                <span className="text-[10px] text-content-muted">Variation BFR</span>
-              </div>
-              <div className={`text-lg font-bold ${variationBFR >= 0 ? 'text-status-info' : 'text-status-warning'}`}>
-                {variationBFR >= 0 ? '+' : ''}{variationBFR.toLocaleString()}
-              </div>
-            </Card>
-            <Card variant="default" padding="sm" className={excedentRessources >= 0 ? 'bg-status-success-bg border-status-success/50' : 'bg-status-danger-bg border-status-danger/50'}>
-              <div className="flex items-center gap-1 mb-1">
-                <Activity size={12} className={excedentRessources >= 0 ? 'text-status-success' : 'text-status-danger'} />
-                <span className="text-[10px] text-content-muted">Excédent</span>
-              </div>
-              <div className={`text-lg font-bold ${excedentRessources >= 0 ? 'text-status-success' : 'text-status-danger'}`}>
-                {excedentRessources >= 0 ? '+' : ''}{excedentRessources.toLocaleString()}
-              </div>
-            </Card>
-          </div>
-
-          {/* Légende colonnes */}
-          <div className="flex justify-end gap-4 text-[10px] text-content-muted px-2">
-            <span>Exercice N ({exercice})</span>
-            <span className="hidden md:inline">Exercice N-1 ({exercice - 1})</span>
-          </div>
-
-          {/* Détails */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            {renderLignesSection(
-              'I - Ressources Durables',
-              data.ressourcesDurables,
-              totalRessources,
-              'bg-gradient-to-r from-status-success to-status-success',
-              <PlusCircle size={14} className="text-white" />,
-              'ressource'
-            )}
-            {renderLignesSection(
-              'II - Emplois Durables',
-              data.emploisDurables,
-              totalEmplois,
-              'bg-gradient-to-r from-status-danger to-status-danger',
-              <MinusCircle size={14} className="text-white" />,
-              'emploi'
-            )}
-          </div>
-
-          {/* Excédent */}
-          <Card variant="default" padding="sm" className={excedentRessources >= 0 ? 'bg-status-success-bg border-status-success/30' : 'bg-status-danger-bg border-status-danger/30'}>
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-bold text-content-primary">Excédent de Ressources (I - II)</span>
-              <span className={`text-lg font-bold ${excedentRessources >= 0 ? 'text-status-success' : 'text-status-danger'}`}>
-                {excedentRessources >= 0 ? '+' : ''}{excedentRessources.toLocaleString()} FCFA
-              </span>
-            </div>
-          </Card>
-
-          {/* Variation BFR */}
-          {renderLignesSection(
-            'III - Variation du BFR',
-            data.variationBFR,
-            variationBFR,
-            'bg-gradient-to-r from-status-info to-status-info',
-            <Layers size={14} className="text-white" />,
-            'ressource'
-          )}
-
-          {/* Variation Trésorerie finale */}
-          <Card variant="default" padding="sm" className={variationTresorerie >= 0 ? 'bg-status-success-bg border-status-success/50' : 'bg-status-danger-bg border-status-danger/50'}>
-            <div className="flex justify-between items-center py-2">
-              <span className="text-sm font-bold text-content-primary">VARIATION DE TRESORERIE</span>
-              <span className={`text-xl font-bold ${variationTresorerie >= 0 ? 'text-status-success' : 'text-status-danger'}`}>
-                {variationTresorerie >= 0 ? '+' : ''}{variationTresorerie.toLocaleString()} FCFA
-              </span>
-            </div>
-            <div className="border-t border-edge pt-2 mt-2 space-y-1">
-              {data.tresorerie.map((t, i) => (
-                <div key={i} className="flex justify-between text-xs">
-                  <span className="text-content-muted">{t.libelle}</span>
-                  <span className="text-content-primary font-mono">{t.montantN.toLocaleString()} FCFA</span>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </>
-      ) : (
-        <Card variant="default" padding="lg" className="text-center">
-          <Activity className="w-12 h-12 mx-auto mb-3 text-content-muted" />
-          <p className="text-content-muted">Aucune donnée TAFIRE disponible</p>
-        </Card>
-      )}
+      {renderContent()}
     </div>
   );
 }
