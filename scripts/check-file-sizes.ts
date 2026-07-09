@@ -6,8 +6,9 @@
  *   1. tout fichier HORS baseline doit rester ≤ 400 lignes (les nouveaux fichiers
  *      ne peuvent pas naître au-dessus de la limite) ;
  *   2. un fichier de la baseline ne doit pas GROSSIR au-delà de sa valeur figée ;
- *   3. si un fichier de la baseline redescend, exécuter avec --update pour
- *      resserrer le cliquet (la baseline ne peut que diminuer) ;
+ *   3. si un fichier de la baseline redescend, le cliquet se resserre
+ *      AUTOMATIQUEMENT hors CI (la baseline ne peut que diminuer) ;
+ *      en CI (CI=true) la vérification est en lecture seule ;
  *   4. un fichier de la baseline repassé sous la limite en sort définitivement.
  *
  * Usage :
@@ -32,6 +33,7 @@ const SCOPES = [
 
 const EXTENSIONS = new Set([".ts", ".tsx"]);
 const UPDATE = process.argv.includes("--update");
+const AUTO_UPDATE = !process.env.CI && !process.argv.includes("--no-update");
 
 function listFiles(dir: string): string[] {
   const out: string[] = [];
@@ -95,8 +97,14 @@ if (UPDATE) {
 }
 
 if (improvements.length > 0) {
-  console.log(`ℹ ${improvements.length} amélioration(s) détectée(s) — exécuter avec --update pour resserrer la baseline :`);
-  for (const i of improvements.slice(0, 10)) console.log(`  ${i}`);
+  if (AUTO_UPDATE && violations.length === 0) {
+    writeFileSync(BASELINE_PATH, JSON.stringify(nextBaseline, null, 2) + "\n");
+    console.log(`✓ Baseline resserrée automatiquement (${improvements.length} amélioration(s), ${Object.keys(nextBaseline).length} fichiers hérités restants) — committer docs/audit/lines-baseline.json.`);
+    for (const i of improvements.slice(0, 10)) console.log(`  ${i}`);
+  } else {
+    console.log(`ℹ ${improvements.length} amélioration(s) détectée(s) — exécuter avec --update pour resserrer la baseline :`);
+    for (const i of improvements.slice(0, 10)) console.log(`  ${i}`);
+  }
 }
 
 if (violations.length > 0) {
