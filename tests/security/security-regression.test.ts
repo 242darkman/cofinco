@@ -19,6 +19,14 @@ const logger = createLogger('SecurityTest');
 const PROJECT_ROOT = resolve(__dirname, "../..");
 const ROOT = resolve(PROJECT_ROOT, "apps/api");
 
+// `routes/finance.ts` a été découpé en sous-modules `routes/finance/*.ts`
+// (AGENTS.md §8, règle des 400 lignes). Les contrôles qui ciblaient l'ancien
+// monolithe balaient désormais l'ensemble des sous-modules pour ne pas laisser
+// d'invariant sécurité sans couverture.
+const FINANCE_ROUTE_FILES = readdirSync(join(ROOT, "routes/finance"))
+  .filter((f) => f.endsWith(".ts"))
+  .map((f) => `routes/finance/${f}`);
+
 /**
  * Recursively collect all .ts files under a directory (excluding node_modules, __tests__, .d.ts)
  */
@@ -187,7 +195,10 @@ describe("Broadcast coverage — Balance updates are broadcast", () => {
 describe("Error handling — Routes catch guard errors", () => {
 
   it("finance routes should handle isCoffreCaisseError", () => {
-    const content = readFileSync(join(ROOT, "routes/finance.ts"), "utf-8");
+    // Gestion coffre déplacée dans les sous-modules de décaissement de finance/.
+    const content = FINANCE_ROUTE_FILES
+      .map((f) => readFileSync(join(ROOT, f), "utf-8"))
+      .join("\n");
     expect(content).toContain("isCoffreCaisseError");
     // Count occurrences — should appear in at least 2 catch blocks
     const matches = content.match(/isCoffreCaisseError/g);
@@ -479,7 +490,7 @@ describe("Math.random() elimination — Server-side references and IDs", () => {
   const SERVER_CRITICAL_FILES = [
     "storage/finance.ts",
     "services/comptes.ts",
-    "routes/finance.ts",
+    ...FINANCE_ROUTE_FILES,
     "routes/hr.ts",
     "routes/accounting.ts",
     "services/coffre/transfert-service.ts",
@@ -663,20 +674,22 @@ describe("Decimal precision — critical files use Decimal imports", () => {
     "services/repayment-allocation-service.ts",
     "services/credit-allocation-service.ts",
     "storage/finance.ts",
-    "routes/finance.ts",
+    "routes/finance/credit-plans.ts",
+    "routes/finance/sessions-caisse-request-opening.ts",
     "routes/config.ts",
   ];
 
   it("all critical financial files should import from money.ts", () => {
     for (const relPath of DECIMAL_FILES) {
       const content = readFileSync(join(ROOT, relPath), "utf-8");
-      expect(content).toContain("from \"../lib/money\"");
+      // ../lib/money (services, storage, config) ou ../../lib/money (sous-modules routes/finance/)
+      expect(content, relPath).toMatch(/from ["']\.\.(?:\/\.\.)?\/lib\/money["']/);
     }
   });
 
   it("schedule generation should not use raw toFixed(2) for installment amounts", () => {
-    // storage/finance.ts and routes/finance.ts should use roundMoney/splitEvenly
-    for (const relPath of ["storage/finance.ts", "routes/finance.ts"]) {
+    // storage/finance.ts et les sous-modules d'échéancier doivent utiliser roundMoney/splitEvenly
+    for (const relPath of ["storage/finance.ts", "routes/finance/credit-plans.ts", "routes/finance/sessions-caisse-request-opening.ts"]) {
       const content = readFileSync(join(ROOT, relPath), "utf-8");
       // Should not have the old pattern: capitalPerInstallment.toFixed(2)
       expect(content).not.toMatch(/capitalPerInstallment\.toFixed/);
