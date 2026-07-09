@@ -16,8 +16,8 @@ scrape_configs:
     static_configs:
       - targets: ['localhost:9090']
 
-  # Cofinco Application (stateless API instances)
-  - job_name: 'cofinco-app'
+  # MicroFlex Application (stateless API instances)
+  - job_name: 'microflex-app'
     dns_sd_configs:
       - names: ['app']
         type: A
@@ -27,8 +27,8 @@ scrape_configs:
     scrape_interval: 30s
     scrape_timeout: 10s
 
-  # Cofinco Worker (cron/background single instance)
-  - job_name: 'cofinco-worker'
+  # MicroFlex Worker (cron/background single instance)
+  - job_name: 'microflex-worker'
     static_configs:
       - targets: ['worker:5000']
     metrics_path: /api/metrics

@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { db } from 'server/db';
+import { db } from '../../apps/api/db';
 import {
   credits,
   echeancesCredits,
@@ -28,13 +28,13 @@ import {
   reverseRepaymentAllocations,
   markLateInstallments,
   calculateInstallmentStatus
-} from 'server/services/repayment-allocation-service';
-import { createRemboursementWithAllocation, reverseRemboursement } from 'server/storage/finance-enhanced';
+} from '../../apps/api/services/repayment-allocation-service';
+import { createRemboursementWithAllocation, reverseRemboursement } from '../../apps/api/storage/finance-enhanced';
 import { eq, and, isNull } from 'drizzle-orm';
 import { StatutEcheanceCredit, StatutCredit } from '@shared/enum/status-constants';
 
 // Mock WebSocket
-vi.mock('server/ws-server', () => ({
+vi.mock('../../apps/api/ws-server', () => ({
   getWsInstance: () => ({
     broadcast: vi.fn(),
     broadcastToAgency: vi.fn(),

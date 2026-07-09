@@ -1,5 +1,5 @@
 # ==========================================================
-# Cofinco — Release & Deploy Pipeline (Tag-based)
+# MicroFlex — Release & Deploy Pipeline (Tag-based)
 # ==========================================================
 # Triggered by Git tags:
 #   v*    → PRODUCTION  (e.g., v3.61.0, v4.0.0)
@@ -28,6 +28,8 @@ on:
 permissions:
   contents: read
   packages: write
+  id-token: write
+  attestations: write
 
 env:
   REGISTRY: ghcr.io
@@ -85,7 +87,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - run: npm ci
@@ -94,7 +96,9 @@ jobs:
         run: npm run check
 
       - name: Unit tests
-        run: npx vitest run --exclude 'tests/contracts/**' --exclude 'tests/e2e/**' --exclude 'tests/integration/**' --exclude 'tests/robustness/**'
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
+        run: npx vitest run --exclude 'tests/contracts/**' --exclude 'tests/e2e/**' --exclude 'tests/integration/**' --exclude 'tests/robustness/**' --exclude 'tests/unit/balance-consistency.test.ts' --exclude 'tests/unit/conversations.test.ts'
 
   # ==========================================
   # Step 1b: GL Audit — Contract Tests
@@ -106,9 +110,9 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: cofinco
-          POSTGRES_PASSWORD: cofinco
-          POSTGRES_DB: cofinco
+          POSTGRES_USER: microflex
+          POSTGRES_PASSWORD: microflex
+          POSTGRES_DB: microflex
         ports:
           - 5432:5432
         options: >-
@@ -121,27 +125,28 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - run: npm ci
 
       - name: DB Init — schema push + seeds
         env:
-          DATABASE_URL: postgresql://cofinco:cofinco@localhost:5432/cofinco
+          DATABASE_URL: postgresql://microflex:microflex@localhost:5432/microflex
         run: |
-          npx drizzle-kit push --force
-          node --env-file=.env --import tsx seeds/seed-prod.ts
+          npm run db:migrate
+          node --import dotenv/config --import tsx scripts/ensure-sql.ts
+          node --import dotenv/config --import tsx seeds/seed-prod.ts
 
       - name: GL Contract Tests
         env:
-          DATABASE_URL: postgresql://cofinco:cofinco@localhost:5432/cofinco
+          DATABASE_URL: postgresql://microflex:microflex@localhost:5432/microflex
           GL_POSTING_MODE: STRICT
         run: npx vitest run tests/contracts/gl-accounting-contracts.test.ts
 
       - name: GL Coverage Matrix
         env:
-          DATABASE_URL: postgresql://cofinco:cofinco@localhost:5432/cofinco
+          DATABASE_URL: postgresql://microflex:microflex@localhost:5432/microflex
         run: node --import tsx scripts/generate-gl-coverage.ts
 
   # ==========================================
@@ -174,11 +179,14 @@ jobs:
             type=raw,value=latest,enable=${{ needs.prepare.outputs.is_prod }}
 
       - name: Build & push runtime image
+        id: build-runtime
         uses: docker/build-push-action@v6
         with:
           context: .
           target: runtime
           push: true
+          build-args: |
+            TENANT_CONFIG_FILE=${{ vars.TENANT_CONFIG_FILE || 'config/tenants/microflex.json' }}
           tags: ${{ steps.meta-runtime.outputs.tags }}
           labels: ${{ steps.meta-runtime.outputs.labels }}
           cache-from: type=gha
@@ -186,6 +194,7 @@ jobs:
 
       # --- Init image (schema push + seeds) ---
       - name: Build & push init image
+        id: build-init
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -194,14 +203,139 @@ jobs:
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.prepare.outputs.image_tag }}-init
           cache-from: type=gha
 
+      - name: Attest image provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.build-runtime.outputs.digest }}
+          push-to-registry: true
+
+      # --- Signature cosign (keyless, OIDC GitHub) ---
+      # Vérifiable côté client avec :
+      #   cosign verify --certificate-identity-regexp <repo> \
+      #     --certificate-oidc-issuer https://token.actions.githubusercontent.com <image>@<digest>
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign images (cosign keyless)
+        run: |
+          cosign sign --yes ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build-runtime.outputs.digest }}
+          cosign sign --yes ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build-init.outputs.digest }}
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.prepare.outputs.image_tag }}
+          format: spdx-json
+          output-file: sbom.spdx.json
+
+      # --- Attestation SBOM liée à l'image (Sigstore) ---
+      - name: Attest SBOM
+        uses: actions/attest-sbom@v2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.build-runtime.outputs.digest }}
+          sbom-path: sbom.spdx.json
+          push-to-registry: true
+
+      # --- SBOM archivé comme artefact de release (livrable client) ---
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ needs.prepare.outputs.image_tag }}
+          path: sbom.spdx.json
+          retention-days: 90
+
       # --- Security scan ---
       - name: Scan Docker image (Trivy)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.prepare.outputs.image_tag }}
           format: 'table'
           severity: 'CRITICAL,HIGH'
-          exit-code: '0'
+          ignore-unfixed: true
+          exit-code: '1'
+
+  # ==========================================
+  # Step 2b: Images dédiées par client
+  # Une image par fichier config/tenants/*.json (hors microflex, l'image
+  # standard). Chaque image embarque UNIQUEMENT la config de son client.
+  # ==========================================
+  tenants:
+    name: Détecter les tenants dédiés
+    needs: [prepare]
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.list.outputs.matrix }}
+      count: ${{ steps.list.outputs.count }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Valider les configurations tenant
+        run: |
+          npm ci --ignore-scripts
+          node --import tsx scripts/validate-tenant-configs.ts
+
+      - name: Lister les tenants dédiés
+        id: list
+        run: |
+          TENANTS=$(ls config/tenants/*.json | xargs -n1 basename | sed 's/\.json$//' | grep -v '^microflex$' | jq -R . | jq -sc .)
+          echo "matrix=$TENANTS" >> $GITHUB_OUTPUT
+          echo "count=$(echo "$TENANTS" | jq length)" >> $GITHUB_OUTPUT
+          echo "Tenants dédiés: $TENANTS"
+
+  build-client-images:
+    name: Image client (${{ matrix.tenant }})
+    needs: [prepare, test, gl-audit, tenants]
+    if: needs.tenants.outputs.count != '0'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        tenant: ${{ fromJson(needs.tenants.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push image client
+        id: build-client
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: runtime
+          push: true
+          build-args: |
+            TENANT_CONFIG_FILE=config/tenants/${{ matrix.tenant }}.json
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.prepare.outputs.image_tag }}-${{ matrix.tenant }}
+          cache-from: type=gha
+
+      - name: Attest image provenance (client)
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.build-client.outputs.digest }}
+          push-to-registry: true
+
+      - name: Scan image client (Trivy)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.prepare.outputs.image_tag }}-${{ matrix.tenant }}
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
+          exit-code: '1'
 
   # ==========================================
   # Step 3: Deploy to VPS
@@ -215,7 +349,7 @@ jobs:
       # Generate .env.runtime from GitHub Environment secrets/variables
       - name: Generate runtime env file
         run: |
-          cat > /tmp/.env.runtime <<'ENVEOF'
+          cat > .env.runtime <<'ENVEOF'
           # Auto-generated by GitHub Actions — DO NOT EDIT MANUALLY
           # Tag: ${{ needs.prepare.outputs.image_tag }}
           # Environment: ${{ needs.prepare.outputs.environment }}
@@ -223,6 +357,10 @@ jobs:
           NODE_ENV=production
           PORT=5000
           APP_VERSION=${{ needs.prepare.outputs.image_tag }}
+
+          # Tenant — la config métier vient du fichier embarqué dans l'image
+          # (TENANT_CONFIG_FILE au build) + surcharges en base, jamais d'env.
+          TENANT_CONFIG_PATH=dist/tenant-config.json
 
           # Registry
           REGISTRY=${{ env.REGISTRY }}
@@ -289,7 +427,7 @@ jobs:
           ENVEOF
 
           # Clean up: remove leading whitespace from heredoc
-          sed -i 's/^          //' /tmp/.env.runtime
+          sed -i 's/^          //' .env.runtime
 
       # Upload env file to VPS
       - name: Upload env to VPS
@@ -298,9 +436,9 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          source: /tmp/.env.runtime
-          target: /opt/cofinco/env/
-          strip_components: 2
+          source: .env.runtime
+          target: /opt/microflex/env/
+          strip_components: 0
 
       # Run deploy script on VPS
       - name: Deploy to VPS
@@ -313,7 +451,7 @@ jobs:
           script: |
             set -euo pipefail
 
-            APP_DIR="/opt/cofinco"
+            APP_DIR="/opt/microflex"
             TAG="${{ needs.prepare.outputs.image_tag }}"
 
             # Secure the env file

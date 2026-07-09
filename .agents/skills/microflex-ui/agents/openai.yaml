@@ -1,0 +1,4 @@
+interface:
+  display_name: "MicroFlex UI"
+  short_description: "Concevoir une UI cohérente et accessible"
+  default_prompt: "Utilise $microflex-ui pour concevoir ou améliorer cette interface MicroFlex."

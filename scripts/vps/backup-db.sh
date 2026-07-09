@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 # ==========================================================
-# Cofinco — PostgreSQL Backup (VPS natif)
+# MicroFlex — PostgreSQL Backup (VPS natif)
 # ==========================================================
 # Usage :
 #   bash scripts/vps/backup-db.sh
 #
-# Configuré automatiquement via systemd timer (cofinco-backup.timer)
+# Configuré automatiquement via systemd timer (microflex-backup.timer)
 # Exécuté quotidiennement à 02:00 UTC.
 #
 # Options (via variables d'environnement) :
-#   PG_DB           Database name (default: cofinco)
-#   PG_USER         Database user (default: cofinco_app)
+#   PG_DB           Database name (default: microflex)
+#   PG_USER         Database user (default: microflex_app)
 #   PG_HOST         Database host (default: localhost)
 #   PG_PORT         Database port (default: 5432)
-#   BACKUP_DIR      Backup directory (default: /opt/cofinco/backups)
+#   BACKUP_DIR      Backup directory (default: /opt/microflex/backups)
 #   RETENTION_DAILY Number of daily backups to keep (default: 7)
 #   RETENTION_WEEKLY Number of weekly backups to keep (default: 4)
 #   GPG_RECIPIENT   GPG key ID for encryption (optional)
@@ -25,11 +25,11 @@ set -euo pipefail
 umask 077
 
 # ── Configuration ────────────────────────────────────────
-PG_DB="${PG_DB:-cofinco}"
-PG_USER="${PG_USER:-cofinco_app}"
+PG_DB="${PG_DB:-microflex}"
+PG_USER="${PG_USER:-microflex_app}"
 PG_HOST="${PG_HOST:-localhost}"
 PG_PORT="${PG_PORT:-5432}"
-BACKUP_DIR="${BACKUP_DIR:-/opt/cofinco/backups}"
+BACKUP_DIR="${BACKUP_DIR:-/opt/microflex/backups}"
 RETENTION_DAILY="${RETENTION_DAILY:-7}"
 RETENTION_WEEKLY="${RETENTION_WEEKLY:-4}"
 
@@ -74,14 +74,7 @@ fi
 
 log "Backup created: $BACKUP_FILE ($FILESIZE bytes)"
 
-# ── Step 2: Weekly copy (Sunday) ─────────────────────────
-if [ "$DAY_OF_WEEK" = "7" ]; then
-  WEEKLY_FILE="$WEEKLY_DIR/${PG_DB}_week_$(date +%Y-W%V).sql.gz"
-  cp "$BACKUP_FILE" "$WEEKLY_FILE"
-  log "Weekly copy: $WEEKLY_FILE"
-fi
-
-# ── Step 3: Optional GPG encryption ─────────────────────
+# ── Step 2: Optional GPG encryption ─────────────────────
 if [ -n "${GPG_RECIPIENT:-}" ]; then
   log "Encrypting with GPG..."
   gpg --batch --yes --trust-model always \
@@ -90,6 +83,21 @@ if [ -n "${GPG_RECIPIENT:-}" ]; then
   rm -f "$BACKUP_FILE"
   BACKUP_FILE="$BACKUP_FILE.gpg"
   log "Encrypted: $BACKUP_FILE"
+fi
+
+FILESIZE=$(stat -f%z "$BACKUP_FILE" 2>/dev/null || stat -c%s "$BACKUP_FILE" 2>/dev/null || echo "0")
+
+# ── Step 3: Checksums and weekly copy ───────────────────
+command -v sha256sum >/dev/null || die "sha256sum not found"
+sha256sum "$BACKUP_FILE" > "$BACKUP_FILE.sha256"
+log "Checksum created: $BACKUP_FILE.sha256"
+
+if [ "$DAY_OF_WEEK" = "7" ]; then
+  BACKUP_SUFFIX="${BACKUP_FILE#${BACKUP_DIR}/${PG_DB}_${TIMESTAMP}.}"
+  WEEKLY_FILE="$WEEKLY_DIR/${PG_DB}_week_$(date +%Y-W%V).${BACKUP_SUFFIX}"
+  cp "$BACKUP_FILE" "$WEEKLY_FILE"
+  sha256sum "$WEEKLY_FILE" > "$WEEKLY_FILE.sha256"
+  log "Weekly copy: $WEEKLY_FILE"
 fi
 
 # ── Step 4: Optional S3 offsite upload ───────────────────
@@ -102,9 +110,11 @@ if [ -n "${S3_BUCKET:-}" ]; then
   if command -v aws >/dev/null 2>&1; then
     log "Uploading to S3: $S3_BUCKET"
     aws s3 cp $S3_OPTS "$BACKUP_FILE" "s3://$S3_BUCKET/backups/daily/$(basename "$BACKUP_FILE")"
+    aws s3 cp $S3_OPTS "$BACKUP_FILE.sha256" "s3://$S3_BUCKET/backups/daily/$(basename "$BACKUP_FILE.sha256")"
 
     if [ "$DAY_OF_WEEK" = "7" ] && [ -f "${WEEKLY_FILE:-}" ]; then
       aws s3 cp $S3_OPTS "$WEEKLY_FILE" "s3://$S3_BUCKET/backups/weekly/$(basename "$WEEKLY_FILE")"
+      aws s3 cp $S3_OPTS "$WEEKLY_FILE.sha256" "s3://$S3_BUCKET/backups/weekly/$(basename "$WEEKLY_FILE.sha256")"
     fi
 
     log "S3 upload complete"
@@ -127,12 +137,13 @@ log "  Weekly: deleted $WEEKLY_DELETED old backups (retention: $RETENTION_WEEKLY
 
 # ── Step 6: Summary ─────────────────────────────────────
 TOTAL_SIZE=$(du -sh "$BACKUP_DIR" 2>/dev/null | cut -f1)
-BACKUP_COUNT=$(find "$BACKUP_DIR" -maxdepth 1 -type f -name "${PG_DB}_*.sql.gz*" | wc -l)
-WEEKLY_COUNT=$(find "$WEEKLY_DIR" -maxdepth 1 -type f -name "${PG_DB}_*.sql.gz*" | wc -l)
+BACKUP_COUNT=$(find "$BACKUP_DIR" -maxdepth 1 -type f -name "${PG_DB}_*.sql.gz*" ! -name "*.sha256" | wc -l)
+WEEKLY_COUNT=$(find "$WEEKLY_DIR" -maxdepth 1 -type f -name "${PG_DB}_*.sql.gz*" ! -name "*.sha256" | wc -l)
 
 log "=========================================="
 log "Backup complete"
 log "  File:     $(basename "$BACKUP_FILE")"
+log "  Checksum: $(basename "$BACKUP_FILE.sha256")"
 log "  Size:     $FILESIZE bytes"
 log "  Daily:    $BACKUP_COUNT backups"
 log "  Weekly:   $WEEKLY_COUNT backups"

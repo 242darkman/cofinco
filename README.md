@@ -1,4 +1,4 @@
-# Cofinco — Plateforme de Microfinance
+# MicroFlex — Plateforme de Microfinance
 
 Application de microfinance complète (Node.js / React / PostgreSQL / Drizzle / MinIO).
 
@@ -128,7 +128,7 @@ Le deploiement se fait via tags Git. Voir [DEPLOY.md](DEPLOY.md) pour le guide c
 
 ```bash
 # Setup initial du VPS (une seule fois)
-sudo DOMAIN=cofinco-m.com ACME_EMAIL=admin@cofinco-m.com bash scripts/vps/setup.sh
+sudo DOMAIN=microflex-m.com ACME_EMAIL=admin@microflex-m.com bash scripts/vps/setup.sh
 
 # Deployer en preprod (release candidate)
 git tag rc-v3.62.0
@@ -139,11 +139,11 @@ git tag v3.62.0
 git push origin v3.62.0
 
 # Rollback (SSH sur le VPS)
-bash /opt/cofinco/scripts/vps/rollback.sh          # tag precedent
-bash /opt/cofinco/scripts/vps/rollback.sh v3.61.0  # tag specifique
+bash /opt/microflex/scripts/vps/rollback.sh          # tag precedent
+bash /opt/microflex/scripts/vps/rollback.sh v3.61.0  # tag specifique
 
 # Verification sante
-curl -sf https://cofinco-m.com/api/health | jq .
+curl -sf https://microflex-m.com/api/health | jq .
 ```
 
 ## Structure des fichiers
@@ -164,7 +164,7 @@ Dockerfile                      <- multi-stage (deps -> dev -> init -> test -> b
 +-- release.yml                 <- tag-based deploy (build + push GHCR + SSH deploy)
 
 infra/
-|-- nginx/cofinco.conf          <- reverse proxy Nginx (VPS natif)
+|-- nginx/microflex.conf          <- reverse proxy Nginx (VPS natif)
 +-- systemd/                    <- backup timer + service
 
 scripts/vps/
@@ -214,6 +214,12 @@ npm run dev              # Serveur dev local (tsx, sans Docker)
 npm run build            # Build production (esbuild + Vite)
 npm run start            # Lancement production
 npm run check            # Type check TypeScript
+
+# Turborepo (cache et builds ciblés)
+npm run turbo:check      # Type check avec cache
+npm run turbo:test       # Tests unitaires + sécurité avec cache
+npm run turbo:affected   # Uniquement ce qui est impacté par le diff
+npm run build:apps       # Builds par workspace
 
 # Base de donnees
 npm run db:push          # Sync schema -> DB (Drizzle Kit)
@@ -287,7 +293,7 @@ docker compose --profile test run --rm test-e2e npx playwright test tests/e2e/cr
 ## Observabilite
 
 - **Logs live** : Grafana -> Explore -> Loki -> `{service="app"}` -> Live
-- **Metriques** : Grafana -> Dashboards -> COFINCO Overview
+- **Metriques** : Grafana -> Dashboards -> MICROFLEX Overview
 - **Alertes** : 15+ regles (AppDown, DBDown, HighErrorRate, GLDiscrepancy...)
 - **Endpoints** : `/api/health` (sante), `/api/metrics` (Prometheus)
 
@@ -351,7 +357,7 @@ Le conteneur `db-init` :
 
 ```bash
 # Verifier les logs d'initialisation
-docker logs cofinco-db-init
+docker logs microflex-db-init
 
 # Relancer l'init manuellement (si necessaire)
 docker compose restart db-init

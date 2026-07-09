@@ -11,13 +11,21 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync, statSync } from "fs";
 import { join, resolve } from "path";
-import { createLogger } from "server/lib/logger";
-import { D, roundMoney, roundFCFA, roundRate, splitEvenly, isEffectivelyZero } from "server/lib/money";
+import { createLogger } from "../../apps/api/lib/logger";
+import { D, roundMoney, roundFCFA, roundRate, splitEvenly, isEffectivelyZero } from "../../apps/api/lib/money";
 
 const logger = createLogger('SecurityTest');
 
 const PROJECT_ROOT = resolve(__dirname, "../..");
-const ROOT = resolve(PROJECT_ROOT, "server");
+const ROOT = resolve(PROJECT_ROOT, "apps/api");
+
+// `routes/finance.ts` a été découpé en sous-modules `routes/finance/*.ts`
+// (AGENTS.md §8, règle des 400 lignes). Les contrôles qui ciblaient l'ancien
+// monolithe balaient désormais l'ensemble des sous-modules pour ne pas laisser
+// d'invariant sécurité sans couverture.
+const FINANCE_ROUTE_FILES = readdirSync(join(ROOT, "routes/finance"))
+  .filter((f) => f.endsWith(".ts"))
+  .map((f) => `routes/finance/${f}`);
 
 /**
  * Recursively collect all .ts files under a directory (excluding node_modules, __tests__, .d.ts)
@@ -187,7 +195,10 @@ describe("Broadcast coverage — Balance updates are broadcast", () => {
 describe("Error handling — Routes catch guard errors", () => {
 
   it("finance routes should handle isCoffreCaisseError", () => {
-    const content = readFileSync(join(ROOT, "routes/finance.ts"), "utf-8");
+    // Gestion coffre déplacée dans les sous-modules de décaissement de finance/.
+    const content = FINANCE_ROUTE_FILES
+      .map((f) => readFileSync(join(ROOT, f), "utf-8"))
+      .join("\n");
     expect(content).toContain("isCoffreCaisseError");
     // Count occurrences — should appear in at least 2 catch blocks
     const matches = content.match(/isCoffreCaisseError/g);
@@ -221,12 +232,12 @@ describe("Session secret — No hardcoded fallback in production", () => {
   it("auth.ts should crash if SESSION_SECRET is missing in production", () => {
     const content = readFileSync(join(ROOT, "auth.ts"), "utf-8");
     expect(content).toContain("process.exit(1)");
-    expect(content).not.toContain("cofin-secret-key-change-in-production");
+    expect(content).not.toContain("microflex-secret-key-change-in-production");
   });
 
   it("ws-server.ts should not use the old hardcoded secret", () => {
     const content = readFileSync(join(ROOT, "ws-server.ts"), "utf-8");
-    expect(content).not.toContain("cofin-secret-key-change-in-production");
+    expect(content).not.toContain("microflex-secret-key-change-in-production");
   });
 });
 
@@ -317,7 +328,7 @@ describe("XSS prevention — dangerouslySetInnerHTML uses DOMPurify", () => {
 
   it("NotificationPreview should sanitize HTML with DOMPurify", () => {
     const content = readFileSync(
-      resolve(PROJECT_ROOT, "client/src/components/admin/notifications/NotificationPreview.tsx"),
+      resolve(PROJECT_ROOT, "apps/web/src/components/admin/notifications/NotificationPreview.tsx"),
       "utf-8"
     );
     expect(content).toContain("DOMPurify");
@@ -360,7 +371,7 @@ describe("Environment — No real credentials in example files", () => {
   it(".env.production.example should not contain real-looking passwords", () => {
     const content = readFileSync(resolve(PROJECT_ROOT, ".env.production.example"), "utf-8");
     expect(content).not.toMatch(/Admin123/);
-    expect(content).not.toMatch(/COFINCO_SECRET_2026/);
+    expect(content).not.toMatch(/MICROFLEX_SECRET_2026/);
   });
 });
 
@@ -413,7 +424,7 @@ describe("Password policy — Minimum length >= 12", () => {
   });
 
   it("seed securitySettings should have passwordMinLength >= 12", () => {
-    const content = readFileSync(resolve(ROOT, "../seeds/seed-prod.ts"), "utf-8");
+    const content = readFileSync(resolve(ROOT, "../../seeds/seed-prod.ts"), "utf-8");
     const matches = content.match(/passwordMinLength:\s*(\d+)/g);
     expect(matches).toBeTruthy();
     for (const m of matches!) {
@@ -479,7 +490,7 @@ describe("Math.random() elimination — Server-side references and IDs", () => {
   const SERVER_CRITICAL_FILES = [
     "storage/finance.ts",
     "services/comptes.ts",
-    "routes/finance.ts",
+    ...FINANCE_ROUTE_FILES,
     "routes/hr.ts",
     "routes/accounting.ts",
     "services/coffre/transfert-service.ts",
@@ -547,7 +558,7 @@ describe("Math.random() elimination — Client-side security code", () => {
   ];
 
   it("should not use Math.random() for passwords, codes, references, or tokens", () => {
-    const clientRoot = resolve(PROJECT_ROOT, "client/src");
+    const clientRoot = resolve(PROJECT_ROOT, "apps/web/src");
     const violations: string[] = [];
     for (const relPath of CLIENT_CRITICAL_FILES) {
       const content = readFileSync(join(clientRoot, relPath), "utf-8");
@@ -570,7 +581,7 @@ describe("Math.random() elimination — Client-side security code", () => {
 describe("Schema — Agency code generation uses crypto", () => {
 
   it("settings.ts should use crypto.randomInt for agency code", () => {
-    const content = readFileSync(resolve(PROJECT_ROOT, "shared/schema/settings.ts"), "utf-8");
+    const content = readFileSync(resolve(PROJECT_ROOT, "packages/shared/schema/settings.ts"), "utf-8");
     const genFn = content.substring(content.indexOf("generateAgenceCode"), content.indexOf("generateAgenceCode") + 300);
     expect(genFn).toContain("crypto.randomInt");
     expect(genFn).not.toContain("Math.random");
@@ -663,20 +674,22 @@ describe("Decimal precision — critical files use Decimal imports", () => {
     "services/repayment-allocation-service.ts",
     "services/credit-allocation-service.ts",
     "storage/finance.ts",
-    "routes/finance.ts",
+    "routes/finance/credit-plans.ts",
+    "routes/finance/sessions-caisse-request-opening.ts",
     "routes/config.ts",
   ];
 
   it("all critical financial files should import from money.ts", () => {
     for (const relPath of DECIMAL_FILES) {
       const content = readFileSync(join(ROOT, relPath), "utf-8");
-      expect(content).toContain("from \"../lib/money\"");
+      // ../lib/money (services, storage, config) ou ../../lib/money (sous-modules routes/finance/)
+      expect(content, relPath).toMatch(/from ["']\.\.(?:\/\.\.)?\/lib\/money["']/);
     }
   });
 
   it("schedule generation should not use raw toFixed(2) for installment amounts", () => {
-    // storage/finance.ts and routes/finance.ts should use roundMoney/splitEvenly
-    for (const relPath of ["storage/finance.ts", "routes/finance.ts"]) {
+    // storage/finance.ts et les sous-modules d'échéancier doivent utiliser roundMoney/splitEvenly
+    for (const relPath of ["storage/finance.ts", "routes/finance/credit-plans.ts", "routes/finance/sessions-caisse-request-opening.ts"]) {
       const content = readFileSync(join(ROOT, relPath), "utf-8");
       // Should not have the old pattern: capitalPerInstallment.toFixed(2)
       expect(content).not.toMatch(/capitalPerInstallment\.toFixed/);

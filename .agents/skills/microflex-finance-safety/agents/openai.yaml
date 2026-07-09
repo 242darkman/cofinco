@@ -1,0 +1,4 @@
+interface:
+  display_name: "MicroFlex Finance Safety"
+  short_description: "Sécuriser les opérations financières critiques"
+  default_prompt: "Utilise $microflex-finance-safety pour implémenter ou auditer cette logique financière critique."

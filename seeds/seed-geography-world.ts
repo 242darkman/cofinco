@@ -1,5 +1,5 @@
 /**
- * COFINCO — Seed Géographique Mondial
+ * MICROFLEX — Seed Géographique Mondial
  *
  * Phases couvertes :
  *   3. Seed regions (ADM1) + migration Congo + seed departements (ADM2) + cleanup legacy
@@ -19,9 +19,9 @@
  *   docker compose exec app node --env-file=.env --import tsx seeds/seed-geography-world.ts --dry-run
  */
 
-import { db, pool } from '../server/db';
+import { db, pool } from '../apps/api/db';
 import { eq, and, isNull, isNotNull, count, sql } from 'drizzle-orm';
-import { createLogger } from '../server/lib/logger';
+import { createLogger } from '../apps/api/lib/logger';
 import { readFileSync, existsSync, createReadStream } from 'fs';
 import { createInterface } from 'readline';
 import { resolve } from 'path';
@@ -38,6 +38,12 @@ const logger = createLogger('SeedGeoWorld');
 
 const SEEDS_DIR = resolve(process.cwd(), 'seeds');
 const MIN_POPULATION = 1000; // Seuil population pour insertion villes
+
+// Géographie OPÉRATIONNELLE scopée aux pays d'exploitation. Le lieu de naissance
+// mondial des employés est géré séparément par `villes_reference` (cities5000).
+// Élargir cet ensemble (+ télécharger les fichiers GeoNames pays correspondants)
+// pour couvrir d'autres pays d'exploitation.
+const OPERATING_COUNTRIES = new Set(['CG']);
 
 const DRY_RUN = process.argv.includes('--dry-run');
 const ENRICH_ONLY = process.argv.includes('--enrich-only');
@@ -109,7 +115,7 @@ async function seedRegions(): Promise<StepResult> {
     if (parts.length < 4) continue;
     const [code, name, nameAscii, geonameIdStr] = parts;
     const cc = code.split('.')[0];
-    if (!paysMap[cc]) { skipped++; continue; }
+    if (!OPERATING_COUNTRIES.has(cc) || !paysMap[cc]) { skipped++; continue; }
 
     rows.push({
       code,
@@ -217,7 +223,7 @@ async function seedDepartementsADM2(): Promise<StepResult> {
     const cc = codeParts[0];
     const regionCode = `${codeParts[0]}.${codeParts[1]}`;
 
-    if (!paysMap[cc] || !regionMap[regionCode]) { skipped++; continue; }
+    if (!OPERATING_COUNTRIES.has(cc) || !paysMap[cc] || !regionMap[regionCode]) { skipped++; continue; }
 
     rows.push({
       code,
@@ -285,9 +291,13 @@ async function cleanupLegacyDepts(): Promise<StepResult> {
 // ============================================================================
 
 async function loadGeonamesStaging(): Promise<StepResult> {
-  const filePath = resolve(SEEDS_DIR, 'allCountries.txt');
+  // Scope opérationnel : on lit le fichier GeoNames PAR PAYS (CG.txt, quelques Mo)
+  // au lieu d'allCountries.txt (1.77 Go). Fallback vers allCountries.txt si présent
+  // (legacy / bascule multi-pays) — le filtre OPERATING_COUNTRIES borne alors le staging.
+  const scopedFile = resolve(SEEDS_DIR, 'CG.txt');
+  const filePath = existsSync(scopedFile) ? scopedFile : resolve(SEEDS_DIR, 'allCountries.txt');
   if (!existsSync(filePath)) {
-    return { step: 'loadGeonamesStaging', action: 'error', count: 0, details: `File not found: ${filePath}. Download from https://download.geonames.org/export/dump/allCountries.zip` };
+    return { step: 'loadGeonamesStaging', action: 'error', count: 0, details: `File not found: ${filePath}. Télécharger via scripts/download-geonames.sh CG` };
   }
 
   // Check if staging already loaded
@@ -297,7 +307,7 @@ async function loadGeonamesStaging(): Promise<StepResult> {
   }
 
   if (DRY_RUN) {
-    return { step: 'loadGeonamesStaging', action: 'dry-run', count: 0, details: 'would load allCountries.txt' };
+    return { step: 'loadGeonamesStaging', action: 'dry-run', count: 0, details: `would load ${filePath}` };
   }
 
   try {
@@ -307,7 +317,7 @@ async function loadGeonamesStaging(): Promise<StepResult> {
     // Stream allCountries.txt line-by-line (client-side), filter relevant rows,
     // and batch INSERT into geonames_staging. This avoids PG server-side COPY
     // which fails in Docker when app and db are separate containers.
-    logger.info('Streaming allCountries.txt → filtering featureClass A/P + PCLI → batch INSERT...');
+    logger.info(`Streaming ${filePath} → filtering featureClass A/P + PCLI (pays: ${[...OPERATING_COUNTRIES].join(',')}) → batch INSERT...`);
     const rl = createInterface({ input: createReadStream(filePath), crlfDelay: Infinity });
 
     let batch: (typeof geonamesStaging.$inferInsert)[] = [];
@@ -321,6 +331,7 @@ async function loadGeonamesStaging(): Promise<StepResult> {
       const featureClass = f[6];
       const featureCode = f[7];
       if (featureClass !== 'A' && featureClass !== 'P' && featureCode !== 'PCLI') continue;
+      if (!OPERATING_COUNTRIES.has(f[8])) continue; // borne le staging aux pays d'exploitation
 
       const geonameId = parseInt(f[0]);
       if (isNaN(geonameId)) continue;
@@ -470,7 +481,7 @@ async function enrichFromStaging(): Promise<StepResult[]> {
 
 async function main() {
   logger.info('═══════════════════════════════════════════════════════════════');
-  logger.info('COFINCO — Seed Géographique Mondial');
+  logger.info('MICROFLEX — Seed Géographique Mondial');
   logger.info('═══════════════════════════════════════════════════════════════');
 
   if (DRY_RUN) logger.info('MODE: DRY-RUN');

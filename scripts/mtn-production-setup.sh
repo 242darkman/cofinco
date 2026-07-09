@@ -46,7 +46,7 @@ read -p "Subscription Key Collection: " COLLECTION_KEY
 read -p "Subscription Key Disbursement: " DISBURSEMENT_KEY
 
 # Callback URL (doit être HTTPS en production!)
-read -p "Callback URL HTTPS (ex: https://cofinco.com/api/webhooks/mtn): " CALLBACK_URL
+read -p "Callback URL HTTPS (ex: https://microflex.com/api/webhooks/mtn): " CALLBACK_URL
 
 # Valider que c'est HTTPS
 if [[ ! "$CALLBACK_URL" =~ ^https:// ]]; then

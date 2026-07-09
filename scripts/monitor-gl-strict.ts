@@ -13,7 +13,7 @@
  *   npm run monitor:gl:alert    # Avec alertes (exit code 1 si problème)
  */
 
-import { db } from '../server/db.ts';
+import { db } from '../apps/api/db.ts';
 import {
   coffresForts,
   caisses,

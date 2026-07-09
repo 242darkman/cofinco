@@ -1,0 +1,611 @@
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Plus, Users, DollarSign, Calendar, TrendingUp, Edit2, Trash2, ArrowLeft, Eye, MoreHorizontal, Coins, Target, Clock, Activity, AlertTriangle, Download, Play, Pause, CheckCircle, Ban, LayoutTemplate, Filter } from 'lucide-react';
+import PageHeader from '../../ui/PageHeader';
+import { FeatureHeader, FEATURE_DESCRIPTIONS } from '../../ui/FeatureHeader';
+import Badge from '../../ui/Badge';
+import Card from '../../ui/Card';
+import StatCard from '../../ui/StatCard';
+import ResponsiveTable from '../../ui/ResponsiveTable';
+import Button from '../../ui/Button';
+import IconButton from '../../ui/IconButton';
+import TabGroup from '../../ui/TabGroup';
+import ConfirmDialog from '../../ui/ConfirmDialog';
+import { tontineApi, tontinePlanApi } from '../../../lib/api-client';
+import { toast, handleApiError } from '../../../lib/toast';
+import { escapeHtml } from '../../../lib/sanitize';
+import { exportToPDF } from '../../../lib/exportUtils';
+import { usePermissions } from '../../auth/ProtectedFeature';
+import { useConfirmDialog } from '../../../hooks/useConfirmDialog';
+import { TontineGroupWizard } from '../../admin/TontineGroupWizard';
+import TontineMembers from './TontineMembers';
+import TontineContributions from './TontineContributions';
+import TontineDistributions from './TontineDistributions';
+import { TontineStatus, type Tontine as SchemaTontine } from '@shared/schema/tontines';
+import { STATUT_TONTINE_LABELS, FREQUENCE_TONTINE_LABELS } from '@shared/enum/status-constants';
+import TontineDashboard from './TontineDashboard';
+import TontineCalendar from './TontineCalendar';
+import TontineConfig from './TontineConfig';
+import TontinePenalties from './TontinePenalties';
+import TontineTurnManager from './TontineTurnManager';
+import TontineSchedules from './TontineSchedules';
+import TontineAuditTrail from './TontineAuditTrail';
+import { currencySymbol } from '@shared/config/currency';
+
+// Extends the DB schema type with computed fields returned by the API
+interface Tontine extends SchemaTontine {
+  nombreMembresActuel?: number;
+  totalCollecte?: number;
+  tourActuel?: number;
+}
+
+export default function Tontines() {
+  const sym = currencySymbol();
+  // RBAC permissions
+  const { hasPermission } = usePermissions();
+  const canCreateTontines = hasPermission('tontines', 'create') || hasPermission('tontines', 'manage');
+  const canEditTontines = hasPermission('tontines', 'edit') || hasPermission('tontines', 'manage');
+  const canDeleteTontines = hasPermission('tontines', 'delete') || hasPermission('tontines', 'manage');
+
+  // Confirmation dialog hook
+  const { confirmState, openConfirm, closeConfirm, handleConfirm } = useConfirmDialog();
+
+  const [tontines, setTontines] = useState<Tontine[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [editingTontine, setEditingTontine] = useState<Tontine | null>(null);
+  const [selectedTontine, setSelectedTontine] = useState<Tontine | null>(null);
+  const [plans, setPlans] = useState<any[]>([]);
+  const [preSelectedPlanId, setPreSelectedPlanId] = useState<string | undefined>();
+  const [showPlanPicker, setShowPlanPicker] = useState(false);
+  const [filterStatut, setFilterStatut] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'config' | 'membres' | 'contributions' | 'distributions' | 'tours' | 'penalites' | 'echeancier' | 'audit' | 'calendar'>('dashboard');
+
+  useEffect(() => {
+    fetchTontines();
+    tontinePlanApi.getAll().then(setPlans).catch(() => {});
+  }, []);
+
+  const fetchTontines = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await tontineApi.getAll();
+      setTontines(data || []);
+    } catch (error) {
+      toast.error(handleApiError(error, 'Erreur lors du chargement des tontines'));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const confirmDelete = useCallback((tontine: Tontine) => {
+    openConfirm({
+      title: 'Supprimer la tontine',
+      message: `Êtes-vous sûr de vouloir supprimer la tontine "${escapeHtml(tontine.nom)}" ? Cette action est irréversible et supprimera toutes les données associées.`,
+      variant: 'danger',
+      confirmText: 'Supprimer',
+      onConfirm: async () => {
+        try {
+          await tontineApi.delete(tontine.id);
+          fetchTontines();
+          if (selectedTontine?.id === tontine.id) setSelectedTontine(null);
+          toast.success('Tontine supprimée');
+        } catch (error) {
+          toast.error(handleApiError(error, 'Erreur lors de la suppression de la tontine'));
+        }
+      },
+    });
+  }, [openConfirm, fetchTontines, selectedTontine]);
+
+  // ... (Keep existing handleStatusChange, handlePasserTourSuivant logic if needed for Details view)
+  // For brevity, using the same detailed view logic when a tontine is selected.
+  // The logic below is largely unchanged from the original for the detailed view part.
+
+  // Calculate success rate based on actual data (memoized)
+  const stats = useMemo(() => {
+    const activeTontines = tontines.filter(t => t.statut === TontineStatus.ACTIVE || t.statut === TontineStatus.COMPLETED);
+
+    let tauxReussite = 0;
+    if (activeTontines.length > 0) {
+      const totalSuccess = activeTontines.reduce((sum, t) => {
+        const expectedTours = t.nombreMembresActuel || t.nombreMembres || 1;
+        const completedTours = t.tourActuel || 0;
+        const tontineSuccess = Math.min((completedTours / expectedTours) * 100, 100);
+        return sum + tontineSuccess;
+      }, 0);
+      tauxReussite = Math.round(totalSuccess / activeTontines.length);
+    }
+
+    return {
+      total: tontines.length,
+      active: tontines.filter(t => t.statut === TontineStatus.ACTIVE).length,
+      membres: tontines.reduce((sum, t) => sum + (t.nombreMembresActuel || 0), 0),
+      volume: tontines.reduce((sum, t) => sum + (Number(t.montantCotisation || 0) * (t.nombreMembresActuel || 0)), 0),
+      tauxReussite,
+    };
+  }, [tontines]);
+
+  const filteredTontines = useMemo(() => {
+    if (!filterStatut) return tontines;
+    return tontines.filter(t => t.statut === filterStatut);
+  }, [tontines, filterStatut]);
+
+  // Export tontine summary as PDF
+  const handleExportSummary = useCallback(() => {
+    if (!selectedTontine) return;
+    const t = selectedTontine;
+    const data = [{
+      'Nom': t.nom,
+      'Statut': STATUT_TONTINE_LABELS[t.statut] || t.statut,
+      'Fréquence': FREQUENCE_TONTINE_LABELS[t.frequence as keyof typeof FREQUENCE_TONTINE_LABELS] || t.frequence,
+      [`Cotisation (${sym})`]: (t.montantCotisation || 0).toLocaleString('fr-FR'),
+      'Membres': `${t.nombreMembresActuel || 0} / ${t.nombreMembres || 0}`,
+      'Tour actuel': t.tourActuel || 1,
+      [`Total collecté (${sym})`]: (t.totalCollecte || 0).toLocaleString('fr-FR'),
+      'Date début': new Date(t.dateDebut).toLocaleDateString('fr-FR'),
+      'Créé le': t.createdAt ? new Date(t.createdAt).toLocaleDateString('fr-FR') : '',
+    }];
+    const date = new Date().toISOString().slice(0, 10);
+    exportToPDF(data, `tontine-resume-${date}`, `Résumé - ${t.nom}`);
+  }, [selectedTontine]);
+
+  const handleLifecycleAction = useCallback((action: 'activate' | 'pause' | 'resume' | 'complete' | 'cancel') => {
+    if (!selectedTontine) return;
+
+    const labels: Record<string, { title: string; message: string; variant: 'warning' | 'danger' | 'info' | 'success'; confirm: string }> = {
+      activate: { title: 'Activer la tontine ?', message: 'La tontine passera en mode actif. Les cotisations et distributions seront possibles.', variant: 'info', confirm: 'Activer' },
+      pause: { title: 'Suspendre la tontine ?', message: 'Les cycles en cours seront suspendus. Aucune opération ne sera possible.', variant: 'warning', confirm: 'Suspendre' },
+      resume: { title: 'Reprendre la tontine ?', message: 'La tontine reprendra son fonctionnement normal.', variant: 'info', confirm: 'Reprendre' },
+      complete: { title: 'Terminer la tontine ?', message: 'La tontine sera marquée comme terminée. Cette action est irréversible.', variant: 'warning', confirm: 'Terminer' },
+      cancel: { title: 'Annuler la tontine ?', message: 'La tontine sera annulée définitivement. Cette action est irréversible.', variant: 'danger', confirm: 'Annuler' },
+    };
+
+    const cfg = labels[action];
+    openConfirm({
+      title: cfg.title,
+      message: cfg.message,
+      variant: cfg.variant,
+      confirmText: cfg.confirm,
+      onConfirm: async () => {
+        try {
+          await tontineApi[action](selectedTontine.id);
+          toast.success(cfg.title.replace(' ?', ''));
+          fetchTontines();
+          // Refresh selected tontine
+          const updated = await tontineApi.getById(selectedTontine.id);
+          setSelectedTontine(updated);
+        } catch (error) {
+          toast.error(handleApiError(error, 'Erreur lors du changement de statut'));
+        }
+      },
+    });
+  }, [selectedTontine, openConfirm, fetchTontines]);
+
+  const columns = [
+    {
+      label: 'Tontine',
+      key: 'nom',
+      primary: true,
+      format: (value: any, row: Tontine) => (
+        <div>
+          <div className="font-bold text-content-primary">{value}</div>
+          <div className="text-xs text-content-muted line-clamp-1">{row.description}</div>
+        </div>
+      )
+    },
+    {
+      label: 'Membres',
+      key: 'nombreMembresActuel',
+      format: (value: any, row: Tontine) => (
+        <span className="text-xs text-content-secondary">{value || 0}/{row.nombreMembres}</span>
+      )
+    },
+    {
+      label: 'Cotisation',
+      key: 'montantCotisation',
+      format: (value: any) => (
+        <span className="font-bold text-accent">{Number(value).toLocaleString()} {sym}</span>
+      )
+    },
+    {
+      label: 'Fréquence',
+      key: 'frequence',
+      format: (value: any) => (
+        <span className="text-xs text-content-secondary">{FREQUENCE_TONTINE_LABELS[value as keyof typeof FREQUENCE_TONTINE_LABELS] || value}</span>
+      )
+    },
+    {
+      label: 'Statut',
+      key: 'statut',
+      format: (value: any) => (
+        <Badge
+          value={STATUT_TONTINE_LABELS[value] || value}
+          variant={
+            value === 'ACTIVE' ? 'success'
+            : value === 'PAUSED' ? 'warning'
+            : value === 'DRAFT' ? 'neutral'
+            : value === 'COMPLETED' ? 'info'
+            : 'danger'
+          }
+          size="sm"
+        />
+      )
+    }
+  ];
+
+  const actions = useCallback((row: Tontine) => (
+    <div className="flex items-center gap-1">
+      <IconButton
+        icon={Eye}
+        variant="ghost"
+        size="sm"
+        onClick={(e) => { e.stopPropagation(); setSelectedTontine(row); }}
+        aria-label={`Voir détails de ${escapeHtml(row.nom)}`}
+      />
+      {canEditTontines && (
+        <IconButton
+          icon={Edit2}
+          variant="ghost"
+          size="sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            setEditingTontine(row);
+            setShowForm(true);
+          }}
+          aria-label={`Modifier ${escapeHtml(row.nom)}`}
+        />
+      )}
+      {canDeleteTontines && (
+        <IconButton
+          icon={Trash2}
+          variant="danger"
+          size="sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            confirmDelete(row);
+          }}
+          aria-label={`Supprimer ${escapeHtml(row.nom)}`}
+        />
+      )}
+    </div>
+  ), [canEditTontines, canDeleteTontines, confirmDelete]);
+
+  // If a tontine is selected, show the detailed view (legacy view preserved for deep drilling)
+  if (selectedTontine) {
+    // ... preserved detailed view logic ...
+    // Note: I will reimplement the detailed view using the exact logic from the original file
+    // to ensure no functionality is lost, while wrapping it in the new structure if needed.
+    // For this rewrite, I'll paste the logic back.
+    
+    return (
+      <div className="flex flex-col h-full overflow-hidden gap-2">
+        <div className="shrink-0 flex flex-col gap-2 p-1">
+          <PageHeader
+            title={selectedTontine.nom}
+            description={selectedTontine.description ?? undefined}
+            actions={
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <Badge
+                  value={STATUT_TONTINE_LABELS[selectedTontine.statut] || selectedTontine.statut}
+                  variant={
+                    selectedTontine.statut === 'ACTIVE' ? 'success'
+                    : selectedTontine.statut === 'PAUSED' ? 'warning'
+                    : selectedTontine.statut === 'DRAFT' ? 'neutral'
+                    : selectedTontine.statut === 'COMPLETED' ? 'info'
+                    : 'danger'
+                  }
+                  size="sm"
+                />
+                {/* Lifecycle actions */}
+                {canEditTontines && selectedTontine.statut === 'DRAFT' && (
+                  <Button variant="primary" size="sm" icon={Play} onClick={() => handleLifecycleAction('activate')}>
+                    Activer
+                  </Button>
+                )}
+                {canEditTontines && selectedTontine.statut === 'ACTIVE' && (
+                  <Button variant="secondary" size="sm" icon={Pause} onClick={() => handleLifecycleAction('pause')}>
+                    Suspendre
+                  </Button>
+                )}
+                {canEditTontines && selectedTontine.statut === 'PAUSED' && (
+                  <Button variant="primary" size="sm" icon={Play} onClick={() => handleLifecycleAction('resume')}>
+                    Reprendre
+                  </Button>
+                )}
+                {canEditTontines && selectedTontine.statut === 'ACTIVE' && (
+                  <Button variant="ghost" size="sm" icon={CheckCircle} onClick={() => handleLifecycleAction('complete')}>
+                    Terminer
+                  </Button>
+                )}
+                {canEditTontines && (selectedTontine.statut === 'DRAFT' || selectedTontine.statut === 'ACTIVE' || selectedTontine.statut === 'PAUSED') && (
+                  <Button variant="ghost" size="sm" icon={Ban} onClick={() => handleLifecycleAction('cancel')} className="text-status-danger">
+                    Annuler
+                  </Button>
+                )}
+                <IconButton
+                  icon={Download}
+                  size="sm"
+                  onClick={handleExportSummary}
+                  aria-label="Exporter le résumé en PDF"
+                  title="Exporter résumé PDF"
+                />
+                <Button
+                  variant="ghost"
+                  onClick={() => setSelectedTontine(null)}
+                  icon={ArrowLeft}
+                  size="sm"
+                  className="text-content-muted hover:text-content-primary h-8 text-xs"
+                >
+                  Retour
+                </Button>
+              </div>
+            }
+            className="p-0 m-0"
+          />
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+             <StatCard title="Membres" value={`${selectedTontine.nombreMembresActuel || 0}/${selectedTontine.nombreMembres || 0}`} icon={Users} color="primary" className="p-2" />
+             <StatCard title="Contribution" value={`${(selectedTontine.montantCotisation || 0).toLocaleString()} ${sym}`} icon={DollarSign} color="success" className="p-2" />
+             <StatCard title="Total Collecté" value={`${(selectedTontine.totalCollecte || 0).toLocaleString()} ${sym}`} icon={TrendingUp} color="warning" className="p-2" />
+             <StatCard title="Tour Actuel" value={selectedTontine.tourActuel || 1} icon={Calendar} color="primary" className="p-2" />
+          </div>
+
+          <TabGroup
+            activeTab={activeTab}
+            onTabChange={(key) => setActiveTab(key as any)}
+            tabs={[
+              { key: 'dashboard', label: 'Dashboard' },
+              { key: 'config', label: 'Configuration' },
+              { key: 'membres', label: 'Membres' },
+              { key: 'contributions', label: 'Contributions' },
+              { key: 'distributions', label: 'Distributions' },
+              { key: 'tours', label: 'Tours' },
+              { key: 'penalites', label: 'Penalites' },
+              { key: 'echeancier', label: 'Echeancier' },
+              { key: 'audit', label: 'Audit' },
+              { key: 'calendar', label: 'Calendrier' },
+            ]}
+            variant="underline"
+            className="mb-0 border-b border-edge"
+          />
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-y-auto bg-surface-base/50 border border-edge rounded-lg p-3 custom-scrollbar">
+             {activeTab === 'dashboard' && (
+                <TontineDashboard
+                  tontineId={selectedTontine.id}
+                  montantContribution={Number(selectedTontine.montantCotisation || 0)}
+                  nombreMembres={selectedTontine.nombreMembres}
+                  tourActuel={selectedTontine.tourActuel || 1}
+                />
+              )}
+              {activeTab === 'config' && (
+                <TontineConfig
+                  tontineId={selectedTontine.id}
+                  onEdit={canEditTontines ? () => {
+                    setEditingTontine(selectedTontine);
+                    setPreSelectedPlanId(undefined);
+                    setShowForm(true);
+                  } : undefined}
+                />
+              )}
+              {activeTab === 'membres' && <TontineMembers tontineId={selectedTontine.id} maxMembres={selectedTontine.nombreMembres} onUpdate={fetchTontines} />}
+              {activeTab === 'contributions' && <TontineContributions tontineId={selectedTontine.id} />}
+              {activeTab === 'distributions' && (
+                <TontineDistributions
+                  tontineId={selectedTontine.id}
+                  tourActuel={selectedTontine.tourActuel || 1}
+                  montantContribution={Number(selectedTontine.montantCotisation || 0)}
+                  nombreMembres={selectedTontine.nombreMembres}
+                  onUpdate={fetchTontines}
+                />
+              )}
+              {activeTab === 'tours' && (
+                <TontineTurnManager tontineId={selectedTontine.id} onUpdate={fetchTontines} />
+              )}
+              {activeTab === 'penalites' && (
+                <TontinePenalties tontineId={selectedTontine.id} onUpdate={fetchTontines} />
+              )}
+              {activeTab === 'echeancier' && (
+                <TontineSchedules tontineId={selectedTontine.id} />
+              )}
+              {activeTab === 'audit' && (
+                <TontineAuditTrail tontineId={selectedTontine.id} />
+              )}
+              {activeTab === 'calendar' && (
+                <TontineCalendar
+                  tontineId={selectedTontine.id}
+                  dateDebut={selectedTontine.dateDebut instanceof Date ? selectedTontine.dateDebut.toISOString() : String(selectedTontine.dateDebut)}
+                  frequence={selectedTontine.frequence}
+                  tourActuel={selectedTontine.tourActuel || 1}
+                  nombreMembres={selectedTontine.nombreMembres}
+                />
+              )}
+        </div>
+
+        {/* Confirm Dialog (must be inside early-return branch) */}
+        <ConfirmDialog
+          isOpen={confirmState.isOpen}
+          onClose={closeConfirm}
+          onConfirm={handleConfirm}
+          title={confirmState.title || ''}
+          message={confirmState.message || ''}
+          variant={confirmState.variant}
+          confirmText={confirmState.confirmText}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-full space-y-2">
+      <div className="shrink-0">
+          <FeatureHeader
+            featureKey="finance.tontines"
+            title={FEATURE_DESCRIPTIONS['finance.tontines'].title}
+            subtitle={FEATURE_DESCRIPTIONS['finance.tontines'].subtitle}
+            helpText={FEATURE_DESCRIPTIONS['finance.tontines'].helpText}
+            icon={<Users size={24} />}
+            actions={
+              canCreateTontines ? (
+                <div className="flex items-center gap-2">
+                  {plans.length > 0 && (
+                    <div className="relative">
+                      <Button
+                        onClick={() => setShowPlanPicker(!showPlanPicker)}
+                        icon={LayoutTemplate}
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs"
+                      >
+                        Depuis un modele
+                      </Button>
+                      {showPlanPicker && (
+                        <div className="absolute right-0 top-full mt-1 bg-surface-base border border-edge rounded-lg shadow-xl z-50 w-64 max-h-60 overflow-y-auto">
+                          {plans.map((plan: any) => (
+                            <button
+                              key={plan.id}
+                              type="button"
+                              onClick={() => {
+                                setPreSelectedPlanId(plan.id);
+                                setEditingTontine(null);
+                                setShowForm(true);
+                                setShowPlanPicker(false);
+                              }}
+                              className="w-full text-left px-3 py-2 hover:bg-surface-elevated transition-colors border-b border-edge-subtle last:border-0"
+                            >
+                              <div className="text-sm font-medium text-content-primary">{plan.nom}</div>
+                              {plan.description && <div className="text-[10px] text-content-muted line-clamp-1">{plan.description}</div>}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <Button
+                    onClick={() => {
+                      setEditingTontine(null);
+                      setPreSelectedPlanId(undefined);
+                      setShowForm(true);
+                    }}
+                    icon={Plus}
+                    size="sm"
+                    className="h-8 text-xs"
+                  >
+                    Nouvelle Tontine
+                  </Button>
+                </div>
+              ) : (
+                <div className="px-3 py-1 bg-status-warning-bg text-status-warning rounded-lg text-xs flex items-center gap-1.5 border border-status-warning/30">
+                  <AlertTriangle size={14} />
+                  Permission requise
+                </div>
+              )
+            }
+          />
+
+          {/* Compact Overview Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
+               <StatCard 
+                 title="Total Tontines" 
+                 value={stats.total} 
+                 icon={Target} 
+                 color="primary" 
+                 subtitle={`${stats.active} actives`} 
+                 className="p-3"
+               />
+               <StatCard 
+                 title="Membres Actifs" 
+                 value={stats.membres} 
+                 icon={Users} 
+                 color="success" 
+                 subtitle="Participants" 
+                 className="p-3"
+               />
+               <StatCard 
+                 title="Volume/Tour" 
+                 value={`${stats.volume.toLocaleString()} ${sym}`} 
+                 icon={Coins} 
+                 color="warning" 
+                 subtitle="Collecte estimée" 
+                 className="p-3"
+               />
+               <StatCard 
+                 title="Taux Réussite" 
+                 value={stats.active > 0 ? `${stats.tauxReussite}%` : '-'} 
+                 icon={TrendingUp} 
+                 color="primary" 
+                 subtitle="Moyenne" 
+                 className="p-3"
+               />
+          </div>
+      </div>
+
+      <div className="flex-1 min-h-0 bg-surface-base border border-edge rounded-lg flex flex-col">
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-edge-subtle">
+            <Filter size={14} className="text-content-muted" />
+            <select
+              value={filterStatut}
+              onChange={(e) => setFilterStatut(e.target.value)}
+              className="text-xs bg-input border border-input-border rounded px-2 py-1 focus:border-input-focus focus:outline-none"
+            >
+              <option value="">Tous les statuts</option>
+              <option value="DRAFT">Brouillon</option>
+              <option value="ACTIVE">Active</option>
+              <option value="PAUSED">Suspendue</option>
+              <option value="COMPLETED">Terminée</option>
+              <option value="CANCELLED">Annulée</option>
+            </select>
+            {filterStatut && (
+              <span className="text-[10px] text-content-muted">
+                {filteredTontines.length}/{tontines.length}
+              </span>
+            )}
+          </div>
+          <div className="flex-1 overflow-hidden">
+              <ResponsiveTable
+                data={filteredTontines}
+                columns={columns}
+                actions={actions}
+                loading={loading}
+                emptyMessage="Aucune tontine trouvée"
+                onRowClick={(row) => setSelectedTontine(row)}
+                density="compact"
+                maxHeight="100%"
+                className="border-0 rounded-none h-full"
+                headerClassName="bg-surface-base sticky top-0"
+              />
+          </div>
+      </div>
+
+      <TontineGroupWizard
+        isOpen={showForm}
+        onClose={() => {
+          setShowForm(false);
+          setEditingTontine(null);
+          setPreSelectedPlanId(undefined);
+        }}
+        onSave={async (data) => {
+          if (editingTontine) {
+            await tontineApi.update(editingTontine.id, data);
+          } else {
+            await tontineApi.create(data);
+          }
+          fetchTontines();
+        }}
+        editTontine={editingTontine ?? undefined}
+        preSelectedPlanId={preSelectedPlanId}
+      />
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={confirmState.isOpen}
+        onClose={closeConfirm}
+        onConfirm={handleConfirm}
+        title={confirmState.title || ''}
+        message={confirmState.message || ''}
+        variant={confirmState.variant}
+        confirmText={confirmState.confirmText}
+      />
+    </div>
+  );
+}

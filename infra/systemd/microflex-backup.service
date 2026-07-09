@@ -1,0 +1,25 @@
+[Unit]
+Description=MicroFlex PostgreSQL Backup
+After=postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=oneshot
+User=deploy
+Group=deploy
+ExecStart=/opt/microflex/scripts/vps/backup-db.sh
+Environment=PG_DB=microflex
+Environment=PG_USER=microflex_app
+Environment=PG_HOST=localhost
+Environment=PG_PORT=5432
+Environment=BACKUP_DIR=/opt/microflex/backups
+Environment=RETENTION_DAILY=7
+Environment=RETENTION_WEEKLY=4
+StandardOutput=journal
+StandardError=journal
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

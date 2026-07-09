@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { processAutomaticCreditRepayments } from 'server/services/automatic-repayment-service';
-import { db } from 'server/db';
+import { processAutomaticCreditRepayments } from '../../apps/api/services/automatic-repayment-service';
+import { db } from '../../apps/api/db';
 
 // Mock dependencies
-vi.mock('server/db', () => ({
+vi.mock('../../apps/api/db', () => ({
   db: {
     query: {
       credits: {
@@ -35,7 +35,7 @@ const createMockQueryBuilder = (result: any[]) => {
 
 // Mock Ledger functions 
 // Check where they are imported from in service. Usually ./ledger or ../storage/finance
-vi.mock('server/services/ledger', () => ({
+vi.mock('../../apps/api/services/ledger', () => ({
     executeWithLedger: vi.fn(async (module, data, callback) => {
         // Mock implementation that simply executes the callback
         const simpleTx = {
@@ -76,7 +76,7 @@ describe('Automatic Repayment Robustness', () => {
         vi.mocked(db.query.credits.findMany).mockResolvedValue([mockCredit] as any);
         vi.mocked(db.select).mockReturnValue(createMockQueryBuilder([mockAccount]));
 
-        const { updateCreditSolde, updateCompteSolde } = await import('server/services/ledger');
+        const { updateCreditSolde, updateCompteSolde } = await import('../../apps/api/services/ledger');
 
         // Execute
         await processAutomaticCreditRepayments();
@@ -108,7 +108,7 @@ describe('Automatic Repayment Robustness', () => {
         // Important: Reset previous select mock to match structure if needed, or rely on implementation detail
         vi.mocked(db.select).mockReturnValue(createMockQueryBuilder([mockAccount]));
 
-        const { updateCreditSolde, updateCompteSolde } = await import('server/services/ledger');
+        const { updateCreditSolde, updateCompteSolde } = await import('../../apps/api/services/ledger');
 
         // Execute
         await processAutomaticCreditRepayments();
@@ -132,7 +132,7 @@ describe('Automatic Repayment Robustness', () => {
 
         vi.mocked(db.query.credits.findMany).mockResolvedValue([mockCredit] as any);
 
-        const { updateCreditSolde } = await import('server/services/ledger');
+        const { updateCreditSolde } = await import('../../apps/api/services/ledger');
 
         // Execute
         await processAutomaticCreditRepayments();

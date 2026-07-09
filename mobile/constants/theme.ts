@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 
 /**
- * COFINCO Design Tokens
+ * MICROFLEX Design Tokens
  * Mirrors the CSS variables in global.css for programmatic access.
  */
 export const Colors = {

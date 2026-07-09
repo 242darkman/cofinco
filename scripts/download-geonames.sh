@@ -18,7 +18,10 @@ SEEDS_DIR="$(cd "$(dirname "$0")/../seeds" && pwd)"
 GEONAMES_URL="https://download.geonames.org/export/dump"
 
 # Files to download (name without extension — expects .zip → .txt)
-DEFAULT_FILES="allCountries cities5000"
+#   CG          : géographie OPÉRATIONNELLE Congo (fichier GeoNames par pays, ~qq Mo)
+#   cities5000  : référentiel MONDIAL de villes >5000 hab. (lieu de naissance, villes_reference)
+# Élargir la liste (ex. "CG CM GA cities5000") pour couvrir d'autres pays d'exploitation.
+DEFAULT_FILES="CG cities5000"
 
 download_and_extract() {
   file="$1"

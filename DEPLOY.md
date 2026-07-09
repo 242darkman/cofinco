@@ -1,427 +1,854 @@
-# Cofinco — Deployment Guide (Option B — Microfinance)
+# MicroFlex — Mode Operatoire de Deploiement (VPS OVH)
+
+> Guide complet et pratique pour deployer MicroFlex sur un VPS OVH.
+> Teste et valide sur VPS OVH Rise-4 (64GB RAM, 16 vCores, 350GB SSD).
+
+---
+
+## Table des matieres
+
+1. [Architecture](#architecture)
+2. [Prerequisites](#prerequisites)
+3. [Etape 1 — Provisionner le VPS](#etape-1--provisionner-le-vps)
+4. [Etape 2 — Configurer GitHub](#etape-2--configurer-github)
+5. [Etape 3 — Preparer le VPS pour les deploiements](#etape-3--preparer-le-vps-pour-les-deploiements)
+6. [Etape 4 — Premier deploiement](#etape-4--premier-deploiement)
+7. [Etape 5 — Verification post-deploiement](#etape-5--verification-post-deploiement)
+8. [Deploiements suivants](#deploiements-suivants)
+9. [Rollback](#rollback)
+10. [Maintenance](#maintenance)
+11. [Troubleshooting](#troubleshooting)
+12. [Reference rapide](#reference-rapide)
+13. [Livraison enterprise](#livraison-enterprise)
+
+---
 
 ## Architecture
 
 ```
 VPS OVH (Ubuntu 22.04/24.04 LTS)
-├── Native Services:
+├── Services natifs (hors Docker) :
 │   ├── PostgreSQL 16 (localhost:5432, scram-sha-256)
-│   ├── Nginx (reverse proxy, ports 80/443)
+│   ├── Nginx (reverse proxy, ports 80/443, least_conn)
 │   └── Certbot (auto-renew Let's Encrypt)
-├── Docker Services (bridge network: microfinance_net):
-│   ├── app ×3 (API stateless, ports 5001-5003 → Nginx least_conn)
-│   ├── worker (cron jobs, single instance)
-│   ├── redis 7.2 (sessions + cache, persistant)
-│   └── minio (object storage S3-compatible)
-├── Backups:
+│
+├── Services Docker (bridge network: microfinance_net) :
+│   ├── app x3 (API stateless, ports 5001-5003 → Nginx)
+│   ├── worker x1 (cron jobs, singleton — NE JAMAIS scaler)
+│   ├── redis 7.2 (sessions + cache, 512MB maxmemory)
+│   └── minio (stockage documents S3-compatible)
+│
+├── Backups :
 │   ├── pg_dump quotidien (systemd timer, 02:00 UTC)
-│   ├── Rotation: 7 jours daily, 4 semaines weekly
-│   └── Option offsite: S3-compatible / rsync
-└── CI/CD:
-    └── GitHub Actions → tags Git → deploy SSH
+│   ├── Rotation : 7 jours daily, 4 semaines weekly
+│   └── Option offsite : S3-compatible
+│
+└── CI/CD :
+    └── GitHub Actions → tags Git → build GHCR → deploy SSH
 ```
 
-## Allocation des Ressources (VPS 64GB RAM / 16 vCores / 350GB SSD)
+### Flux reseau
 
-| Service | Replicas | RAM (limit) | CPU (limit) | Rôle |
-|---|---|---|---|---|
-| PostgreSQL (natif) | 1 | ~48 GB | reste | Base de données principale |
-| app | 3 | 1 GB chacun | 2 CPU | API stateless, zero-downtime deploy |
-| worker | 1 | 1 GB | 1 CPU | Cron jobs, tâches de fond (singleton) |
-| redis | 1 | 1 GB | 1 CPU | Sessions + cache (512 MB maxmemory) |
-| minio | 1 | 1 GB | 1 CPU | Stockage documents S3-compatible |
-| db-init | 1 (one-shot) | 1 GB | 1 CPU | Schema push + seeds |
-| Nginx + OS | — | ~10 GB | — | Reverse proxy, buffers, OS |
+```
+Internet
+   │
+   ▼
+Nginx (80/443)
+   │ least_conn
+   ├──► app:5001
+   ├──► app:5002
+   └──► app:5003
+         │
+         ├──► PostgreSQL (host.docker.internal:5432)
+         ├──► Redis (redis:6379)
+         └──► MinIO (minio:9000)
+```
 
-### PostgreSQL Tuning (auto-appliqué par setup.sh)
+### Allocation des ressources (64GB RAM / 16 vCores)
 
-| Paramètre | Valeur | Explication |
-|---|---|---|
-| `shared_buffers` | 16 GB | 25% de la RAM — cache données en mémoire |
-| `effective_cache_size` | 48 GB | 75% de la RAM — estimation cache OS |
-| `work_mem` | 256 MB | Mémoire par opération (tri, jointure) |
-| `maintenance_work_mem` | 2 GB | VACUUM, CREATE INDEX |
-| `max_connections` | 200 | 3 app replicas × pool + worker + admin |
-| `max_parallel_workers` | 8 | Parallélisme requêtes complexes |
-| `random_page_cost` | 1.1 | Optimisé SSD |
+| Service            | Replicas     | RAM (limit) | CPU (limit) | Role                       |
+| ------------------ | ------------ | ----------- | ----------- | -------------------------- |
+| PostgreSQL (natif) | 1            | ~48 GB      | reste       | Base de donnees principale |
+| app                | 3            | 1 GB chacun | 2 CPU       | API stateless              |
+| worker             | 1            | 1 GB        | 1 CPU       | Cron jobs (singleton)      |
+| redis              | 1            | 1 GB        | 1 CPU       | Sessions + cache           |
+| minio              | 1            | 1 GB        | 1 CPU       | Stockage documents         |
+| db-init            | 1 (one-shot) | 1 GB        | 1 CPU       | Schema push + seeds        |
 
-### Ports réseau (host)
+---
 
-| Port | Service | Accès |
-|---|---|---|
-| 80/443 | Nginx | Public (HTTP/HTTPS) |
-| 5001-5003 | app ×3 | Localhost uniquement (Nginx upstream) |
-| 5432 | PostgreSQL | Localhost + Docker subnet (UFW bloqué) |
-| 9001 | MinIO Console | Localhost (SSH tunnel) |
+## Prerequisites
 
-## Matrice des Environnements
+Avant de commencer, vous devez avoir :
 
-| | **DEV** | **PREPROD** | **PROD** |
-|---|---|---|---|
-| **Trigger** | `docker compose up` | Tag `rc-v*` | Tag `v*` |
-| **Compose** | `docker-compose.yml` + override | `docker-compose.vps.yml` | `docker-compose.vps.yml` |
-| **Images** | Build local | GHCR `rc-vX.Y.Z` | GHCR `vX.Y.Z` + `latest` |
-| **Env source** | `.env` local | GitHub Environment `preprod` | GitHub Environment `production` |
-| **Database** | Docker (postgres:16-alpine) | VPS natif (PostgreSQL 16) | VPS natif (PostgreSQL 16) |
-| **Reverse proxy** | Acces direct :5000 | Nginx natif + Certbot | Nginx natif + Certbot |
-| **Redis** | Docker | Docker | Docker |
-| **Domain** | localhost | preprod.cofinco-m.com | cofinco-m.com |
-| **Replicas** | 1 | 1 | 3 (zero-downtime) |
-| **Monitoring** | Optionnel (profile admin) | Optionnel | Prometheus + Grafana |
-| **Backups** | Non | Quotidien | Quotidien + weekly + offsite |
-| **Rollback** | N/A | Manuel ou auto | Auto (health check) |
+- [ ] **Un VPS OVH** avec Ubuntu 22.04 ou 24.04 LTS
+- [ ] **Un nom de domaine** pointe vers l'IP du VPS (A record + www CNAME)
+- [ ] **Un repo GitHub** avec le code MicroFlex et les workflows CI/CD
+- [ ] **Un Personal Access Token GitHub** (PAT) avec scope `read:packages` pour GHCR
+- [ ] **Acces root** au VPS (SSH)
 
-## Variables d'Environnement
+### DNS (a faire AVANT le setup)
 
-### Classification
+Configurez les enregistrements DNS pour votre domaine :
 
-| Variable | Scope | Type | Requis |
-|---|---|---|---|
-| `NODE_ENV` | Runtime | Variable | Oui |
-| `PORT` | Runtime | Variable | Oui (default: 5000) |
-| `APP_VERSION` | Runtime | Variable | Oui (set by CI) |
-| `DATABASE_URL` | Runtime | **Secret** | Oui |
-| `REDIS_PASSWORD` | Runtime | **Secret** | Oui |
-| `SESSION_SECRET` | Runtime | **Secret** | Oui (min 32 chars) |
-| `OTP_HMAC_SECRET` | Runtime | **Secret** | Oui (min 32 chars) |
-| `OFFLINE_LIMITS_HMAC_KEY` | Runtime | **Secret** | Recommandé |
-| `MINIO_ROOT_USER` | Runtime | **Secret** | Oui |
-| `MINIO_ROOT_PASSWORD` | Runtime | **Secret** | Oui |
-| `MINIO_PUBLIC_ENDPOINT` | Runtime | Variable | Oui |
-| `DOMAIN` | Runtime | Variable | Oui (prod) |
-| `SMTP_HOST` | Runtime | Variable | Recommandé |
-| `SMTP_PASSWORD` | Runtime | **Secret** | Recommandé |
-| `MTN_SMS_CLIENT_ID` | Runtime | **Secret** | Optionnel |
-| `MTN_SMS_CLIENT_SECRET` | Runtime | **Secret** | Optionnel |
-| `PAWAPAY_API_TOKEN` | Runtime | **Secret** | Prod only |
-| `GL_POSTING_MODE` | Runtime | Variable | Oui (STRICT) |
-| `LOG_LEVEL` | Runtime | Variable | Oui (default: info) |
-| `VITE_*` | **Build-time** | Variable | Optionnel |
+```
+Type    Nom       Valeur            TTL
+A       @         91.134.136.73     3600
+CNAME   www       microflex.bvsandbox.dev.    3600
+```
 
-### Build-time vs Runtime
+> **Important** : Le DNS doit etre propage AVANT de lancer Certbot (etape setup). Verifiez avec `dig +short microflex.bvsandbox.dev.com`.
 
-- **Build-time** (`VITE_*`) : Baked dans l'image Docker pendant le build. Les valeurs par défaut sont suffisantes. Si des valeurs custom sont nécessaires, il faut rebuild l'image.
-- **Runtime** (`process.env.*`) : Injectées via `.env.runtime` au démarrage des containers. Jamais dans l'image Docker.
+---
 
-### GitHub Environments Setup
+## Etape 1 — Provisionner le VPS
 
-Settings → Environments → chaque environnement a ses propres secrets & variables (pas de préfixes).
-
-**`production`** (avec protection rules : required reviewers)
-- Secrets : DATABASE_URL, REDIS_PASSWORD, SESSION_SECRET, OTP_HMAC_SECRET, OFFLINE_LIMITS_HMAC_KEY, MINIO_ROOT_USER, MINIO_ROOT_PASSWORD, SMTP_HOST, SMTP_USERNAME, SMTP_PASSWORD, MTN_SMS_CLIENT_ID, MTN_SMS_CLIENT_SECRET, MTN_SMS_WEBHOOK_SECRET, PAWAPAY_API_TOKEN, PAWAPAY_WEBHOOK_PUBLIC_KEYS, GRAFANA_ADMIN_PASSWORD, VPS_HOST, VPS_USER, VPS_SSH_KEY
-- Variables : DOMAIN, MINIO_PUBLIC_ENDPOINT, SMTP_PORT, SMTP_FROM_EMAIL, SMTP_FROM_NAME, SMTP_SECURE, MTN_SMS_SENDER_ID, MTN_SMS_TOKEN_URL, MTN_SMS_BASE_URL, PAWAPAY_ENVIRONMENT, PAWAPAY_CALLBACK_URL, PAWAPAY_STATEMENT_PREFIX, WEBHOOK_IP_VALIDATION, GL_POSTING_MODE, BALANCE_RECONCILIATION_INTERVAL_MINUTES, ENABLE_BALANCE_AUTO_CORRECTION, LOG_LEVEL, APP_REPLICAS, GRAFANA_ADMIN_USER
-
-**`preprod`** (sans protection rules)
-- Mêmes clés avec des valeurs preprod (DB séparée, domain preprod, etc.)
-
-## Setup Initial VPS
-
-### 1. Provisionner le VPS
+### 1.1 Se connecter en root
 
 ```bash
-# Se connecter en root
-ssh root@VPS_IP
-
-# Cloner le repo (une seule fois, pour les scripts)
-git clone https://github.com/your-org/cofinco.git /tmp/cofinco-setup
-cd /tmp/cofinco-setup
-
-# Lancer le setup (installe tout : PG, Nginx, Docker, UFW, etc.)
-sudo DOMAIN=cofinco-m.com ACME_EMAIL=admin@cofinco-m.com bash scripts/vps/setup.sh
+ssh root@91.134.136.73
 ```
 
-Le script setup.sh :
-- Installe PostgreSQL 16 + crée la DB et l'utilisateur
-- Installe Docker + configure le daemon
-- Installe Nginx + Certbot + obtient le certificat SSL
-- Configure UFW (SSH + HTTP/HTTPS only)
-- Crée l'utilisateur `deploy` + l'arborescence `/opt/cofinco/`
-- Configure le backup systemd timer
-- Configure fail2ban + logrotate
-
-**IMPORTANT** : Notez le `DATABASE_URL` affiché à la fin du setup pour le configurer dans GitHub Secrets.
-
-### 2. Préparer le VPS pour les déploiements
+### 1.2 Cloner le repo (temporairement, pour les scripts)
 
 ```bash
-# En tant qu'utilisateur deploy
-su - deploy
-
-# Copier les fichiers nécessaires
-cp /tmp/cofinco-setup/docker-compose.vps.yml /opt/cofinco/
-cp -r /tmp/cofinco-setup/scripts/vps/ /opt/cofinco/scripts/
-chmod +x /opt/cofinco/scripts/vps/*.sh
-
-# Login GHCR (utiliser un Personal Access Token avec read:packages)
-echo "ghp_YOUR_TOKEN" | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
-
-# Cleanup
-rm -rf /tmp/cofinco-setup
+git clone https://github.com/242darkman/microflex.git /tmp/microflex-setup
+cd /tmp/microflex-setup
 ```
 
-### 3. Configurer GitHub
-
-1. Créer les environments `production` et `preprod`
-2. Ajouter tous les secrets et variables (voir section ci-dessus)
-3. Ajouter la clé SSH du VPS dans `VPS_SSH_KEY`
-
-### 4. Premier déploiement
+### 1.3 Lancer le script de setup
 
 ```bash
-# Depuis votre machine locale
-git tag v3.61.0
-git push origin v3.61.0
+sudo DOMAIN=microflex.bvsandbox.dev ACME_EMAIL=admin@microflex.bvsandbox.dev bash scripts/vps/setup.sh
 ```
 
-Le workflow `release.yml` va :
-1. Exécuter les tests (unit + GL contracts)
-2. Build et push les images Docker vers GHCR
-3. Générer `.env.runtime` depuis les GitHub Secrets
-4. SSH sur le VPS et exécuter `deploy.sh`
-5. Vérifier la santé de l'application
+Ce script installe et configure automatiquement :
 
-## Déploiement Quotidien
+- **PostgreSQL 16** : base `microflex`, user `microflex_app`, tuning auto (shared_buffers=16GB, etc.)
+- **Docker** : daemon avec log rotation, live-restore, subnet `172.20.0.0/16`
+- **Nginx** : reverse proxy avec config MicroFlex (least_conn, rate limiting, security headers)
+- **Certbot** : certificat SSL Let's Encrypt + auto-renew
+- **UFW** : firewall restrictif (SSH + HTTP/HTTPS + PostgreSQL Docker)
+- **Fail2ban** : protection SSH + Nginx
+- **User `deploy`** : acces Docker, arborescence `/opt/microflex/`
+- **Backup timer** : pg_dump quotidien a 02:00 UTC
+
+### 1.4 NOTER les informations affichees
+
+A la fin du script, **notez imperativement** :
+
+```
+  PostgreSQL
+    Database:  microflex
+    User:      microflex_app
+    Password:  <MOT_DE_PASSE_GENERE>
+    URL:       postgresql://microflex_app:<PASSWORD>@host.docker.internal:5432/microflex
+```
+
+> **CRITIQUE** : Le `DATABASE_URL` sera necessaire pour GitHub Secrets. Notez-le maintenant.
+
+### 1.5 Verifier que tout fonctionne
+
+```bash
+# PostgreSQL
+sudo -u postgres psql -c "SELECT 1;"
+
+# Docker
+docker --version
+docker compose version
+
+# Nginx
+nginx -t
+systemctl status nginx
+
+# UFW
+ufw status numbered
+
+# Certbot
+certbot certificates
+```
+
+---
+
+## Etape 2 — Configurer GitHub
+
+### 2.1 Creer les GitHub Environments
+
+Allez dans **Settings → Environments** de votre repo GitHub et creez deux environments :
+
+1. **`production`** — avec protection rules (required reviewers recommande)
+2. **`preprod`** — sans protection rules
+
+### 2.2 Generer les secrets de securite
+
+Sur votre machine locale (ou sur le VPS) :
+
+```bash
+# Redis password — IMPORTANT : PAS de caracteres speciaux URL (/, +, =, @, :, %)
+openssl rand -base64 32 | tr -d '/+=' | head -c 32
+# Exemple : 0rYnqEJzeMwTzdrE9UzCHIIhm9evNHxX
+
+# Session secret
+openssl rand -base64 32
+
+# OTP HMAC secret
+openssl rand -hex 32
+
+# Offline limits HMAC key
+openssl rand -hex 32
+
+# MinIO credentials
+openssl rand -base64 16 | tr -d '/+=' | head -c 16  # user
+openssl rand -base64 32 | tr -d '/+=' | head -c 32  # password
+```
+
+> **ATTENTION — REDIS_PASSWORD** : Le mot de passe Redis est utilise directement dans une URL (`redis://:PASSWORD@redis:6379`). Les caracteres `/`, `+`, `=`, `@`, `:`, `%` cassent le parsing de l'URL. Utilisez uniquement des caracteres alphanumeriques.
+
+### 2.3 Configurer les secrets (environment `production`)
+
+Dans **Settings → Environments → production → Environment secrets**, ajoutez :
+
+| Secret                        | Description                        | Exemple                                                              |
+| ----------------------------- | ---------------------------------- | -------------------------------------------------------------------- |
+| `DATABASE_URL`                | URL PostgreSQL (du setup)          | `postgresql://microflex_app:xxx@host.docker.internal:5432/microflex` |
+| `REDIS_PASSWORD`              | Mot de passe Redis (alphanum only) | `0rYnqEJzeMwTzdrE9UzCHIIhm9evNHxX`                                   |
+| `SESSION_SECRET`              | Secret sessions Express            | `openssl rand -base64 32`                                            |
+| `OTP_HMAC_SECRET`             | Secret HMAC pour OTP               | `openssl rand -hex 32`                                               |
+| `OFFLINE_LIMITS_HMAC_KEY`     | Secret HMAC offline                | `openssl rand -hex 32`                                               |
+| `MINIO_ROOT_USER`             | User MinIO                         | `microflex_minio_admin`                                              |
+| `MINIO_ROOT_PASSWORD`         | Password MinIO                     | `openssl rand -base64 32`                                            |
+| `SMTP_HOST`                   | Serveur SMTP                       | `smtp-relay.brevo.com`                                               |
+| `SMTP_USERNAME`               | User SMTP                          | (votre login SMTP)                                                   |
+| `SMTP_PASSWORD`               | Password SMTP                      | (votre password SMTP)                                                |
+| `MTN_SMS_CLIENT_ID`           | API MTN SMS                        | (optionnel)                                                          |
+| `MTN_SMS_CLIENT_SECRET`       | API MTN SMS                        | (optionnel)                                                          |
+| `MTN_SMS_WEBHOOK_SECRET`      | Webhook MTN SMS                    | (optionnel)                                                          |
+| `PAWAPAY_API_TOKEN`           | API pawaPay                        | (optionnel)                                                          |
+| `PAWAPAY_WEBHOOK_PUBLIC_KEYS` | Cles publiques pawaPay             | (optionnel)                                                          |
+| `GRAFANA_ADMIN_PASSWORD`      | Admin Grafana                      | (optionnel)                                                          |
+| `VPS_HOST`                    | IP du VPS                          | `91.134.136.73`                                                      |
+| `VPS_USER`                    | Utilisateur SSH                    | `deploy`                                                             |
+| `VPS_SSH_KEY`                 | Cle privee SSH                     | (contenu de `~/.ssh/id_ed25519`)                                     |
+
+### 2.4 Configurer les variables (environment `production`)
+
+Dans **Settings → Environments → production → Environment variables**, ajoutez :
+
+| Variable                                  | Valeur                                         |
+| ----------------------------------------- | ---------------------------------------------- |
+| `DOMAIN`                                  | `microflex.bvsandbox.dev`                      |
+| `MINIO_PUBLIC_ENDPOINT`                   | `https://microflex.bvsandbox.dev/storage`      |
+| `SMTP_PORT`                               | `587`                                          |
+| `SMTP_FROM_EMAIL`                         | `noreply@microflex.com`                        |
+| `SMTP_FROM_NAME`                          | `MICROFLEX`                                    |
+| `SMTP_SECURE`                             | `false`                                        |
+| `MTN_SMS_SENDER_ID`                       | `MICROFLEX`                                    |
+| `MTN_SMS_TOKEN_URL`                       | (URL token MTN)                                |
+| `MTN_SMS_BASE_URL`                        | (URL base MTN)                                 |
+| `PAWAPAY_ENVIRONMENT`                     | `production`                                   |
+| `PAWAPAY_CALLBACK_URL`                    | `https://microflex.bvsandbox.dev/api/webhooks/pawapay` |
+| `PAWAPAY_STATEMENT_PREFIX`                | `MicroFlex`                                    |
+| `WEBHOOK_IP_VALIDATION`                   | `true`                                         |
+| `GL_POSTING_MODE`                         | `STRICT`                                       |
+| `BALANCE_RECONCILIATION_INTERVAL_MINUTES` | `60`                                           |
+| `ENABLE_BALANCE_AUTO_CORRECTION`          | `false`                                        |
+| `LOG_LEVEL`                               | `info`                                         |
+| `APP_REPLICAS`                            | `3`                                            |
+| `GRAFANA_ADMIN_USER`                      | `admin`                                        |
+
+### 2.5 Configurer la cle SSH de deploiement
+
+La cle SSH doit permettre au runner GitHub Actions de se connecter au VPS en tant que `deploy`.
+
+**Option A** (recommande) : Generer une cle dediee sur votre machine locale :
+
+```bash
+ssh-keygen -t ed25519 -C "github-actions-deploy" -f ~/.ssh/microflex-deploy
+# Copier la cle publique sur le VPS
+ssh-copy-id -i ~/.ssh/microflex-deploy.pub deploy@91.134.136.73
+# Copier le contenu de la cle PRIVEE dans le secret VPS_SSH_KEY
+cat ~/.ssh/microflex-deploy
+```
+
+**Option B** : Reutiliser la cle du VPS (deja copiee par setup.sh vers l'user deploy).
+
+---
+
+## Etape 3 — Preparer le VPS pour les deploiements
+
+### 3.1 Copier les fichiers necessaires
+
+```bash
+ssh deploy@91.134.136.73
+```
+
+```bash
+# Depuis le clone temporaire (si encore present)
+cp /tmp/microflex-setup/docker-compose.vps.yml /opt/microflex/
+cp -r /tmp/microflex-setup/scripts/vps/ /opt/microflex/scripts/
+cp -r /tmp/microflex-setup/infra/ /opt/microflex/infra/
+chmod +x /opt/microflex/scripts/vps/*.sh
+
+# Nettoyer le clone temporaire
+rm -rf /tmp/microflex-setup
+```
+
+> **Si le clone a deja ete supprime**, copiez les fichiers depuis votre machine locale :
+>
+> ```bash
+> scp docker-compose.vps.yml deploy@91.134.136.73:/opt/microflex/
+> scp -r scripts/vps/ deploy@91.134.136.73:/opt/microflex/scripts/
+> scp -r infra/ deploy@91.134.136.73:/opt/microflex/infra/
+> ```
+
+### 3.2 Se connecter a GHCR (GitHub Container Registry)
+
+```bash
+# Sur le VPS, en tant que deploy
+ssh deploy@91.134.136.73
+
+# Login GHCR avec un Personal Access Token (scope: read:packages)
+echo "ghp_VOTRE_TOKEN" | docker login ghcr.io -u VOTRE_USERNAME_GITHUB --password-stdin
+```
+
+> Le login est persistant (credentials stockees dans `~/.docker/config.json`).
+
+### 3.3 Creer les repertoires manquants
+
+```bash
+mkdir -p /opt/microflex/{logs,data/geonames}
+```
+
+### 3.4 Verifier l'arborescence
+
+```bash
+tree /opt/microflex/ -L 2
+```
+
+Resultat attendu :
+
+```
+/opt/microflex/
+├── backups/
+├── data/
+│   └── geonames/
+├── docker-compose.vps.yml
+├── env/
+│   └── .env.runtime   (sera genere par CI/CD au premier deploy)
+├── infra/
+│   └── nginx/
+├── logs/
+└── scripts/
+    └── vps/
+        ├── backup-db.sh
+        ├── deploy.sh
+        ├── rollback.sh
+        └── setup.sh
+```
+
+---
+
+## Etape 4 — Premier deploiement
+
+### 4.1 Creer et pousser un tag
+
+Depuis votre machine locale, sur la branche `master` :
+
+```bash
+git checkout master
+git tag v2.0.0
+git push origin v2.0.0
+```
+
+### 4.2 Le pipeline CI/CD s'execute automatiquement
+
+Le workflow `.github/workflows/release.yml` :
+
+1. **Parse tag** : `v2.0.0` → environment `production`
+2. **Tests** : unit tests + GL contract tests (en parallele)
+3. **Build** : images Docker `runtime` + `init` → GHCR
+4. **Deploy** :
+   - Genere `.env.runtime` depuis les GitHub Secrets
+   - Upload `.env.runtime` vers `/opt/microflex/env/` via SCP
+   - Execute `deploy.sh v2.0.0` via SSH
+
+### 4.3 Ce que fait `deploy.sh`
+
+1. Sauvegarde le tag precedent (pour rollback)
+2. Met a jour `APP_VERSION` dans `.env.runtime`
+3. Pull les images depuis GHCR
+4. **DB init** (one-shot) :
+   - Telecharge GeoNames (~15 MB : CG.txt geo operationnelle Congo + cities5000.txt referentiel villes de naissance ; cache dans `/opt/microflex/data/geonames/`)
+   - Schema push (`drizzle-kit push --force`)
+   - SQL functions/triggers/views (`ensure-sql.ts`)
+   - Seeds production (`seed-prod.ts`)
+5. Demarre les containers (`docker compose up -d`)
+6. Health check app (30 tentatives, 2s interval)
+7. Health check worker
+8. Nettoyage des anciennes images
+9. Sauvegarde du tag reussi
+
+### 4.4 Surveiller le deploiement
+
+Dans GitHub Actions → onglet "Actions" → workflow "Release & Deploy", suivez l'avancement.
+
+Le premier deploiement est plus long car :
+
+- Le DB init cree toutes les tables et seeds (~70 SQL objects, 143k villes GeoNames)
+- Les images Docker sont telechargees pour la premiere fois
+
+**Duree estimee du premier deploiement** : 8-15 minutes (selon la bande passante).
+
+---
+
+## Etape 5 — Verification post-deploiement
+
+### 5.1 Verifier les containers
+
+```bash
+ssh deploy@91.134.136.73
+docker compose -f /opt/microflex/docker-compose.vps.yml --env-file /opt/microflex/env/.env.runtime ps
+```
+
+Resultat attendu :
+
+```
+NAME              IMAGE                                    STATUS                   PORTS
+microflex-app-1     ghcr.io/242darkman/microflex:v2.0.0       Up (healthy)             127.0.0.1:5001->5000/tcp
+microflex-app-2     ghcr.io/242darkman/microflex:v2.0.0       Up (healthy)             127.0.0.1:5002->5000/tcp
+microflex-app-3     ghcr.io/242darkman/microflex:v2.0.0       Up (healthy)             127.0.0.1:5003->5000/tcp
+microflex-worker    ghcr.io/242darkman/microflex:v2.0.0       Up (healthy)             5000/tcp
+microflex-redis     redis:7.2-alpine                        Up (healthy)             6379/tcp
+microflex-minio     minio/minio:...                         Up (healthy)             127.0.0.1:9001->9001/tcp
+```
+
+### 5.2 Verifier la sante de l'API
+
+```bash
+# Depuis le VPS (direct)
+curl http://127.0.0.1:5001/api/health
+
+# Depuis l'exterieur (via Nginx + HTTPS)
+curl https://microflex.bvsandbox.dev/api/health
+```
+
+Reponse attendue : `{"status":"ok"}` (HTTP 200)
+
+### 5.3 Verifier les cron jobs (worker)
+
+```bash
+docker logs microflex-worker --tail 50
+```
+
+Les crons doivent s'afficher (ils tournent UNIQUEMENT sur le worker, pas sur les 3 instances app) :
+
+```
+[CRON] CoffreBalanceSnapshots: scheduled ...
+[CRON] TreasuryReconciliation: scheduled ...
+[CRON] PaymentReconciliation: scheduled ...
+```
+
+### 5.4 Verifier le seeding GeoNames
+
+```bash
+ssh deploy@91.134.136.73
+sudo -u postgres psql -d microflex -c "SELECT COUNT(*) AS total_villes FROM villes;"
+```
+
+Resultat attendu : `143699` villes.
+
+### 5.5 Verifier les backups
+
+```bash
+systemctl status microflex-backup.timer
+systemctl list-timers microflex-backup.timer
+```
+
+### 5.6 Verifier Nginx et SSL
+
+```bash
+# Certificat SSL
+sudo certbot certificates
+
+# Config Nginx
+sudo nginx -t
+
+# Logs d'acces
+tail -5 /var/log/nginx/microflex_access.log
+```
+
+---
+
+## Deploiements suivants
 
 ### Release Production
 
 ```bash
-# Depuis develop, créer un tag de release
+# Depuis votre machine locale
 git checkout master
-git merge develop
-git tag v3.62.0
+git merge develop       # ou cherry-pick des commits specifiques
+git tag vX.Y.Z          # ex: v2.1.0
 git push origin master --tags
 ```
+
+Le pipeline se declenche automatiquement sur le tag `v*`.
 
 ### Release Preprod (Release Candidate)
 
 ```bash
-# Depuis develop
-git tag rc-v3.62.0
-git push origin rc-v3.62.0
+git tag rc-vX.Y.Z       # ex: rc-v2.1.0
+git push origin rc-vX.Y.Z
 ```
 
-### Rollback
+Deploie sur l'environment GitHub `preprod` (meme infrastructure, config differente).
+
+### Deploiement manuel (urgence)
+
+Si le CI/CD est en panne, deployer directement depuis le VPS :
 
 ```bash
-# Automatique : si le health check échoue après deploy, rollback auto
-# Manuel via SSH :
-ssh deploy@VPS_IP
-bash /opt/cofinco/scripts/vps/rollback.sh              # tag précédent
-bash /opt/cofinco/scripts/vps/rollback.sh v3.60.0      # tag spécifique
+ssh deploy@91.134.136.73
+bash /opt/microflex/scripts/vps/deploy.sh v2.1.0
 ```
 
-### Vérification
+> **Prerequis** : le `.env.runtime` doit deja contenir les bonnes valeurs et les images doivent etre disponibles sur GHCR.
+
+### Convention de tags
+
+| Pattern     | Environnement | Exemple                         |
+| ----------- | ------------- | ------------------------------- |
+| `vX.Y.Z`    | Production    | `v2.0.0`, `v2.1.0`              |
+| `rc-vX.Y.Z` | Preprod       | `rc-v2.1.0`, `rc-v3.0.0-beta.1` |
+
+- **MAJOR** (vX.0.0) : Breaking changes, migration majeure
+- **MINOR** (v0.X.0) : Nouvelles fonctionnalites
+- **PATCH** (v0.0.X) : Bug fixes, correctifs urgents
+
+---
+
+## Rollback
+
+### Rollback automatique
+
+Si le health check echoue apres un deploiement, `deploy.sh` tente automatiquement un rollback vers le tag precedent.
+
+### Rollback manuel
 
 ```bash
-# Santé de l'application
-curl https://cofinco-m.com/api/health
+ssh deploy@91.134.136.73
 
-# Logs
-ssh deploy@VPS_IP
-docker compose -f /opt/cofinco/docker-compose.vps.yml logs -f app
-docker compose -f /opt/cofinco/docker-compose.vps.yml logs -f worker
+# Rollback au tag precedent
+bash /opt/microflex/scripts/vps/rollback.sh
 
-# État des containers
-docker compose -f /opt/cofinco/docker-compose.vps.yml ps
+# Rollback a un tag specifique
+bash /opt/microflex/scripts/vps/rollback.sh v2.0.0
 ```
 
-## PostgreSQL (VPS Natif)
+Le rollback :
 
-### Connexion app → DB
+1. Pull les images de l'ancien tag
+2. Redemarre les containers
+3. Verifie la sante (20 tentatives)
+4. **NE relance PAS le DB init** (le schema doit etre retro-compatible)
 
-Les containers Docker accèdent au PG natif via `host.docker.internal` :
+> **Attention** : Si une migration de schema non-retrocompatible a ete appliquee, un rollback applicatif seul peut ne pas suffire. Il faudra aussi restaurer la base.
+
+---
+
+## Maintenance
+
+### Backups PostgreSQL
+
+```bash
+# Lancer un backup manuel
+bash /opt/microflex/scripts/vps/backup-db.sh
+
+# Verifier le timer automatique
+systemctl status microflex-backup.timer
+journalctl -u microflex-backup.service --since today
+
+# Lister les backups
+ls -lht /opt/microflex/backups/
+
+# Restaurer un backup
+sudo -u postgres pg_restore -d microflex -c /opt/microflex/backups/microflex_2026-02-24_020000.sql.gz
 ```
-DATABASE_URL=postgresql://cofinco_app:PASSWORD@host.docker.internal:5432/cofinco
+
+### Logs
+
+```bash
+# Logs applicatifs (docker)
+docker compose -f /opt/microflex/docker-compose.vps.yml --env-file /opt/microflex/env/.env.runtime logs -f app
+docker compose -f /opt/microflex/docker-compose.vps.yml --env-file /opt/microflex/env/.env.runtime logs -f worker
+
+# Logs de deploiement
+cat /opt/microflex/logs/deploy.log
+
+# Logs Nginx
+tail -f /var/log/nginx/microflex_access.log
+tail -f /var/log/nginx/microflex_error.log
 ```
 
-Docker résout `host.docker.internal` vers l'IP du host gateway grâce à :
-```yaml
-extra_hosts:
-  - "host.docker.internal:host-gateway"
-```
-
-### Sécurité
-
-- `listen_addresses = 'localhost'` (pas d'écoute réseau)
-- `pg_hba.conf` : scram-sha-256, Docker subnet autorisé
-- UFW : port 5432 bloqué en entrée
-- Utilisateur `cofinco_app` avec least privileges (pas superuser)
-
-### Maintenance
+### PostgreSQL
 
 ```bash
 # Connexion psql
-sudo -u postgres psql -d cofinco
+sudo -u postgres psql -d microflex
 
 # Taille de la base
-sudo -u postgres psql -c "SELECT pg_size_pretty(pg_database_size('cofinco'));"
+sudo -u postgres psql -c "SELECT pg_size_pretty(pg_database_size('microflex'));"
 
-# Vacuum analyze (auto-vacuum est activé par défaut)
-sudo -u postgres psql -d cofinco -c "VACUUM ANALYZE;"
+# Vacuum analyze
+sudo -u postgres psql -d microflex -c "VACUUM ANALYZE;"
+
+# Requetes lentes (> 1s, logged par defaut)
+sudo -u postgres psql -c "SELECT * FROM pg_stat_activity WHERE state = 'active';"
 ```
 
-## Backups
-
-### Exécution manuelle
+### Docker
 
 ```bash
-bash /opt/cofinco/scripts/vps/backup-db.sh
-```
+# Espace disque Docker
+docker system df
 
-### Vérifier le timer
+# Nettoyage images non utilisees (> 7 jours)
+docker image prune -a --filter "until=168h"
 
-```bash
-systemctl status cofinco-backup.timer
-systemctl list-timers cofinco-backup.timer
-journalctl -u cofinco-backup.service --since today
-```
-
-### Restauration
-
-```bash
-# Lister les backups disponibles
-ls -lht /opt/cofinco/backups/
-
-# Restaurer (avec confirmation interactive)
-bash /opt/cofinco/scripts/vps/restore-db.sh /opt/cofinco/backups/cofinco_2026-02-24_020000.sql.gz
-
-# Restaurer dans une base de test
-bash /opt/cofinco/scripts/vps/restore-db.sh backup.sql.gz --target cofinco_test --confirm
-```
-
-### Backup offsite (optionnel)
-
-Configurer dans le systemd service ou .bashrc du deploy user :
-```bash
-export S3_BUCKET=cofinco-backups
-export S3_ENDPOINT=https://s3.your-provider.com
-export AWS_ACCESS_KEY_ID=...
-export AWS_SECRET_ACCESS_KEY=...
-```
-
-## Nginx
-
-### Configuration
-
-```bash
-# Éditer la config
-sudo nano /etc/nginx/sites-available/cofinco
-
-# Tester
-sudo nginx -t
-
-# Recharger
-sudo systemctl reload nginx
+# Nettoyage complet (attention : supprime les volumes non utilises)
+docker system prune --volumes
 ```
 
 ### Certbot
 
 ```bash
-# Vérifier le certificat
+# Verifier le certificat
 sudo certbot certificates
 
-# Renouvellement manuel (normalement automatique)
+# Test du renouvellement automatique
 sudo certbot renew --dry-run
 
 # Forcer le renouvellement
 sudo certbot renew --force-renewal
 ```
 
-### Logs
+### MinIO (console admin)
+
+Accessible via SSH tunnel uniquement :
 
 ```bash
-# Access log
-tail -f /var/log/nginx/cofinco_access.log
-
-# Error log
-tail -f /var/log/nginx/cofinco_error.log
+# Depuis votre machine locale
+ssh -L 9001:127.0.0.1:9001 deploy@91.134.136.73
+# Puis ouvrir http://localhost:9001 dans votre navigateur
 ```
 
-## Monitoring (Optionnel)
-
-Le stack monitoring existant (Prometheus, Grafana, Loki, Alertmanager) peut être ajouté sur le VPS via un compose overlay séparé :
-
-```bash
-# Copier les configs monitoring sur le VPS
-scp -r monitoring/ deploy@VPS_IP:/opt/cofinco/
-
-# Créer un overlay monitoring (à adapter du docker-compose.yml existant)
-# Puis lancer :
-docker compose -f docker-compose.vps.yml -f docker-compose.monitoring.yml up -d
-```
-
-Grafana est accessible via `/grafana/` (proxy Nginx, accès restreint localhost).
-
-## Tagging Convention
-
-| Pattern | Environnement | Exemple |
-|---|---|---|
-| `vX.Y.Z` | Production | `v3.61.0`, `v4.0.0` |
-| `rc-vX.Y.Z` | Preprod | `rc-v3.62.0`, `rc-v4.0.0-beta.1` |
-
-### Semantic Versioning
-
-- **MAJOR** (vX.0.0) : Breaking changes, migration majeure
-- **MINOR** (v0.X.0) : Nouvelles fonctionnalités, rétrocompatible
-- **PATCH** (v0.0.X) : Bug fixes, correctifs urgents
-
-### Tags automatiques (optionnel, futur)
-
-Pour automatiser le tagging avec conventional commits :
-1. Installer `release-please` ou `semantic-release`
-2. Configurer un workflow qui crée les tags automatiquement
-3. Les workflows de déploiement restent identiques
+---
 
 ## Troubleshooting
 
-### L'app ne démarre pas
+### L'app ne demarre pas
 
 ```bash
-# Vérifier les logs
-docker compose -f /opt/cofinco/docker-compose.vps.yml logs app
+# 1. Verifier les logs
+docker compose -f /opt/microflex/docker-compose.vps.yml --env-file /opt/microflex/env/.env.runtime logs app --tail 100
 
-# Vérifier la connectivité DB
+# 2. Verifier la connectivite PostgreSQL
 docker run --rm --network host postgres:16-alpine \
-  pg_isready -h localhost -p 5432 -U cofinco_app
+  pg_isready -h localhost -p 5432 -U microflex_app
 
-# Vérifier Redis
-docker compose -f /opt/cofinco/docker-compose.vps.yml exec redis redis-cli ping
+# 3. Verifier Redis
+docker compose -f /opt/microflex/docker-compose.vps.yml --env-file /opt/microflex/env/.env.runtime exec redis redis-cli -a "VOTRE_REDIS_PASSWORD" ping
+
+# 4. Verifier MinIO
+docker compose -f /opt/microflex/docker-compose.vps.yml --env-file /opt/microflex/env/.env.runtime exec minio mc ready local
 ```
 
-### Health check échoue
+### Erreur PostgreSQL : connection timeout depuis Docker
+
+**Symptome** : Les containers ne peuvent pas se connecter a PostgreSQL (timeout).
+
+**Cause** : UFW bloque le port 5432 pour les containers Docker.
+
+**Solution** :
 
 ```bash
-# Test direct
-curl -v http://127.0.0.1:5000/api/health
+# Verifier les regles UFW
+sudo ufw status numbered
 
-# Test via Nginx
-curl -v https://cofinco-m.com/api/health
+# La regle suivante DOIT etre presente :
+# [ X] 5432/tcp    ALLOW IN    172.16.0.0/12    # PostgreSQL from Docker
 
-# Si 502/503, vérifier que le container tourne
-docker ps | grep cofinco
+# Si absente :
+sudo ufw allow from 172.16.0.0/12 to any port 5432 proto tcp comment 'PostgreSQL from Docker'
 ```
 
-### DB init échoue
+### Erreur Redis : Invalid URL
+
+**Symptome** : `TypeError: Invalid URL` dans les logs de l'app.
+
+**Cause** : Le `REDIS_PASSWORD` contient des caracteres speciaux (`/`, `+`, `=`, `@`).
+
+**Solution** : Generer un nouveau mot de passe sans caracteres speciaux :
 
 ```bash
-# Logs du db-init
-docker logs cofinco-db-init
-
-# Relancer manuellement
-docker compose -f /opt/cofinco/docker-compose.vps.yml run --rm db-init
+openssl rand -base64 32 | tr -d '/+=' | head -c 32
 ```
 
-### Disk space
+Mettre a jour le secret `REDIS_PASSWORD` dans GitHub Environments et redeployer.
+
+### Erreur deploy : "container name already in use"
+
+**Symptome** : `microflex-db-init` "is already in use by container".
+
+**Cause** : Un deploy precedent a echoue et le container init n'a pas ete nettoye.
+
+**Solution** : Le script `deploy.sh` gere ce cas automatiquement (`docker rm -f`). Si le probleme persiste :
 
 ```bash
-# Docker
+docker rm -f microflex-db-init
+```
+
+### DB init echoue
+
+```bash
+# Relancer manuellement le db-init
+bash /opt/microflex/scripts/vps/deploy.sh v2.0.0
+# (le deploy.sh relance le db-init)
+
+# Ou relancer uniquement le db-init via compose
+docker compose -f /opt/microflex/docker-compose.vps.yml --env-file /opt/microflex/env/.env.runtime run --rm db-init
+```
+
+### Health check echoue (502/503)
+
+```bash
+# 1. Verifier que les containers tournent
+docker ps | grep microflex
+
+# 2. Test direct sur un container
+curl -v http://127.0.0.1:5001/api/health
+
+# 3. Test via Nginx
+curl -v https://microflex.bvsandbox.dev/api/health
+
+# 4. Verifier Nginx
+sudo nginx -t
+sudo systemctl status nginx
+tail -20 /var/log/nginx/microflex_error.log
+```
+
+### Espace disque sature
+
+```bash
+# Verifier l'espace
+df -h
+
+# Docker (images, volumes, build cache)
 docker system df
-docker image prune -a --filter "until=168h"  # images > 7 jours
+docker image prune -a --filter "until=168h"
 
 # Backups
-du -sh /opt/cofinco/backups/
+du -sh /opt/microflex/backups/
 
-# Logs
-du -sh /opt/cofinco/logs/
-journalctl --vacuum-size=500M
+# Logs systeme
+sudo journalctl --vacuum-size=500M
+
+# Logs Docker
+docker compose -f /opt/microflex/docker-compose.vps.yml --env-file /opt/microflex/env/.env.runtime logs --tail 0
+# Les logs Docker sont limites a 10MB x 5 fichiers par container (daemon.json)
 ```
+
+### GeoNames non seedees (0 villes)
+
+**Cause** : Le download GeoNames a echoue (reseau, timeout).
+
+**Solution** : Le cache dans `/opt/microflex/data/geonames/` evite le re-telechargement. Si le cache est vide, redeployer relancera le download.
+
+```bash
+# Verifier le cache
+ls -lh /opt/microflex/data/geonames/
+# Devrait contenir CG.txt (geo operationnelle Congo) et cities5000.txt (villes de naissance)
+
+# Si vide, supprimer le cache et redeployer
+rm -rf /opt/microflex/data/geonames/*
+bash /opt/microflex/scripts/vps/deploy.sh vX.Y.Z
+```
+
+---
+
+## Reference rapide
+
+### Commandes essentielles
+
+```bash
+# Alias utile (a ajouter dans ~/.bashrc du user deploy)
+alias cdc='docker compose -f /opt/microflex/docker-compose.vps.yml --env-file /opt/microflex/env/.env.runtime'
+
+# Etat des containers
+cdc ps
+
+# Logs en temps reel
+cdc logs -f app
+cdc logs -f worker
+
+# Redemarrer un service
+cdc restart app
+
+# Deployer un tag
+bash /opt/microflex/scripts/vps/deploy.sh v2.1.0
+
+# Rollback
+bash /opt/microflex/scripts/vps/rollback.sh
+
+# Backup manuel
+bash /opt/microflex/scripts/vps/backup-db.sh
+```
+
+### Ports (tous sur localhost sauf 80/443)
+
+| Port      | Service       | Acces                      |
+| --------- | ------------- | -------------------------- |
+| 80/443    | Nginx         | Public                     |
+| 5001-5003 | app x3        | Localhost (Nginx upstream) |
+| 5432      | PostgreSQL    | Localhost + Docker subnet  |
+| 6379      | Redis         | Docker network uniquement  |
+| 9000      | MinIO API     | Docker network uniquement  |
+| 9001      | MinIO Console | Localhost (SSH tunnel)     |
+
+### Fichiers importants sur le VPS
+
+```
+/opt/microflex/
+├── docker-compose.vps.yml       # Compose principal
+├── env/.env.runtime             # Variables d'environnement (genere par CI)
+├── env/.previous-tag            # Tag precedent (pour rollback)
+├── scripts/vps/deploy.sh        # Script de deploiement
+├── scripts/vps/rollback.sh      # Script de rollback
+├── scripts/vps/backup-db.sh     # Script de backup PostgreSQL
+├── logs/deploy.log              # Historique des deploiements
+├── backups/                     # Backups PostgreSQL quotidiens
+└── data/geonames/               # Cache GeoNames (~15 MB : CG.txt + cities5000.txt)
+```
+
+### Variables d'environnement
+
+Voir `.env.vps.example` pour la liste complete avec descriptions.
+
+Classification :
+
+- **Secrets** (GitHub Environment Secrets) : DATABASE*URL, REDIS_PASSWORD, SESSION_SECRET, OTP_HMAC_SECRET, MINIO*\*, SMTP_PASSWORD, VPS_SSH_KEY, etc.
+- **Variables** (GitHub Environment Variables) : DOMAIN, GL_POSTING_MODE, LOG_LEVEL, APP_REPLICAS, SMTP_PORT, etc.
+
+### Matrice CI/CD
+
+| Tag    | Environment | Images GHCR                     | Deploy      |
+| ------ | ----------- | ------------------------------- | ----------- |
+| `v*`   | production  | `vX.Y.Z` + `latest` + `sha-xxx` | VPS via SSH |
+| `rc-*` | preprod     | `rc-vX.Y.Z` + `sha-xxx`         | VPS via SSH |
+
+---
+
+## Livraison enterprise
+
+Identité du déploiement (protection anti-mélange de bases entre clients), feature flags dynamiques avec audit, images Docker dédiées par client, signature cosign et SBOM : voir [docs/operations/livraison-enterprise.md](docs/operations/livraison-enterprise.md).
+
+Variables associées : `TENANT_IDENTITY_REBIND` (réassignation exceptionnelle, un seul démarrage) et `TENANT_FEATURES_STATIC_ONLY` (kill switch des surcharges de flags). Les deux sont documentées dans les fichiers `.env.*.example`.

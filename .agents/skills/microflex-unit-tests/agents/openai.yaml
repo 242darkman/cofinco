@@ -1,0 +1,4 @@
+interface:
+  display_name: "MicroFlex Unit Tests"
+  short_description: "Écrire des tests unitaires métier robustes"
+  default_prompt: "Utilise $microflex-unit-tests pour ajouter les tests unitaires adaptés à ce changement."

@@ -13,6 +13,15 @@ node_modules
 # Build output (rebuilt in Docker)
 dist
 
+# GeoNames : fichiers volumineux téléchargés au runtime par l'init container
+# (scripts/download-geonames.sh), inutiles dans le contexte de build.
+# Les fichiers légers committés (admin1CodesASCII.txt, admin2Codes.txt, all.json,
+# countryInfo.txt) restent inclus car nécessaires au seed et non re-téléchargés.
+seeds/allCountries.txt
+seeds/cities5000.txt
+seeds/CG.txt
+seeds/*.zip
+
 # Development
 .tmp
 .vscode

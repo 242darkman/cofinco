@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==========================================================
-# Cofinco — Rollback Script (VPS)
+# MicroFlex — Rollback Script (VPS)
 # ==========================================================
 # Usage :
 #   bash scripts/vps/rollback.sh              # rollback au tag précédent
@@ -16,7 +16,7 @@
 set -euo pipefail
 
 # ── Configuration ────────────────────────────────────────
-APP_DIR="/opt/cofinco"
+APP_DIR="/opt/microflex"
 ENV_FILE="$APP_DIR/env/.env.runtime"
 COMPOSE_FILE="$APP_DIR/docker-compose.vps.yml"
 COMPOSE_CMD="docker compose -f $COMPOSE_FILE --env-file $ENV_FILE"

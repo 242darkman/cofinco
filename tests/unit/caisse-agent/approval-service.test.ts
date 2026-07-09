@@ -5,7 +5,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Mock du module db avec transaction
-vi.mock('server/db', () => ({
+vi.mock('../../../apps/api/db', () => ({
   db: {
     transaction: vi.fn(async (callback) => {
       const tx = {

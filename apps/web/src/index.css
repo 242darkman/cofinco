@@ -1,0 +1,1030 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;700;900&display=swap");
+
+@import "tailwindcss";
+@config "../../../tailwind.config.js";
+
+/* ==================== BANK-GRADE PROFESSIONAL DESIGN SYSTEM ==================== */
+/* Hybrid Theme System: CSS Variables + Tailwind dark: classes */
+
+/* =========================== THEME VARIABLES =========================== */
+
+/* Light Theme (Default) - Professional Banking Look */
+/* WCAG AA Contrast: 4.5:1 minimum for normal text, 3:1 for large text */
+:root {
+  /* Backgrounds - Blanc cassé / Gris très léger */
+  --bg-base: #f8fafc; /* Fond principal légèrement gris */
+  --bg-surface: #ffffff; /* Cartes et surfaces */
+  --bg-elevated: #ffffff; /* Éléments surélevés */
+  --bg-muted: #f1f5f9; /* Zones secondaires */
+  --bg-subtle: #e2e8f0; /* Zones tertiaires */
+
+  /* Text - Bleu nuit / Gris anthracite pour RGAA AA (4.5:1 min) */
+  --text-primary: #0f172a; /* Bleu nuit - Contrast 15.5:1 on white */
+  --text-secondary: #1e293b; /* Gris anthracite - Contrast 12.6:1 */
+  --text-muted: #475569; /* Gris foncé - Contrast 6.3:1 */
+  --text-inverted: #ffffff;
+
+  /* Borders - Visibles sur fond clair */
+  --border-default: #cbd5e1; /* Bordure standard */
+  --border-subtle: #e2e8f0; /* Bordure légère */
+  --border-strong: #94a3b8; /* Bordure marquée */
+
+  /* Brand/Accent Colors - Vert émeraude professionnel */
+  --accent-primary: #047857; /* Émeraude foncé - 5.1:1 contrast */
+  --accent-primary-hover: #065f46;
+  --accent-secondary: #0e7490; /* Cyan foncé - 5.5:1 contrast */
+  --accent-secondary-hover: #155e75;
+
+  /* Semantic Colors - RGAA AA compliant */
+  --color-success: #047857; /* Vert foncé - 5.1:1 */
+  --color-success-bg: #ecfdf5;
+  --color-success-text: #065f46;
+  --color-warning: #b45309; /* Ambre foncé - 5.2:1 */
+  --color-warning-bg: #fffbeb;
+  --color-warning-text: #92400e;
+  --color-danger: #dc2626; /* Rouge vif - 4.5:1 */
+  --color-danger-bg: #fef2f2;
+  --color-danger-text: #991b1b;
+  --color-info: #1d4ed8; /* Bleu foncé - 5.7:1 */
+  --color-info-bg: #eff6ff;
+  --color-info-text: #1e40af;
+
+  /* Shadows - Plus prononcées en mode clair */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05), 0 1px 3px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.08),
+    0 2px 4px -2px rgb(0 0 0 / 0.06);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1),
+    0 4px 6px -4px rgb(0 0 0 / 0.08);
+  --shadow-glow: 0 0 20px rgba(4, 120, 87, 0.2);
+
+  /* Card specific - Bordure fine + ombre légère */
+  --card-border: #e2e8f0;
+  --card-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05);
+
+  /* Input/Form - Bordures visibles */
+  --input-bg: #ffffff;
+  --input-border: #94a3b8; /* Gris moyen visible */
+  --input-focus: #047857;
+  --input-text: #0f172a;
+  --input-placeholder: #64748b;
+
+  /* Sidebar - Fond blanc avec texte sombre */
+  --sidebar-bg: #ffffff;
+  --sidebar-border: #e2e8f0;
+  --sidebar-item-hover: #f1f5f9;
+  --sidebar-item-active: #ecfdf5;
+  --sidebar-text: #1e293b; /* Gris anthracite - très lisible */
+  --sidebar-text-active: #047857;
+
+  /* Header/Navigation - Icônes sombres sur fond clair */
+  --header-bg: #ffffff;
+  --header-border: #e2e8f0;
+  --header-text: #1e293b;
+  --header-icon: #475569;
+  --header-icon-hover: #0f172a;
+
+  /* Button colors - FIXED across themes (white text on colored bg) */
+  --btn-success: #10b981;
+  --btn-success-hover: #059669;
+  --btn-danger: #ef4444;
+  --btn-danger-hover: #dc2626;
+  --btn-warning: #d97706;
+  --btn-warning-hover: #b45309;
+  --btn-info: #2563eb;
+  --btn-info-hover: #1d4ed8;
+
+  /* Brand/Logo colors - FIXED across themes (from microflex-logo.png) */
+  --brand-navy: #1B2A4A;
+  --brand-green: #2D8B57;
+  --brand-amber: #E8A33D;
+  --brand-teal: #3AAA8C;
+
+  /* Login page - theme-aware */
+  --login-bg-from: #f0f4f8;
+  --login-bg-via: #e8eef5;
+  --login-bg-to: #dce5f0;
+  --login-grid-color: rgba(4, 120, 87, 0.3);
+  --login-card-bg: rgba(255, 255, 255, 0.95);
+  --login-card-border: rgba(4, 120, 87, 0.15);
+  --login-card-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15), 0 0 40px -10px rgba(4, 120, 87, 0.1);
+  --login-glow-1: rgba(4, 120, 87, 0.08);
+  --login-glow-2: rgba(14, 116, 144, 0.06);
+  --login-accent-glow: rgba(4, 120, 87, 0.12);
+  --login-line-color: rgba(4, 120, 87, 0.06);
+  --login-shape-color-1: rgba(4, 120, 87, 0.1);
+  --login-shape-color-2: rgba(14, 116, 144, 0.08);
+  --login-dot-1: rgba(4, 120, 87, 0.2);
+  --login-dot-2: rgba(14, 116, 144, 0.2);
+}
+
+/* Dark Theme - Professional Navy/Cyan theme */
+/* WCAG AA Contrast: Text must have 4.5:1 on dark backgrounds */
+.dark {
+  /* Backgrounds */
+  --bg-base: #0f172a;
+  --bg-surface: #1e293b;
+  --bg-elevated: #334155;
+  --bg-muted: #1e293b;
+  --bg-subtle: #334155;
+
+  /* Text - RGAA AA compliant (min 4.5:1 on dark backgrounds) */
+  --text-primary: #f8fafc; /* Contrast 15.8:1 on #0f172a */
+  --text-secondary: #e2e8f0; /* Contrast 12.3:1 */
+  --text-muted: #94a3b8; /* Gris clair - Contrast 5.4:1 - RGAA compliant */
+  --text-inverted: #0f172a;
+
+  /* Borders - Séparations subtiles (rgba blanc) */
+  --border-default: rgba(255, 255, 255, 0.1);
+  --border-subtle: rgba(255, 255, 255, 0.05);
+  --border-strong: rgba(255, 255, 255, 0.2);
+
+  /* Brand/Accent Colors - Cyan vif pour dark mode */
+  --accent-primary: #22d3ee; /* Cyan brillant - 8.7:1 contrast */
+  --accent-primary-hover: #67e8f9;
+  --accent-secondary: #60a5fa; /* Bleu brillant - 6.1:1 contrast */
+  --accent-secondary-hover: #93c5fd;
+
+  /* Semantic Colors - RGAA AA compliant on dark */
+  --color-success: #34d399; /* Émeraude brillant - 8.2:1 */
+  --color-success-bg: rgba(52, 211, 153, 0.15);
+  --color-success-text: #6ee7b7;
+  --color-warning: #fbbf24; /* Ambre brillant - 10.4:1 */
+  --color-warning-bg: rgba(251, 191, 36, 0.15);
+  --color-warning-text: #fcd34d;
+  --color-danger: #ef4444; /* Rouge vif - 5.3:1 */
+  --color-danger-bg: rgba(239, 68, 68, 0.15);
+  --color-danger-text: #fca5a5;
+  --color-info: #60a5fa; /* Bleu brillant - 6.1:1 */
+  --color-info-bg: rgba(96, 165, 250, 0.15);
+  --color-info-text: #93c5fd;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.4);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.6),
+    0 4px 6px -4px rgb(0 0 0 / 0.5);
+  --shadow-glow: 0 0 20px rgba(34, 211, 238, 0.4);
+
+  /* Card specific - Bordures subtiles blanches */
+  --card-border: rgba(255, 255, 255, 0.1);
+  --card-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3);
+
+  /* Input/Form */
+  --input-bg: #1e293b;
+  --input-border: #475569;
+  --input-focus: #22d3ee;
+  --input-text: #f8fafc;
+  --input-placeholder: #94a3b8;
+
+  /* Sidebar - Texte blanc cassé lisible */
+  --sidebar-bg: #0f172a;
+  --sidebar-border: rgba(255, 255, 255, 0.1);
+  --sidebar-item-hover: #1e293b;
+  --sidebar-item-active: rgba(34, 211, 238, 0.15);
+  --sidebar-text: #e2e8f0; /* 12.3:1 contrast - highly readable */
+  --sidebar-text-active: #67e8f9; /* Bright cyan for active state */
+
+  /* Header/Navigation - Icônes claires sur fond sombre */
+  --header-bg: #1e293b;
+  --header-border: rgba(255, 255, 255, 0.1);
+  --header-text: #f8fafc;
+  --header-icon: #94a3b8;
+  --header-icon-hover: #f8fafc;
+
+  /* Button colors - SAME as light theme (consistent across themes) */
+  --btn-success: #10b981;
+  --btn-success-hover: #059669;
+  --btn-danger: #ef4444;
+  --btn-danger-hover: #dc2626;
+  --btn-warning: #d97706;
+  --btn-warning-hover: #b45309;
+  --btn-info: #2563eb;
+  --btn-info-hover: #1d4ed8;
+
+  /* Brand/Logo colors - SAME as light theme */
+  --brand-navy: #1B2A4A;
+  --brand-green: #2D8B57;
+  --brand-amber: #E8A33D;
+  --brand-teal: #3AAA8C;
+
+  /* Login page - dark variant */
+  --login-bg-from: #0a1628;
+  --login-bg-via: #0f1d32;
+  --login-bg-to: #162544;
+  --login-grid-color: rgba(59, 130, 246, 0.5);
+  --login-card-bg: rgba(30, 41, 59, 0.95);
+  --login-card-border: rgba(34, 211, 238, 0.2);
+  --login-card-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 40px -10px rgba(34, 211, 238, 0.15);
+  --login-glow-1: rgba(34, 211, 238, 0.15);
+  --login-glow-2: rgba(96, 165, 250, 0.10);
+  --login-accent-glow: rgba(34, 211, 238, 0.10);
+  --login-line-color: rgba(59, 130, 246, 0.10);
+  --login-shape-color-1: rgba(34, 211, 238, 0.20);
+  --login-shape-color-2: rgba(96, 165, 250, 0.15);
+  --login-dot-1: rgba(34, 211, 238, 0.30);
+  --login-dot-2: rgba(96, 165, 250, 0.30);
+}
+
+/* Professional Typography */
+body {
+  font-family: "Inter", "IBM Plex Sans", -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.01em;
+}
+
+/* Responsive breakpoints utilities */
+@layer utilities {
+  .container-responsive {
+    @apply px-4 sm:px-6 lg:px-8;
+  }
+
+  .grid-responsive {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4;
+  }
+
+  .text-responsive {
+    @apply text-sm sm:text-base;
+  }
+
+  .heading-responsive {
+    @apply text-xl sm:text-2xl lg:text-3xl;
+  }
+}
+
+@layer base {
+  * {
+    border-color: var(--border-subtle);
+  }
+
+  html {
+    background-color: var(--bg-base);
+  }
+
+  body {
+    @apply antialiased transition-colors duration-300 overflow-x-hidden;
+    background-color: var(--bg-base);
+    color: var(--text-primary);
+  }
+
+  #root {
+    @apply min-h-screen transition-colors duration-300 overflow-x-hidden max-w-full;
+    background-color: var(--bg-base);
+  }
+
+  /* Override browser autofill yellow background - uses CSS vars for theme awareness */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active,
+  textarea:-webkit-autofill,
+  textarea:-webkit-autofill:hover,
+  textarea:-webkit-autofill:focus,
+  textarea:-webkit-autofill:active,
+  select:-webkit-autofill,
+  select:-webkit-autofill:hover,
+  select:-webkit-autofill:focus,
+  select:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 1000px var(--input-bg) inset !important;
+    -webkit-text-fill-color: var(--input-text) !important;
+    caret-color: var(--input-text) !important;
+    transition: background-color 5000s ease-in-out 0s;
+  }
+
+  /* Tableaux responsives */
+  table {
+    table-layout: auto;
+    width: 100%;
+  }
+
+  /* Priorité d'affichage des colonnes sur petits écrans */
+  @media (max-width: 640px) {
+    th,
+    td {
+      padding: 0.5rem !important;
+      font-size: 0.875rem;
+    }
+  }
+
+  /* Recharts chart grid - library-level override */
+  .light .recharts-cartesian-grid line {
+    stroke: var(--border-default) !important;
+  }
+
+  /* Select dropdown native styling */
+  .dark select {
+    color-scheme: dark;
+  }
+
+  .dark select option {
+    background-color: var(--bg-surface);
+    color: var(--text-primary);
+  }
+
+  select option {
+    background-color: var(--bg-surface);
+    color: var(--text-primary);
+  }
+}
+
+@layer utilities {
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.4s ease-out;
+  }
+
+  .animate-slide-down {
+    animation: slideDown 0.4s ease-out;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.3s ease-out;
+  }
+
+  .animate-shimmer {
+    animation: shimmer 2s infinite;
+  }
+
+  .animate-suction {
+    animation: glow-pulse 2s ease-in-out infinite;
+    transition: all 0.3s ease;
+  }
+
+  .animate-suction:hover {
+    transform: scale(1.15) rotate(5deg);
+    cursor: pointer;
+    filter: brightness(1.2);
+  }
+
+  .glass-effect {
+    backdrop-filter: blur(24px);
+    background-color: color-mix(in srgb, var(--bg-surface) 60%, transparent);
+    border: 1px solid var(--border-subtle);
+  }
+
+  .card-hover {
+    @apply transition-all duration-300 hover:scale-[1.02];
+    &:hover {
+      box-shadow: var(--shadow-lg);
+    }
+  }
+
+  .gradient-text {
+    background: linear-gradient(to right, var(--accent-primary), var(--accent-secondary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .brand-gradient {
+    background: linear-gradient(to right, var(--accent-primary), var(--accent-secondary));
+  }
+
+  .brand-gradient-gold {
+    background: linear-gradient(to right, var(--accent-secondary), var(--accent-primary));
+  }
+
+  .brand-border {
+    border-color: color-mix(in srgb, var(--accent-primary) 50%, transparent);
+  }
+
+  .brand-hover {
+    &:hover {
+      background-color: color-mix(in srgb, var(--accent-primary) 20%, transparent);
+      border-color: var(--accent-primary);
+    }
+  }
+
+  /* Options de polices modernes pour le logo */
+  .logo-poppins {
+    font-family: "Poppins", sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  .logo-inter {
+    font-family: "Inter", sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+  }
+
+  .logo-montserrat {
+    font-family: "Montserrat", sans-serif;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+  }
+
+  .logo-orbitron {
+    font-family: "Orbitron", sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+
+  .logo-space-grotesk {
+    font-family: "Space Grotesk", sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  .smooth-scroll {
+    scroll-behavior: smooth;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s ease-out;
+}
+
+@keyframes suction {
+  0%,
+  100% {
+    transform: scale(1) rotate(0deg);
+    box-shadow: 0 10px 25px -3px rgba(6, 182, 212, 0.3),
+      0 0 0 0 rgba(6, 182, 212, 0.4);
+    filter: brightness(1);
+  }
+  25% {
+    transform: scale(0.85) rotate(-2deg);
+    box-shadow: 0 5px 10px -2px rgba(6, 182, 212, 0.5),
+      inset 0 4px 8px 0 rgba(6, 182, 212, 0.5);
+    filter: brightness(1.1);
+  }
+  50% {
+    transform: scale(0.8) rotate(0deg);
+    box-shadow: 0 2px 5px -1px rgba(6, 182, 212, 0.6),
+      inset 0 6px 12px 0 rgba(6, 182, 212, 0.7),
+      0 0 0 8px rgba(6, 182, 212, 0.2);
+    filter: brightness(1.2);
+  }
+  75% {
+    transform: scale(0.85) rotate(2deg);
+    box-shadow: 0 5px 10px -2px rgba(6, 182, 212, 0.5),
+      inset 0 4px 8px 0 rgba(6, 182, 212, 0.5);
+    filter: brightness(1.1);
+  }
+}
+
+@keyframes glow-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(6, 182, 212, 0.8), 0 0 40px rgba(6, 182, 212, 0.6),
+      0 0 60px rgba(6, 182, 212, 0.4);
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(6, 182, 212, 1), 0 0 60px rgba(6, 182, 212, 0.8),
+      0 0 90px rgba(6, 182, 212, 0.6), 0 0 120px rgba(6, 182, 212, 0.4);
+    transform: scale(1.05);
+    filter: brightness(1.2);
+  }
+}
+
+@keyframes float-bounce {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  25% {
+    transform: translateY(-8px) scale(1.03);
+  }
+  50% {
+    transform: translateY(-12px) scale(1.05);
+  }
+  75% {
+    transform: translateY(-8px) scale(1.03);
+  }
+}
+
+@keyframes border-dance {
+  0%,
+  100% {
+    border-color: rgba(6, 182, 212, 0.6);
+    border-width: 2px;
+  }
+  33% {
+    border-color: rgba(59, 130, 246, 0.8);
+    border-width: 3px;
+  }
+  66% {
+    border-color: rgba(168, 85, 247, 0.7);
+    border-width: 4px;
+  }
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: color-mix(in srgb, var(--bg-surface) 50%, transparent);
+  border-radius: 9999px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 9999px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.input-focus {
+  @apply transition-all duration-200;
+  &:focus {
+    outline: 2px solid color-mix(in srgb, var(--accent-primary) 50%, transparent);
+    outline-offset: 1px;
+    border-color: var(--accent-primary);
+  }
+}
+
+.btn-primary {
+  background: linear-gradient(to right, var(--accent-primary), var(--accent-secondary));
+  @apply text-white font-semibold px-6 py-2.5 rounded-lg transition-all duration-300 hover:scale-105 active:scale-95;
+  box-shadow: var(--shadow-md);
+  &:hover {
+    filter: brightness(1.1);
+    box-shadow: var(--shadow-lg);
+  }
+}
+
+.btn-secondary {
+  background-color: var(--bg-elevated);
+  color: var(--text-primary);
+  @apply font-semibold px-6 py-2.5 rounded-lg transition-all duration-300 hover:scale-105 active:scale-95;
+  &:hover {
+    background-color: var(--bg-subtle);
+  }
+}
+
+.btn-danger {
+  @apply bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold px-6 py-2.5 rounded-lg transition-all duration-300 shadow-lg shadow-red-500/30 hover:shadow-xl hover:shadow-red-500/40 hover:scale-105 active:scale-95;
+}
+
+.card-gradient {
+  background-color: var(--bg-surface);
+  backdrop-filter: blur(24px);
+  border: 1px solid var(--border-subtle);
+  @apply rounded-xl;
+  box-shadow: var(--card-shadow);
+}
+
+.stat-card {
+  @apply p-6 rounded-xl transition-all duration-300 hover:scale-105 cursor-pointer;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  backdrop-filter: blur(4px);
+  box-shadow: var(--card-shadow);
+  &:hover {
+    box-shadow: var(--shadow-lg);
+  }
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: color-mix(in srgb, var(--bg-surface) 50%, transparent);
+  border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-primary);
+}
+
+/* ==================== PROFESSIONAL DASHBOARD SCROLLBAR ==================== */
+/* Uses CSS vars for theme-aware scrollbar */
+
+.pro-scrollbar {
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text-muted) 50%, transparent) transparent;
+}
+
+.pro-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.pro-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 100px;
+  margin: 4px 0;
+}
+
+.pro-scrollbar::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text-muted) 40%, transparent);
+  border-radius: 100px;
+  transition: background 0.2s ease;
+}
+
+.pro-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--text-muted) 70%, transparent);
+}
+
+.pro-scrollbar::-webkit-scrollbar-thumb:active {
+  background: color-mix(in srgb, var(--accent-primary) 80%, transparent);
+}
+
+/* POS/Touch: Horizontal snap scrolling for carousels */
+.snap-x-mandatory {
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline-start: 12px;
+}
+.snap-x-mandatory > * {
+  scroll-snap-align: start;
+}
+
+/* Scroll container with fade indicators - uses CSS var for bg-base */
+.scroll-fade-container {
+  position: relative;
+}
+
+.scroll-fade-container::before,
+.scroll-fade-container::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 6px;
+  height: 24px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 10;
+}
+
+.scroll-fade-container::before {
+  top: 0;
+  background: linear-gradient(to bottom,
+    color-mix(in srgb, var(--bg-base) 95%, transparent) 0%,
+    transparent 100%);
+}
+
+.scroll-fade-container::after {
+  bottom: 0;
+  background: linear-gradient(to top,
+    color-mix(in srgb, var(--bg-base) 95%, transparent) 0%,
+    transparent 100%);
+}
+
+.scroll-fade-container.has-scroll-top::before {
+  opacity: 1;
+}
+
+.scroll-fade-container.has-scroll-bottom::after {
+  opacity: 1;
+}
+
+/* Mobile-specific scrollbar - slightly wider for touch */
+@media (max-width: 768px) {
+  .pro-scrollbar::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  .pro-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(100, 116, 139, 0.6);
+  }
+}
+
+/* Very small screens - hide scrollbar but keep scroll functionality */
+@media (max-width: 480px) {
+  .pro-scrollbar-mobile-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .pro-scrollbar-mobile-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+/* Fix pour les modals qui ne scrollent pas */
+.modal-overlay {
+  @apply fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4;
+  background-color: color-mix(in srgb, var(--bg-base) 60%, transparent);
+  overflow-y: visible !important;
+}
+
+.modal-content {
+  @apply max-h-[90vh] overflow-y-auto;
+  margin: auto;
+}
+
+/* Empêcher le body de scroller quand un modal est ouvert */
+body.modal-open {
+  overflow: hidden;
+}
+
+.modal-content::-webkit-scrollbar {
+  width: 8px;
+}
+.modal-content::-webkit-scrollbar-track {
+  background: color-mix(in srgb, var(--bg-surface) 50%, transparent);
+  border-radius: 9999px;
+}
+.modal-content::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 9999px;
+}
+.modal-content::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-primary);
+}
+
+@layer utilities {
+  .mask-linear-fade {
+    mask-image: linear-gradient(to right, black 85%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+/* ==================== MESSAGES SCROLLBAR - Ultra Thin & No Shift ==================== */
+.messages-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.messages-scrollbar:hover {
+  scrollbar-color: rgba(99, 102, 241, 0.4) transparent;
+}
+
+.messages-scrollbar::-webkit-scrollbar {
+  width: 2px; /* Always same width - no shift */
+}
+
+.messages-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.messages-scrollbar::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 100px;
+}
+
+.messages-scrollbar:hover::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.4);
+}
+
+/* Sidebar conversations scrollbar */
+.sidebar-scrollbar {
+  scrollbar-width: none;
+}
+
+.sidebar-scrollbar:hover {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(71, 85, 105, 0.25) transparent;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar {
+  width: 2px;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 100px;
+}
+
+.sidebar-scrollbar:hover::-webkit-scrollbar-thumb {
+  background: rgba(71, 85, 105, 0.3);
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(71, 85, 105, 0.5);
+}
+
+/* ==================== SYNC INDICATOR ANIMATIONS ==================== */
+@keyframes pulse-subtle {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0);
+  }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s ease-in-out infinite;
+}
+
+/* ─── CreateClientModal wizard: Uniform form controls ─── */
+
+/* Base: 44px height, 16px padding, 12px radius */
+.wizard-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.wizard-form select {
+  height: 2.75rem !important;
+  padding-left: 1rem !important;
+  padding-right: 1rem !important;
+  border-radius: 0.75rem !important;
+  font-size: 0.875rem !important;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* Select: extra right padding for chevron (icon at 12px from right edge) */
+.wizard-form select {
+  padding-right: 2.5rem !important;
+}
+
+/* SearchableSelect trigger: match 44px height */
+.wizard-form div[data-state] {
+  min-height: 2.75rem !important;
+  height: 2.75rem !important;
+  border-radius: 0.75rem !important;
+  font-size: 0.875rem !important;
+}
+
+/* SearchableSelect inner search input: reset overrides */
+.wizard-form div[data-state] input {
+  height: auto !important;
+  min-height: auto !important;
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  white-space: normal !important;
+  overflow: visible !important;
+}
+
+/* PhoneInput: unified group container */
+.wizard-form .phone-input-group {
+  height: 2.75rem !important;
+  border-radius: 0.75rem !important;
+}
+.wizard-form .phone-input-group .phone-prefix {
+  font-size: 0.875rem !important;
+}
+.wizard-form .phone-input-group input {
+  height: 100% !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding-left: 0.75rem !important;
+  padding-right: 1rem !important;
+}
+.wizard-form .phone-input-group:focus-within {
+  border-color: var(--input-focus) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--input-focus) 20%, transparent) !important;
+}
+
+/* Active / touch feedback */
+.wizard-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):active:not(:focus),
+.wizard-form select:active:not(:focus),
+.wizard-form div[data-state]:active:not([data-state="open"]) {
+  transform: scale(0.995);
+  transition: transform 0.1s ease;
+}
+
+/* Focus ring consistency */
+.wizard-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
+.wizard-form select:focus {
+  border-color: var(--input-focus) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--input-focus) 20%, transparent) !important;
+  outline: none !important;
+}
+
+/* ─── POS / Touch devices: 48px targets, 16px min font ─── */
+@media (pointer: coarse), (max-width: 600px) {
+  .wizard-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+  .wizard-form select {
+    height: 3rem !important;
+    font-size: 1rem !important;
+  }
+
+  .wizard-form div[data-state] {
+    min-height: 3rem !important;
+    height: 3rem !important;
+    font-size: 1rem !important;
+  }
+
+  .wizard-form .phone-input-group {
+    height: 3rem !important;
+  }
+
+  .wizard-form .phone-input-group .phone-prefix {
+    font-size: 1rem !important;
+  }
+
+  .wizard-form .phone-input-group input {
+    font-size: 1rem !important;
+  }
+
+  /* Toggle buttons: 48px on touch */
+  .wizard-form .h-11 {
+    height: 3rem !important;
+  }
+
+  /* Stronger active feedback for touch */
+  .wizard-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):active,
+  .wizard-form select:active,
+  .wizard-form div[data-state]:active:not([data-state="open"]) {
+    transform: scale(0.98);
+    background-color: color-mix(in srgb, var(--input-bg) 90%, var(--accent-primary)) !important;
+    transition: transform 0.1s ease, background-color 0.1s ease;
+  }
+}

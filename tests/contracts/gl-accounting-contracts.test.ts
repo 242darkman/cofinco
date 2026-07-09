@@ -12,14 +12,14 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { db, pool } from "server/db";
+import { db, pool } from "../../apps/api/db";
 import { comptes, mouvementsFinanciers, users, clients, accountingRules, agences } from "@shared/schema";
 import { glPostingLinks, ecritures } from "@shared/schema/accounting";
 import { eq, sql } from "drizzle-orm";
 import { faker } from "@faker-js/faker";
-import { executeWithLedger } from "server/services/ledger";
-import { postGlForMouvement } from "server/services/accounting-posting-service";
-import { isGLStrictMode } from "server/services/accounting-validation";
+import { executeWithLedger } from "../../apps/api/services/ledger";
+import { postGlForMouvement } from "../../apps/api/services/accounting-posting-service";
+import { isGLStrictMode } from "../../apps/api/services/accounting-validation";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -89,12 +89,22 @@ describe("Contract 1: No Direct Balance Update", () => {
   afterEach(cleanupTestEntities);
 
   it("should block direct UPDATE on comptes.solde_courant without mouvement", async () => {
-    // Attempt a raw SQL UPDATE outside any mouvement creation
-    await expect(
-      db.execute(
+    // Attempt a raw SQL UPDATE outside any mouvement creation.
+    // drizzle-orm >= 0.44 encapsule l'erreur PG dans DrizzleQueryError
+    // (message "Failed query: …") ; le message de la garde BALANCE_GUARD se
+    // trouve dans la chaîne `.cause`. On inspecte donc toute la chaîne.
+    let error: unknown;
+    try {
+      await db.execute(
         sql`UPDATE comptes SET solde_courant = '999999' WHERE id = ${testCompteId}`
-      )
-    ).rejects.toThrow(/BALANCE_GUARD/);
+      );
+    } catch (e) {
+      error = e;
+    }
+    expect(error, "L'UPDATE direct doit être bloqué par la garde BALANCE_GUARD").toBeDefined();
+    const err = error as { message?: string; cause?: { message?: string; cause?: { message?: string } } };
+    const chain = `${err?.message ?? ""} ${err?.cause?.message ?? ""} ${err?.cause?.cause?.message ?? ""}`;
+    expect(chain).toMatch(/BALANCE_GUARD/);
 
     // Verify balance is unchanged
     const [compte] = await db
@@ -469,24 +479,24 @@ describe("Contract 6: No Direct Balance Updates (Static Scan)", () => {
 
   // Files allowed to update balances (ledger internals, seeds, DB functions, tests)
   const ALLOWLIST = [
-    "server/services/ledger.ts",
-    "server/db.ts",
+    "apps/api/services/ledger.ts",
+    "apps/api/db.ts",
     "seeds/seed-prod.ts",
     // Legacy violations — each must be refactored to use executeWithLedger
     // Adding a file here is TEMPORARY and must be tracked for cleanup
-    "server/services/compte-transfers.ts",
-    "server/services/scheduled-transfers-service.ts",
-    "server/services/automatic-transfers-service.ts",
-    "server/routes/finance.ts",
-    "server/services/caisse-agent/approval-service.ts",
-    "server/services/tontine-production-service.ts",
-    "server/services/tontine-logic.ts",
-    "server/storage/finance.ts",
-    "server/routes/settings.ts",
+    "apps/api/services/compte-transfers.ts",
+    "apps/api/services/scheduled-transfers-service.ts",
+    "apps/api/services/automatic-transfers-service.ts",
+    "apps/api/routes/finance.ts",
+    "apps/api/services/caisse-agent/approval-service.ts",
+    "apps/api/services/tontine-production-service.ts",
+    "apps/api/services/tontine-logic.ts",
+    "apps/api/storage/finance.ts",
+    "apps/api/routes/settings.ts",
   ];
 
   it("should have no NEW direct balance updates outside allowlist", () => {
-    const serverDir = path.resolve(process.cwd(), "server");
+    const serverDir = path.resolve(process.cwd(), "apps/api");
     const violations: Array<{ file: string; line: number; content: string }> = [];
 
     function scanDir(dir: string) {
@@ -537,7 +547,7 @@ describe("Contract 6: No Direct Balance Updates (Static Scan)", () => {
     // Current known legacy violations: 8 files.
     // If you add a file, update this count AND create a cleanup ticket.
     const LEGACY_FILES = ALLOWLIST.filter(
-      (f) => !["server/services/ledger.ts", "server/db.ts", "seeds/seed-prod.ts"].includes(f)
+      (f) => !["apps/api/services/ledger.ts", "apps/api/db.ts", "seeds/seed-prod.ts"].includes(f)
     );
     expect(LEGACY_FILES.length).toBeLessThanOrEqual(9);
   });

@@ -1,20 +1,20 @@
 import { describe, it, expect, vi } from 'vitest';
 
 // Mock heavy dependencies so the module can load without a real DB / ledger.
-vi.mock('server/db', () => ({
+vi.mock('../../apps/api/db', () => ({
   db: { query: {}, select: vi.fn(), update: vi.fn(), insert: vi.fn(), delete: vi.fn(), transaction: vi.fn() },
 }));
-vi.mock('server/services/ledger', () => ({
+vi.mock('../../apps/api/services/ledger', () => ({
   executeWithLedger: vi.fn(),
   updateCompteSolde: vi.fn(),
   updateSessionSolde: vi.fn(),
   createOutboxEvent: vi.fn(),
   generateReference: vi.fn(),
 }));
-vi.mock('server/services/accounting-posting-service', () => ({
+vi.mock('../../apps/api/services/accounting-posting-service', () => ({
   postGlForMouvement: vi.fn(),
 }));
-vi.mock('server/storage/finance', () => ({
+vi.mock('../../apps/api/storage/finance', () => ({
   createFactureForDepot: vi.fn(),
   createFactureForRetrait: vi.fn(),
   createFactureForDepotInitial: vi.fn(),
@@ -24,7 +24,7 @@ import {
   recomputeAccountStatus,
   allocateOpeningPayment,
   type OpeningSnapshot,
-} from 'server/services/comptes';
+} from '../../apps/api/services/comptes';
 
 // ---------------------------------------------------------------------------
 // Helpers

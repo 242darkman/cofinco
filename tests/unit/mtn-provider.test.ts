@@ -13,7 +13,7 @@ const createMockBuilder = (result: any = []) => {
   return builder;
 };
 
-vi.mock('server/db', () => ({
+vi.mock('../../apps/api/db', () => ({
   db: {
     select: (...args: any[]) => mockSelect(...args),
   },
@@ -23,7 +23,7 @@ vi.mock('server/db', () => ({
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
-import { MtnSmsProvider } from 'server/services/notifications/providers/sms-mtn.provider';
+import { MtnSmsProvider } from '../../apps/api/services/notifications/providers/sms-mtn.provider';
 
 const MTN_SETTINGS = {
   id: '1',
@@ -271,7 +271,7 @@ describe('MtnSmsProvider', () => {
           }),
         });
 
-      const result = await provider.checkDeliveryStatus('req-123', 'tel:+242COFIN');
+      const result = await provider.checkDeliveryStatus('req-123', 'tel:+242MicroFlex');
 
       expect(result.status).toBe('DeliveredToTerminal');
     });
@@ -287,7 +287,7 @@ describe('MtnSmsProvider', () => {
           json: async () => ({}),
         });
 
-      const result = await provider.checkDeliveryStatus('req-123', 'tel:+242COFIN');
+      const result = await provider.checkDeliveryStatus('req-123', 'tel:+242MicroFlex');
 
       expect(result.status).toBe('UNKNOWN');
     });

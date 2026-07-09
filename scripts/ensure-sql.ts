@@ -8,7 +8,7 @@
  * Usage: node --import tsx scripts/ensure-sql.ts
  */
 
-import { ensureCustomFunctions, pool } from "../server/db";
+import { ensureCustomFunctions, pool } from "../apps/api/db";
 
 try {
   await ensureCustomFunctions();

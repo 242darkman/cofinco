@@ -1,5 +1,5 @@
 /**
- * COFINCO - Clean Dead Letter Jobs
+ * MICROFLEX - Clean Dead Letter Jobs
  *
  * Removes notification jobs that are in DEAD_LETTER status
  * (jobs that failed repeatedly and are no longer retryable)
@@ -9,7 +9,7 @@
  *   npm run db:clean-dead-letters -- --force   # Skip confirmation
  */
 
-import { pool } from "../server/db";
+import { pool } from "../apps/api/db";
 
 const RED = "\x1b[31m";
 const YELLOW = "\x1b[33m";
@@ -35,7 +35,7 @@ async function main() {
   const force = args.includes("--force");
 
   console.log(`\n${CYAN}${"═".repeat(68)}${RESET}`);
-  console.log(`${CYAN}${BOLD}   COFINCO - NETTOYAGE DES JOBS EN DEAD_LETTER${RESET}`);
+  console.log(`${CYAN}${BOLD}   MICROFLEX - NETTOYAGE DES JOBS EN DEAD_LETTER${RESET}`);
   console.log(`${CYAN}${"═".repeat(68)}${RESET}\n`);
 
   const client = await pool.connect();

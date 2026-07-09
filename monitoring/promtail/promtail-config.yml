@@ -28,7 +28,7 @@ scrape_configs:
         refresh_interval: 5s
         filters:
           - name: label
-            values: ["com.docker.compose.project=cofinco"]
+            values: ["com.docker.compose.project=microflex"]
     relabel_configs:
       # Use container name as label
       - source_labels: ['__meta_docker_container_name']

@@ -1,10 +1,13 @@
 # ============================================
 # Stage 1: Install dependencies
 # ============================================
-FROM node:20-alpine AS deps
+FROM node:24-alpine AS deps
 WORKDIR /app
-COPY package.json ./
-RUN npm install
+COPY package.json package-lock.json ./
+COPY apps/web/package.json ./apps/web/package.json
+COPY apps/api/package.json ./apps/api/package.json
+COPY packages/shared/package.json ./packages/shared/package.json
+RUN npm ci
 
 # ============================================
 # Stage: DEV — hot reload (tsx watch + Vite HMR)
@@ -16,7 +19,7 @@ RUN apk add --no-cache tini
 WORKDIR /app
 EXPOSE 5000 5173
 ENTRYPOINT ["tini", "--"]
-CMD ["npx", "tsx", "watch", "--clear-screen=false", "server/index.ts"]
+CMD ["npx", "tsx", "watch", "--clear-screen=false", "apps/api/index.ts"]
 
 # ============================================
 # Stage: INIT — one-shot DB schema push + seed
@@ -28,7 +31,7 @@ RUN apk add --no-cache unzip
 WORKDIR /app
 COPY . .
 ENTRYPOINT ["sh", "-c"]
-CMD ["sh scripts/download-geonames.sh && npx drizzle-kit push --force && node --import tsx scripts/ensure-sql.ts && node --import tsx seeds/seed-prod.ts"]
+CMD ["sh scripts/download-geonames.sh && npm run db:migrate && node --import tsx scripts/ensure-sql.ts && node --import tsx seeds/seed-prod.ts"]
 
 # ============================================
 # Stage: TEST — unit + integration tests
@@ -45,7 +48,7 @@ CMD ["vitest", "run"]
 # ============================================
 # Usage: docker compose run --rm test-e2e
 # Uses Debian (not Alpine) because Playwright browsers need glibc
-FROM node:20-bookworm-slim AS test-e2e
+FROM node:24-bookworm-slim AS test-e2e
 WORKDIR /app
 COPY package.json ./
 RUN npm install && npx playwright install --with-deps chromium
@@ -56,20 +59,22 @@ CMD ["playwright", "test"]
 # ============================================
 # Stage 2: Build application
 # ============================================
-FROM node:20-alpine AS build
+FROM node:24-alpine AS build
 WORKDIR /app
+ARG TENANT_CONFIG_FILE=config/tenants/microflex.json
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
+RUN test -f "$TENANT_CONFIG_FILE" && cp "$TENANT_CONFIG_FILE" dist/tenant-config.json
 
 # ============================================
 # Stage 3: Production runtime
 # ============================================
-FROM node:20-alpine AS runtime
+FROM node:24-alpine AS runtime
 
 # OCI labels
-LABEL org.opencontainers.image.source="https://github.com/owner/cofinco"
-LABEL org.opencontainers.image.description="Cofinco Platform"
+LABEL org.opencontainers.image.source="https://github.com/owner/microflex"
+LABEL org.opencontainers.image.description="MicroFlex Platform"
 LABEL org.opencontainers.image.licenses="MIT"
 
 # Create non-root user
@@ -82,10 +87,14 @@ RUN apk add --no-cache wget tini
 WORKDIR /app
 
 ENV NODE_ENV=production
+ENV TENANT_CONFIG_PATH=dist/tenant-config.json
 
 # Install production dependencies only
-COPY package.json ./
-RUN npm install --omit=dev && npm cache clean --force
+COPY package.json package-lock.json ./
+COPY apps/web/package.json ./apps/web/package.json
+COPY apps/api/package.json ./apps/api/package.json
+COPY packages/shared/package.json ./packages/shared/package.json
+RUN npm ci --omit=dev && npm cache clean --force
 
 # Copy build artifacts
 COPY --from=build /app/dist ./dist

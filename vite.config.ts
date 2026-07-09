@@ -19,7 +19,7 @@ export default defineConfig({
     metaImagesPlugin(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'cofin-logo.png', 'icons/*.png'],
+      includeAssets: ['favicon.ico', 'microflex-logo.png', 'icons/*.png'],
       manifest: false, // Use external manifest.json
       workbox: {
         // Precache all static assets
@@ -199,13 +199,12 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      "@": path.resolve(import.meta.dirname, "client", "src"),
-      "@shared": path.resolve(import.meta.dirname, "shared"),
-      "server": path.resolve(import.meta.dirname, "server"),
+      "@": path.resolve(import.meta.dirname, "apps/web/src"),
+      "@shared": path.resolve(import.meta.dirname, "packages/shared"),
     },
     dedupe: ['react', 'react-dom'],
   },
-  root: path.resolve(import.meta.dirname, "client"),
+  root: path.resolve(import.meta.dirname, "apps/web"),
 
   // ========== BUILD OPTIMIZATION FOR SLOW CONNECTIONS ==========
   build: {
@@ -291,7 +290,7 @@ export default defineConfig({
           }
 
           // PDF/Excel generation (lazy loaded on export only)
-          if (id.includes('jspdf') || id.includes('xlsx') || id.includes('html2canvas')) {
+          if (id.includes('jspdf') || id.includes('exceljs') || id.includes('html2canvas')) {
             return 'export-tools';
           }
 
@@ -300,10 +299,8 @@ export default defineConfig({
             return 'offline-storage';
           }
 
-          // Radix UI components
-          if (id.includes('@radix-ui')) {
-            return 'radix-ui';
-          }
+          // Radix UI reste dans vendor : un chunk dédié crée un cycle
+          // (vaul → @radix-ui/react-dialog → react-remove-scroll → vendor)
 
           // Lucide icons
           if (id.includes('lucide-react')) {

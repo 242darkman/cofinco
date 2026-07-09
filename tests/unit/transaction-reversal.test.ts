@@ -8,8 +8,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // ============================================================================
 
 // Mock heavy dependencies to avoid DB/schema import side-effects
-vi.mock("server/db", () => ({ db: {} }));
-vi.mock("server/services/ledger", () => ({
+vi.mock("../../apps/api/db", () => ({ db: {} }));
+vi.mock("../../apps/api/services/ledger", () => ({
   createMouvementFinancier: vi.fn(),
   createOutboxEvent: vi.fn(),
   createMouvementEvents: vi.fn(),
@@ -18,11 +18,11 @@ vi.mock("server/services/ledger", () => ({
   generateReference: vi.fn(),
   emitBalanceUpdates: vi.fn(),
 }));
-vi.mock("server/services/notifications/domain-events/event-registry", () => ({
+vi.mock("../../apps/api/services/notifications/domain-events/event-registry", () => ({
   dispatchDomainEvent: vi.fn(),
 }));
 
-import { ReversalError } from "server/services/caisse/transaction-reversal-service";
+import { ReversalError } from "../../apps/api/services/caisse/transaction-reversal-service";
 
 describe("ReversalError", () => {
   it("should create error with code and default httpStatus", () => {

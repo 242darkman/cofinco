@@ -1,0 +1,4 @@
+interface:
+  display_name: "MicroFlex Feature"
+  short_description: "Développer une feature de bout en bout"
+  default_prompt: "Utilise $microflex-feature pour implémenter cette fonctionnalité de bout en bout."

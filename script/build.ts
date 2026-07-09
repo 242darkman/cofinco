@@ -1,10 +1,10 @@
 import { build as esbuild } from "esbuild";
 import { build as viteBuild } from "vite";
-import { rm, readFile } from "fs/promises";
+import { rm, readFile } from "node:fs/promises";
 
 // server deps to bundle to reduce openat(2) syscalls
 // which helps cold start times
-const allowlist = [
+const allowlist = new Set([
   "connect-pg-simple",
   "date-fns",
   "drizzle-orm",
@@ -17,10 +17,8 @@ const allowlist = [
   "pg",
   "uuid",
   "ws",
-  "xlsx",
   "zod",
-  "zod-validation-error",
-];
+]);
 
 async function buildAll() {
   await rm("dist", { recursive: true, force: true });
@@ -29,15 +27,25 @@ async function buildAll() {
   await viteBuild();
 
   console.log("building server...");
-  const pkg = JSON.parse(await readFile("package.json", "utf-8"));
-  const allDeps = [
-    ...Object.keys(pkg.dependencies || {}),
-    ...Object.keys(pkg.devDependencies || {}),
+  // Agréger les dépendances de la racine et de chaque workspace :
+  // depuis la répartition par app (npm workspaces), les deps du serveur
+  // vivent dans apps/api et packages/shared, plus l'outillage racine.
+  const manifests = [
+    "package.json",
+    "apps/api/package.json",
+    "apps/web/package.json",
+    "packages/shared/package.json",
   ];
-  const externals = allDeps.filter((dep) => !allowlist.includes(dep));
+  const allDeps = new Set<string>();
+  for (const manifest of manifests) {
+    const pkg = JSON.parse(await readFile(manifest, "utf-8"));
+    for (const dep of Object.keys(pkg.dependencies || {})) allDeps.add(dep);
+    for (const dep of Object.keys(pkg.devDependencies || {})) allDeps.add(dep);
+  }
+  const externals = Array.from(allDeps).filter((dep) => !allowlist.has(dep));
 
   await esbuild({
-    entryPoints: ["server/index.ts"],
+    entryPoints: ["apps/api/index.ts"],
     platform: "node",
     bundle: true,
     format: "cjs",
@@ -51,7 +59,9 @@ async function buildAll() {
   });
 }
 
-buildAll().catch((err) => {
+try {
+  await buildAll();
+} catch (err) {
   console.error(err);
   process.exit(1);
-});
+}

@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { processAutomaticTontineContributions } from 'server/services/automatic-tontine-service';
-import { executeAutomaticTransfer } from 'server/services/automatic-transfers-service';
-import { processAutomaticCreditRepayments } from 'server/services/automatic-repayment-service';
-import { createFactureForDepot } from 'server/storage/finance';
-import { db } from 'server/db';
+import { processAutomaticTontineContributions } from '../../apps/api/services/automatic-tontine-service';
+import { executeAutomaticTransfer } from '../../apps/api/services/automatic-transfers-service';
+import { processAutomaticCreditRepayments } from '../../apps/api/services/automatic-repayment-service';
+import { createFactureForDepot } from '../../apps/api/storage/finance';
+import { db } from '../../apps/api/db';
 import { transactionsCompte, modelesFactures, tontines, versementsAutomatiques } from '@shared/schema';
 
 // --- Mocks Setup ---
@@ -36,7 +36,7 @@ const createMockBuilder = (result: any = []) => {
   return builder;
 };
 
-vi.mock('server/db', () => ({
+vi.mock('../../apps/api/db', () => ({
   db: {
     query: {
       tontines: { findMany: vi.fn() },
@@ -56,7 +56,7 @@ vi.mock('server/db', () => ({
   }
 }));
 
-vi.mock('server/services/ledger', () => ({
+vi.mock('../../apps/api/services/ledger', () => ({
   executeWithLedger: vi.fn(async (module, data, callback) => {
     // Setup generic mock returns for the transaction context
     mockTx.update.mockReturnValue(createMockBuilder([{}]));
@@ -69,21 +69,21 @@ vi.mock('server/services/ledger', () => ({
   generateReference: vi.fn().mockReturnValue('REF-TEST'),
 }));
 
-vi.mock('server/storage/tontines', () => ({
+vi.mock('../../apps/api/storage/tontines', () => ({
     createContributionTontineWithLedger: vi.fn(),
 }));
 
-vi.mock('server/services/tontine-logic', () => ({
+vi.mock('../../apps/api/services/tontine-logic', () => ({
     isTourFullyPaid: vi.fn().mockResolvedValue({ isPaid: false, montantRestant: 1000 }),
 }));
 
-vi.mock('server/lib/logger', () => ({
+vi.mock('../../apps/api/lib/logger', () => ({
   createLogger: () => ({
     info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn()
   })
 }));
 
-vi.mock('server/services/accounting-posting-service', () => ({
+vi.mock('../../apps/api/services/accounting-posting-service', () => ({
   postGlForMouvement: vi.fn().mockResolvedValue(null),
   AccountingRuleNotFoundError: class extends Error {},
 }));

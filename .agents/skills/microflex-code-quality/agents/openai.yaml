@@ -1,0 +1,4 @@
+interface:
+  display_name: "MicroFlex Code Quality"
+  short_description: "Auditer et renforcer la qualité du code"
+  default_prompt: "Utilise $microflex-code-quality pour auditer et améliorer ce changement sans élargir son périmètre."

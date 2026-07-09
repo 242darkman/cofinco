@@ -41,7 +41,7 @@ const mockTx: any = {
   update: vi.fn(),
 };
 
-vi.mock('server/db', () => ({
+vi.mock('../../apps/api/db', () => ({
   db: {
     select: (...args: any[]) => mockSelect(...args),
     insert: (...args: any[]) => mockInsert(...args),
@@ -59,7 +59,7 @@ vi.mock('server/db', () => ({
   },
 }));
 
-vi.mock('server/lib/logger', () => ({
+vi.mock('../../apps/api/lib/logger', () => ({
   createLogger: () => ({
     info: vi.fn(),
     warn: vi.fn(),
@@ -77,7 +77,7 @@ vi.mock('@shared/schema/tontines', async (importOriginal) => {
 // IMPORTS (after mocks)
 // ============================================================================
 
-import { db } from 'server/db';
+import { db } from '../../apps/api/db';
 import {
   POINTS_TABLE,
   SCORE_WEIGHTS,
@@ -91,7 +91,7 @@ import {
   getAgencyScoreStats,
   getAdminScoreEvents,
   getAdminScoreStates,
-} from 'server/services/scoring-engine';
+} from '../../apps/api/services/scoring-engine';
 
 // ============================================================================
 // HELPERS

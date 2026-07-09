@@ -1,6 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
-import { db } from '../../server/db';
-import { demandesCredit, credits } from '../../shared/schema/finance';
+import { db } from '../../apps/api/db';
+import { demandesCredit, credits } from '../../packages/shared/schema/finance';
 import { eq, desc } from 'drizzle-orm';
 import { createTestFixture, type TestFixture } from './test-fixtures';
 

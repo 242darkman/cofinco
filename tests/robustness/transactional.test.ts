@@ -1,7 +1,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { executeWithLedger, updateCompteSolde } from 'server/services/ledger';
-import { db } from 'server/db';
+import { executeWithLedger, updateCompteSolde } from '../../apps/api/services/ledger';
+import { db } from '../../apps/api/db';
 import { comptes, mouvementsFinanciers, users, clients, agences } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { faker } from '@faker-js/faker';
