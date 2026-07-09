@@ -41,7 +41,9 @@
     "test:security": "vitest run tests/security",
     "test:e2e": "playwright test",
     "docker:test": "docker compose --profile test run --rm test-unit",
-    "docker:test:e2e": "docker compose --profile test run --rm test-e2e"
+    "docker:test:e2e": "docker compose --profile test run --rm test-e2e",
+    "check:sizes": "node --import tsx scripts/check-file-sizes.ts",
+    "check:sizes:update": "node --import tsx scripts/check-file-sizes.ts --update"
   },
   "dependencies": {
     "@casl/ability": "^6.8.0",

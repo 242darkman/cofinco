@@ -66,6 +66,9 @@ jobs:
       - name: Configurations tenant valides
         run: node --import tsx scripts/validate-tenant-configs.ts
 
+      - name: Taille des fichiers (cliquet 400 lignes)
+        run: node --import tsx scripts/check-file-sizes.ts
+
       - name: Unit tests (no DB)
         run: npx vitest run --exclude 'tests/contracts/**' --exclude 'tests/e2e/**' --exclude 'tests/integration/**' --exclude 'tests/robustness/**'
 

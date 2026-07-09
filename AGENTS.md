@@ -105,7 +105,7 @@ La stratégie de long terme est hybride : monorepo pour l'isolation structurelle
 ## 7. Règles frontend
 
 - Utiliser des composants fonctionnels et des hooks React.
-- Les composants et les pages ne doivent pas dépasser 400 lignes pour garantir une meilleure maintenabilité à long terme. Découper en sous-composants ou en hooks personnalisés si nécessaire.
+- Les composants et les pages ne doivent pas dépasser 400 lignes pour garantir une meilleure maintenabilité à long terme. Découper en sous-composants ou en hooks personnalisés si nécessaire. Cette règle est appliquée en CI par cliquet (`npm run check:sizes`) : l'existant au-dessus du seuil est figé dans `docs/audit/lines-baseline.json`, ne doit jamais grossir, et tout fichier touché doit être découpé à cette occasion (`npm run check:sizes:update` pour resserrer la baseline).
 - Garder l'état serveur dans TanStack Query et l'état local au plus près de son usage.
 - Centraliser les clés de requête et invalider précisément les données après mutation.
 - Toujours représenter les états chargement, vide, erreur, succès et absence de permission.
@@ -117,7 +117,7 @@ La stratégie de long terme est hybride : monorepo pour l'isolation structurelle
 
 ## 8. Règles API et sécurité
 
-- Les fichiers backend (contrôleurs, services, routes) ne doivent pas dépasser 400 lignes pour garantir la maintenabilité. Découper par responsabilité si ce seuil est atteint.
+- Les fichiers backend (contrôleurs, services, routes) ne doivent pas dépasser 400 lignes pour garantir la maintenabilité. Découper par responsabilité si ce seuil est atteint. Même mécanisme de cliquet CI que côté frontend (`npm run check:sizes`).
 - Authentifier puis autoriser chaque opération sensible côté serveur.
 - Appliquer les scopes tenant/agence/utilisateur dans les requêtes, pas seulement après lecture des données.
 - Ne jamais faire confiance à un identifiant de tenant, rôle, agence ou utilisateur fourni par le client.
