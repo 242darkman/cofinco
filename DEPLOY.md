@@ -66,14 +66,14 @@ Nginx (80/443)
 
 ### Allocation des ressources (64GB RAM / 16 vCores)
 
-| Service | Replicas | RAM (limit) | CPU (limit) | Role |
-|---|---|---|---|---|
-| PostgreSQL (natif) | 1 | ~48 GB | reste | Base de donnees principale |
-| app | 3 | 1 GB chacun | 2 CPU | API stateless |
-| worker | 1 | 1 GB | 1 CPU | Cron jobs (singleton) |
-| redis | 1 | 1 GB | 1 CPU | Sessions + cache |
-| minio | 1 | 1 GB | 1 CPU | Stockage documents |
-| db-init | 1 (one-shot) | 1 GB | 1 CPU | Schema push + seeds |
+| Service            | Replicas     | RAM (limit) | CPU (limit) | Role                       |
+| ------------------ | ------------ | ----------- | ----------- | -------------------------- |
+| PostgreSQL (natif) | 1            | ~48 GB      | reste       | Base de donnees principale |
+| app                | 3            | 1 GB chacun | 2 CPU       | API stateless              |
+| worker             | 1            | 1 GB        | 1 CPU       | Cron jobs (singleton)      |
+| redis              | 1            | 1 GB        | 1 CPU       | Sessions + cache           |
+| minio              | 1            | 1 GB        | 1 CPU       | Stockage documents         |
+| db-init            | 1 (one-shot) | 1 GB        | 1 CPU       | Schema push + seeds        |
 
 ---
 
@@ -94,10 +94,10 @@ Configurez les enregistrements DNS pour votre domaine :
 ```
 Type    Nom       Valeur            TTL
 A       @         91.134.136.73     3600
-CNAME   www       microflex-m.com.    3600
+CNAME   www       microflex.bvsandbox.dev.    3600
 ```
 
-> **Important** : Le DNS doit etre propage AVANT de lancer Certbot (etape setup). Verifiez avec `dig +short microflex-m.com`.
+> **Important** : Le DNS doit etre propage AVANT de lancer Certbot (etape setup). Verifiez avec `dig +short microflex.bvsandbox.dev.com`.
 
 ---
 
@@ -119,10 +119,11 @@ cd /tmp/microflex-setup
 ### 1.3 Lancer le script de setup
 
 ```bash
-sudo DOMAIN=microflex-m.com ACME_EMAIL=admin@microflex-m.com bash scripts/vps/setup.sh
+sudo DOMAIN=microflex.bvsandbox.dev ACME_EMAIL=admin@microflex.bvsandbox.dev bash scripts/vps/setup.sh
 ```
 
 Ce script installe et configure automatiquement :
+
 - **PostgreSQL 16** : base `microflex`, user `microflex_app`, tuning auto (shared_buffers=16GB, etc.)
 - **Docker** : daemon avec log rotation, live-restore, subnet `172.20.0.0/16`
 - **Nginx** : reverse proxy avec config MicroFlex (least_conn, rate limiting, security headers)
@@ -207,59 +208,60 @@ openssl rand -base64 32 | tr -d '/+=' | head -c 32  # password
 
 Dans **Settings → Environments → production → Environment secrets**, ajoutez :
 
-| Secret | Description | Exemple |
-|---|---|---|
-| `DATABASE_URL` | URL PostgreSQL (du setup) | `postgresql://microflex_app:xxx@host.docker.internal:5432/microflex` |
-| `REDIS_PASSWORD` | Mot de passe Redis (alphanum only) | `0rYnqEJzeMwTzdrE9UzCHIIhm9evNHxX` |
-| `SESSION_SECRET` | Secret sessions Express | `openssl rand -base64 32` |
-| `OTP_HMAC_SECRET` | Secret HMAC pour OTP | `openssl rand -hex 32` |
-| `OFFLINE_LIMITS_HMAC_KEY` | Secret HMAC offline | `openssl rand -hex 32` |
-| `MINIO_ROOT_USER` | User MinIO | `microflex_minio_admin` |
-| `MINIO_ROOT_PASSWORD` | Password MinIO | `openssl rand -base64 32` |
-| `SMTP_HOST` | Serveur SMTP | `smtp-relay.brevo.com` |
-| `SMTP_USERNAME` | User SMTP | (votre login SMTP) |
-| `SMTP_PASSWORD` | Password SMTP | (votre password SMTP) |
-| `MTN_SMS_CLIENT_ID` | API MTN SMS | (optionnel) |
-| `MTN_SMS_CLIENT_SECRET` | API MTN SMS | (optionnel) |
-| `MTN_SMS_WEBHOOK_SECRET` | Webhook MTN SMS | (optionnel) |
-| `PAWAPAY_API_TOKEN` | API pawaPay | (optionnel) |
-| `PAWAPAY_WEBHOOK_PUBLIC_KEYS` | Cles publiques pawaPay | (optionnel) |
-| `GRAFANA_ADMIN_PASSWORD` | Admin Grafana | (optionnel) |
-| `VPS_HOST` | IP du VPS | `91.134.136.73` |
-| `VPS_USER` | Utilisateur SSH | `deploy` |
-| `VPS_SSH_KEY` | Cle privee SSH | (contenu de `~/.ssh/id_ed25519`) |
+| Secret                        | Description                        | Exemple                                                              |
+| ----------------------------- | ---------------------------------- | -------------------------------------------------------------------- |
+| `DATABASE_URL`                | URL PostgreSQL (du setup)          | `postgresql://microflex_app:xxx@host.docker.internal:5432/microflex` |
+| `REDIS_PASSWORD`              | Mot de passe Redis (alphanum only) | `0rYnqEJzeMwTzdrE9UzCHIIhm9evNHxX`                                   |
+| `SESSION_SECRET`              | Secret sessions Express            | `openssl rand -base64 32`                                            |
+| `OTP_HMAC_SECRET`             | Secret HMAC pour OTP               | `openssl rand -hex 32`                                               |
+| `OFFLINE_LIMITS_HMAC_KEY`     | Secret HMAC offline                | `openssl rand -hex 32`                                               |
+| `MINIO_ROOT_USER`             | User MinIO                         | `microflex_minio_admin`                                              |
+| `MINIO_ROOT_PASSWORD`         | Password MinIO                     | `openssl rand -base64 32`                                            |
+| `SMTP_HOST`                   | Serveur SMTP                       | `smtp-relay.brevo.com`                                               |
+| `SMTP_USERNAME`               | User SMTP                          | (votre login SMTP)                                                   |
+| `SMTP_PASSWORD`               | Password SMTP                      | (votre password SMTP)                                                |
+| `MTN_SMS_CLIENT_ID`           | API MTN SMS                        | (optionnel)                                                          |
+| `MTN_SMS_CLIENT_SECRET`       | API MTN SMS                        | (optionnel)                                                          |
+| `MTN_SMS_WEBHOOK_SECRET`      | Webhook MTN SMS                    | (optionnel)                                                          |
+| `PAWAPAY_API_TOKEN`           | API pawaPay                        | (optionnel)                                                          |
+| `PAWAPAY_WEBHOOK_PUBLIC_KEYS` | Cles publiques pawaPay             | (optionnel)                                                          |
+| `GRAFANA_ADMIN_PASSWORD`      | Admin Grafana                      | (optionnel)                                                          |
+| `VPS_HOST`                    | IP du VPS                          | `91.134.136.73`                                                      |
+| `VPS_USER`                    | Utilisateur SSH                    | `deploy`                                                             |
+| `VPS_SSH_KEY`                 | Cle privee SSH                     | (contenu de `~/.ssh/id_ed25519`)                                     |
 
 ### 2.4 Configurer les variables (environment `production`)
 
 Dans **Settings → Environments → production → Environment variables**, ajoutez :
 
-| Variable | Valeur |
-|---|---|
-| `DOMAIN` | `microflex-m.com` |
-| `MINIO_PUBLIC_ENDPOINT` | `https://microflex-m.com/storage` |
-| `SMTP_PORT` | `587` |
-| `SMTP_FROM_EMAIL` | `noreply@microflex-m.com` |
-| `SMTP_FROM_NAME` | `MICROFLEX-M` |
-| `SMTP_SECURE` | `false` |
-| `MTN_SMS_SENDER_ID` | `MICROFLEX` |
-| `MTN_SMS_TOKEN_URL` | (URL token MTN) |
-| `MTN_SMS_BASE_URL` | (URL base MTN) |
-| `PAWAPAY_ENVIRONMENT` | `production` |
-| `PAWAPAY_CALLBACK_URL` | `https://microflex-m.com/api/webhooks/pawapay` |
-| `PAWAPAY_STATEMENT_PREFIX` | `MicroFlex` |
-| `WEBHOOK_IP_VALIDATION` | `true` |
-| `GL_POSTING_MODE` | `STRICT` |
-| `BALANCE_RECONCILIATION_INTERVAL_MINUTES` | `60` |
-| `ENABLE_BALANCE_AUTO_CORRECTION` | `false` |
-| `LOG_LEVEL` | `info` |
-| `APP_REPLICAS` | `3` |
-| `GRAFANA_ADMIN_USER` | `admin` |
+| Variable                                  | Valeur                                         |
+| ----------------------------------------- | ---------------------------------------------- |
+| `DOMAIN`                                  | `microflex.bvsandbox.dev`                      |
+| `MINIO_PUBLIC_ENDPOINT`                   | `https://microflex.bvsandbox.dev/storage`      |
+| `SMTP_PORT`                               | `587`                                          |
+| `SMTP_FROM_EMAIL`                         | `noreply@microflex.com`                        |
+| `SMTP_FROM_NAME`                          | `MICROFLEX`                                    |
+| `SMTP_SECURE`                             | `false`                                        |
+| `MTN_SMS_SENDER_ID`                       | `MICROFLEX`                                    |
+| `MTN_SMS_TOKEN_URL`                       | (URL token MTN)                                |
+| `MTN_SMS_BASE_URL`                        | (URL base MTN)                                 |
+| `PAWAPAY_ENVIRONMENT`                     | `production`                                   |
+| `PAWAPAY_CALLBACK_URL`                    | `https://microflex.bvsandbox.dev/api/webhooks/pawapay` |
+| `PAWAPAY_STATEMENT_PREFIX`                | `MicroFlex`                                    |
+| `WEBHOOK_IP_VALIDATION`                   | `true`                                         |
+| `GL_POSTING_MODE`                         | `STRICT`                                       |
+| `BALANCE_RECONCILIATION_INTERVAL_MINUTES` | `60`                                           |
+| `ENABLE_BALANCE_AUTO_CORRECTION`          | `false`                                        |
+| `LOG_LEVEL`                               | `info`                                         |
+| `APP_REPLICAS`                            | `3`                                            |
+| `GRAFANA_ADMIN_USER`                      | `admin`                                        |
 
 ### 2.5 Configurer la cle SSH de deploiement
 
 La cle SSH doit permettre au runner GitHub Actions de se connecter au VPS en tant que `deploy`.
 
 **Option A** (recommande) : Generer une cle dediee sur votre machine locale :
+
 ```bash
 ssh-keygen -t ed25519 -C "github-actions-deploy" -f ~/.ssh/microflex-deploy
 # Copier la cle publique sur le VPS
@@ -292,6 +294,7 @@ rm -rf /tmp/microflex-setup
 ```
 
 > **Si le clone a deja ete supprime**, copiez les fichiers depuis votre machine locale :
+>
 > ```bash
 > scp docker-compose.vps.yml deploy@91.134.136.73:/opt/microflex/
 > scp -r scripts/vps/ deploy@91.134.136.73:/opt/microflex/scripts/
@@ -323,6 +326,7 @@ tree /opt/microflex/ -L 2
 ```
 
 Resultat attendu :
+
 ```
 /opt/microflex/
 ├── backups/
@@ -374,7 +378,7 @@ Le workflow `.github/workflows/release.yml` :
 2. Met a jour `APP_VERSION` dans `.env.runtime`
 3. Pull les images depuis GHCR
 4. **DB init** (one-shot) :
-   - Telecharge GeoNames (~1.6 GB, cache dans `/opt/microflex/data/geonames/`)
+   - Telecharge GeoNames (~15 MB : CG.txt geo operationnelle Congo + cities5000.txt referentiel villes de naissance ; cache dans `/opt/microflex/data/geonames/`)
    - Schema push (`drizzle-kit push --force`)
    - SQL functions/triggers/views (`ensure-sql.ts`)
    - Seeds production (`seed-prod.ts`)
@@ -389,6 +393,7 @@ Le workflow `.github/workflows/release.yml` :
 Dans GitHub Actions → onglet "Actions" → workflow "Release & Deploy", suivez l'avancement.
 
 Le premier deploiement est plus long car :
+
 - Le DB init cree toutes les tables et seeds (~70 SQL objects, 143k villes GeoNames)
 - Les images Docker sont telechargees pour la premiere fois
 
@@ -406,6 +411,7 @@ docker compose -f /opt/microflex/docker-compose.vps.yml --env-file /opt/microfle
 ```
 
 Resultat attendu :
+
 ```
 NAME              IMAGE                                    STATUS                   PORTS
 microflex-app-1     ghcr.io/242darkman/microflex:v2.0.0       Up (healthy)             127.0.0.1:5001->5000/tcp
@@ -423,7 +429,7 @@ microflex-minio     minio/minio:...                         Up (healthy)        
 curl http://127.0.0.1:5001/api/health
 
 # Depuis l'exterieur (via Nginx + HTTPS)
-curl https://microflex-m.com/api/health
+curl https://microflex.bvsandbox.dev/api/health
 ```
 
 Reponse attendue : `{"status":"ok"}` (HTTP 200)
@@ -435,6 +441,7 @@ docker logs microflex-worker --tail 50
 ```
 
 Les crons doivent s'afficher (ils tournent UNIQUEMENT sur le worker, pas sur les 3 instances app) :
+
 ```
 [CRON] CoffreBalanceSnapshots: scheduled ...
 [CRON] TreasuryReconciliation: scheduled ...
@@ -508,10 +515,10 @@ bash /opt/microflex/scripts/vps/deploy.sh v2.1.0
 
 ### Convention de tags
 
-| Pattern | Environnement | Exemple |
-|---|---|---|
-| `vX.Y.Z` | Production | `v2.0.0`, `v2.1.0` |
-| `rc-vX.Y.Z` | Preprod | `rc-v2.1.0`, `rc-v3.0.0-beta.1` |
+| Pattern     | Environnement | Exemple                         |
+| ----------- | ------------- | ------------------------------- |
+| `vX.Y.Z`    | Production    | `v2.0.0`, `v2.1.0`              |
+| `rc-vX.Y.Z` | Preprod       | `rc-v2.1.0`, `rc-v3.0.0-beta.1` |
 
 - **MAJOR** (vX.0.0) : Breaking changes, migration majeure
 - **MINOR** (v0.X.0) : Nouvelles fonctionnalites
@@ -538,6 +545,7 @@ bash /opt/microflex/scripts/vps/rollback.sh v2.0.0
 ```
 
 Le rollback :
+
 1. Pull les images de l'ancien tag
 2. Redemarre les containers
 3. Verifie la sante (20 tentatives)
@@ -661,6 +669,7 @@ docker compose -f /opt/microflex/docker-compose.vps.yml --env-file /opt/microfle
 **Cause** : UFW bloque le port 5432 pour les containers Docker.
 
 **Solution** :
+
 ```bash
 # Verifier les regles UFW
 sudo ufw status numbered
@@ -679,9 +688,11 @@ sudo ufw allow from 172.16.0.0/12 to any port 5432 proto tcp comment 'PostgreSQL
 **Cause** : Le `REDIS_PASSWORD` contient des caracteres speciaux (`/`, `+`, `=`, `@`).
 
 **Solution** : Generer un nouveau mot de passe sans caracteres speciaux :
+
 ```bash
 openssl rand -base64 32 | tr -d '/+=' | head -c 32
 ```
+
 Mettre a jour le secret `REDIS_PASSWORD` dans GitHub Environments et redeployer.
 
 ### Erreur deploy : "container name already in use"
@@ -691,6 +702,7 @@ Mettre a jour le secret `REDIS_PASSWORD` dans GitHub Environments et redeployer.
 **Cause** : Un deploy precedent a echoue et le container init n'a pas ete nettoye.
 
 **Solution** : Le script `deploy.sh` gere ce cas automatiquement (`docker rm -f`). Si le probleme persiste :
+
 ```bash
 docker rm -f microflex-db-init
 ```
@@ -716,7 +728,7 @@ docker ps | grep microflex
 curl -v http://127.0.0.1:5001/api/health
 
 # 3. Test via Nginx
-curl -v https://microflex-m.com/api/health
+curl -v https://microflex.bvsandbox.dev/api/health
 
 # 4. Verifier Nginx
 sudo nginx -t
@@ -754,7 +766,7 @@ docker compose -f /opt/microflex/docker-compose.vps.yml --env-file /opt/microfle
 ```bash
 # Verifier le cache
 ls -lh /opt/microflex/data/geonames/
-# Devrait contenir allCountries.txt (~1.6 GB) et cities5000.txt
+# Devrait contenir CG.txt (geo operationnelle Congo) et cities5000.txt (villes de naissance)
 
 # Si vide, supprimer le cache et redeployer
 rm -rf /opt/microflex/data/geonames/*
@@ -793,14 +805,14 @@ bash /opt/microflex/scripts/vps/backup-db.sh
 
 ### Ports (tous sur localhost sauf 80/443)
 
-| Port | Service | Acces |
-|---|---|---|
-| 80/443 | Nginx | Public |
-| 5001-5003 | app x3 | Localhost (Nginx upstream) |
-| 5432 | PostgreSQL | Localhost + Docker subnet |
-| 6379 | Redis | Docker network uniquement |
-| 9000 | MinIO API | Docker network uniquement |
-| 9001 | MinIO Console | Localhost (SSH tunnel) |
+| Port      | Service       | Acces                      |
+| --------- | ------------- | -------------------------- |
+| 80/443    | Nginx         | Public                     |
+| 5001-5003 | app x3        | Localhost (Nginx upstream) |
+| 5432      | PostgreSQL    | Localhost + Docker subnet  |
+| 6379      | Redis         | Docker network uniquement  |
+| 9000      | MinIO API     | Docker network uniquement  |
+| 9001      | MinIO Console | Localhost (SSH tunnel)     |
 
 ### Fichiers importants sur le VPS
 
@@ -814,7 +826,7 @@ bash /opt/microflex/scripts/vps/backup-db.sh
 ├── scripts/vps/backup-db.sh     # Script de backup PostgreSQL
 ├── logs/deploy.log              # Historique des deploiements
 ├── backups/                     # Backups PostgreSQL quotidiens
-└── data/geonames/               # Cache GeoNames (~1.6 GB)
+└── data/geonames/               # Cache GeoNames (~15 MB : CG.txt + cities5000.txt)
 ```
 
 ### Variables d'environnement
@@ -822,15 +834,17 @@ bash /opt/microflex/scripts/vps/backup-db.sh
 Voir `.env.vps.example` pour la liste complete avec descriptions.
 
 Classification :
-- **Secrets** (GitHub Environment Secrets) : DATABASE_URL, REDIS_PASSWORD, SESSION_SECRET, OTP_HMAC_SECRET, MINIO_*, SMTP_PASSWORD, VPS_SSH_KEY, etc.
+
+- **Secrets** (GitHub Environment Secrets) : DATABASE*URL, REDIS_PASSWORD, SESSION_SECRET, OTP_HMAC_SECRET, MINIO*\*, SMTP_PASSWORD, VPS_SSH_KEY, etc.
 - **Variables** (GitHub Environment Variables) : DOMAIN, GL_POSTING_MODE, LOG_LEVEL, APP_REPLICAS, SMTP_PORT, etc.
 
 ### Matrice CI/CD
 
-| Tag | Environment | Images GHCR | Deploy |
-|---|---|---|---|
-| `v*` | production | `vX.Y.Z` + `latest` + `sha-xxx` | VPS via SSH |
-| `rc-*` | preprod | `rc-vX.Y.Z` + `sha-xxx` | VPS via SSH |
+| Tag    | Environment | Images GHCR                     | Deploy      |
+| ------ | ----------- | ------------------------------- | ----------- |
+| `v*`   | production  | `vX.Y.Z` + `latest` + `sha-xxx` | VPS via SSH |
+| `rc-*` | preprod     | `rc-vX.Y.Z` + `sha-xxx`         | VPS via SSH |
+
 ---
 
 ## Livraison enterprise

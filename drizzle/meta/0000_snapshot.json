@@ -42614,7 +42614,7 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false,
-          "default": "'COFIN&CO-M'"
+          "default": "'MicroFlex'"
         },
         "agence_code": {
           "name": "agence_code",
@@ -54693,7 +54693,7 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "default": "'COFIN&CO-M'"
+          "default": "'MicroFlex'"
         },
         "api_key": {
           "name": "api_key",

@@ -80,7 +80,7 @@ function LocationMarker({ onLocationUpdate, onAddressFound }: {
         { 
           headers: { 
             'Accept-Language': 'fr',
-            'User-Agent': 'MicroFlex-Microfinance/1.0'
+            'User-Agent': 'MicroFlexicrofinance/1.0'
           } 
         }
       );

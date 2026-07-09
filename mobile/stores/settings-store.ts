@@ -24,7 +24,7 @@ interface SettingsState extends AppSettings {
 }
 
 const DEFAULT_BRANDING: BrandingSettings = {
-  appName: 'COFIN&CO',
+  appName: 'MicroFlex',
   primaryColor: '#047857',
   logoUrl: null,
   theme: 'DARK',

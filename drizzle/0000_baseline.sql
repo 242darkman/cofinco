@@ -4569,7 +4569,7 @@ CREATE TABLE "system_alerts" (
 --> statement-breakpoint
 CREATE TABLE "system_settings" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"app_name" text DEFAULT 'COFIN&CO-M',
+	"app_name" text DEFAULT 'MicroFlex',
 	"agence_code" text,
 	"devise" text DEFAULT 'XAF',
 	"pays" text DEFAULT 'République du Congo',
@@ -5763,7 +5763,7 @@ CREATE TABLE "email_provider_settings" (
 	"username" text,
 	"password" text,
 	"from_email" text NOT NULL,
-	"from_name" text DEFAULT 'COFIN&CO-M' NOT NULL,
+	"from_name" text DEFAULT 'MicroFlex' NOT NULL,
 	"api_key" text,
 	"is_active" boolean DEFAULT false NOT NULL,
 	"is_primary" boolean DEFAULT false NOT NULL,

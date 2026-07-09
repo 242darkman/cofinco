@@ -357,6 +357,8 @@ app.get("/api/health", async (_req, res) => {
       } else {
         logger.warn({ provider: 'SMTP' }, message);
       }
+    }).catch((error) => {
+      logger.warn({ err: error, provider: 'SMTP' }, 'SMTP verification skipped after startup error');
     });
 
     // Start the caisse session cleanup cron job (closes expired sessions, monitors risky ones)

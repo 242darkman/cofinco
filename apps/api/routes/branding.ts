@@ -7,8 +7,18 @@ import { db } from "../db";
 import { systemSettings, uiCustomization } from "@shared/schema/settings";
 import { eq } from "drizzle-orm";
 import { getWsInstance } from "../ws-server";
+import { defaultTenantConfig } from "@shared/tenant-config";
 
 const logger = createLogger("Routes:Branding");
+const defaultLogoUrl = defaultTenantConfig.theme.logoUrl;
+
+function resolveLogoUrl(logoUrl: string | null | undefined) {
+  if (!logoUrl || logoUrl.includes("microflex-logo")) {
+    return defaultLogoUrl;
+  }
+
+  return logoUrl;
+}
 
 export function registerBrandingRoutes(app: Express) {
   /**
@@ -192,7 +202,7 @@ export function registerBrandingRoutes(app: Express) {
       res.setHeader("Cache-Control", "public, max-age=60");
       res.json({
         appName: settings?.appName || "MicroFlex",
-        logoUrl: settings?.logoUrl || null,
+        logoUrl: resolveLogoUrl(settings?.logoUrl),
         primaryColor: ui?.primaryColor || "#0f766e",
         accentColor: ui?.accentColor || "#c2410c",
         theme: ui?.theme || "DARK",
@@ -212,7 +222,7 @@ export function registerBrandingRoutes(app: Express) {
       // Return defaults on error
       res.json({
         appName: "MicroFlex",
-        logoUrl: null,
+        logoUrl: defaultLogoUrl,
         primaryColor: "#0f766e",
         accentColor: "#c2410c",
         theme: "DARK",
@@ -283,7 +293,7 @@ export function registerBrandingRoutes(app: Express) {
           const [ui] = await db.select().from(uiCustomization);
           const payload = {
             appName: settings?.appName || "MicroFlex",
-            logoUrl: settings?.logoUrl || null,
+            logoUrl: resolveLogoUrl(settings?.logoUrl),
             primaryColor: ui?.primaryColor || "#0f766e",
             accentColor: ui?.accentColor || "#c2410c",
             theme: ui?.theme || "DARK",
