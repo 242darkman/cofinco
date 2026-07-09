@@ -1,6 +1,8 @@
 {
   "name": "@microflex/shared",
   "version": "1.0.0",
+  "description": "Paquet partagé pour MicroFlex",
+  "author": "BV Corp",
   "private": true,
   "type": "module",
   "exports": {
