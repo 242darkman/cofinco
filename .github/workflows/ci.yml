@@ -31,6 +31,9 @@ jobs:
         with:
           fetch-depth: 0
       - uses: gitleaks/gitleaks-action@v2
+        env:
+          # gitleaks-action@v2 exige GITHUB_TOKEN pour scanner les pull requests
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ==========================================
   # Lint + Type Check + Unit Tests (no DB)
