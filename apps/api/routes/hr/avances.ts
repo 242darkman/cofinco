@@ -19,7 +19,7 @@ import { attachAbility, requireAbility } from "../../authorization";
 import { Actions, Subjects } from "@shared/ability";
 import { postRunEngagement, postRunPayment, reverseRunGL, postAdvancePaymentGL } from "../../services/hr-accounting-service";
 import { users } from "@shared/schema";
-import { broadcastHrUpdate, broadcastHrEvent } from "./shared";
+import { logger, broadcastHrUpdate, broadcastHrEvent } from "./shared";
 
 export const avancesRouter = Router();
 

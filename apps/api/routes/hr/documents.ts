@@ -26,7 +26,7 @@ import { dispatchDomainEvent } from "../../services/notifications/domain-events/
 import { enqueueNotification, sendInAppNotification } from "../../services/notifications/notification-service";
 import { StorageService } from "../../services/storage-service";
 import * as hrStorage from "../../storage/hr";
-import { broadcastHrEvent } from "./shared";
+import { logger, broadcastHrEvent } from "./shared";
 
 export const documentsRouter = Router();
 

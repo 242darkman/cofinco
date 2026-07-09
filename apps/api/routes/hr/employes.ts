@@ -25,7 +25,7 @@ import { getWsInstance } from "../../ws-server";
 import { z } from "zod";
 import { importEmployees, parseCsv } from "../../services/hr-import-service";
 import { StorageService } from "../../services/storage-service";
-import { csvUpload, docUpload, broadcastHrUpdate, successResponse, errorResponse } from "./shared";
+import { logger, csvUpload, docUpload, broadcastHrUpdate, successResponse, errorResponse } from "./shared";
 
 export const employesRouter = Router();
 

@@ -23,7 +23,7 @@ import { hrService } from "../../services/hr-service";
 import { users } from "@shared/schema";
 import * as hrStorage from "../../storage/hr";
 import { normalizePhone } from "@shared/utils/phone";
-import { broadcastHrUpdate, successResponse, errorResponse } from "./shared";
+import { logger, broadcastHrUpdate, successResponse, errorResponse } from "./shared";
 
 export const paiePaiementsRouter = Router();
 
@@ -76,7 +76,7 @@ paiePaiementsRouter.patch("/paie/pay", getAuthUser, attachAbility, requireAbilit
     }
 
     // Create salary payment jobs via the service
-    const { createPaymentJobs, processQueuedJob, getJobsByRunId } = await import("../services/salary-payment-service");
+    const { createPaymentJobs, processQueuedJob, getJobsByRunId } = await import("../../services/salary-payment-service");
 
     const jobsResult = await createPaymentJobs({
       runId,
@@ -217,7 +217,7 @@ paiePaiementsRouter.patch("/paie/confirm-payment", getAuthUser, attachAbility, r
     }
 
     const userId = req.user?.id || "system";
-    const { confirmManualPayment } = await import("../services/salary-payment-service");
+    const { confirmManualPayment } = await import("../../services/salary-payment-service");
     const result = await confirmManualPayment(jobIds, userId, reference);
 
     res.json(successResponse(result));
@@ -239,7 +239,7 @@ paiePaiementsRouter.patch("/paie/retry-payment", getAuthUser, attachAbility, req
     }
 
     const userId = req.user?.id || "system";
-    const { retryJobs } = await import("../services/salary-payment-service");
+    const { retryJobs } = await import("../../services/salary-payment-service");
     const result = await retryJobs(jobIds, userId);
 
     res.json(successResponse(result));
@@ -261,7 +261,7 @@ paiePaiementsRouter.patch("/paie/cancel-payment", getAuthUser, attachAbility, re
     }
 
     const userId = req.user?.id || "system";
-    const { cancelJobs } = await import("../services/salary-payment-service");
+    const { cancelJobs } = await import("../../services/salary-payment-service");
     const result = await cancelJobs(jobIds, userId);
 
     res.json(successResponse(result));
@@ -282,7 +282,7 @@ paiePaiementsRouter.get("/paie/payment-jobs/:runId", getAuthUser, attachAbility,
       return res.status(400).json(errorResponse('VALIDATION_ERROR', 'runId invalide'));
     }
 
-    const { getJobsByRunId } = await import("../services/salary-payment-service");
+    const { getJobsByRunId } = await import("../../services/salary-payment-service");
     const jobs = await getJobsByRunId(runId);
 
     res.json(successResponse({ jobs }));

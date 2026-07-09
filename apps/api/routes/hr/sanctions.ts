@@ -19,7 +19,7 @@ import { Actions, Subjects } from "@shared/ability";
 import { sanctionEscalationService } from "../../services/sanction-escalation-service";
 import { getWsInstance } from "../../ws-server";
 import { dispatchDomainEvent } from "../../services/notifications/domain-events/event-registry";
-import { SANCTION_WORKFLOW_TRANSITIONS } from "./shared";
+import { logger, SANCTION_WORKFLOW_TRANSITIONS } from "./shared";
 
 export const sanctionsRouter = Router();
 

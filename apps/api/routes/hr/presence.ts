@@ -27,6 +27,8 @@ import { users } from "@shared/schema";
 import { getWsInstance } from "../../ws-server";
 import * as hrStorage from "../../storage/hr";
 
+import { logger } from "./shared";
+
 export const presenceRouter = Router();
 
 /**

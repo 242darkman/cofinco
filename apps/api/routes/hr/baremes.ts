@@ -17,6 +17,8 @@ import { Actions, Subjects } from "@shared/ability";
 import { users } from "@shared/schema";
 import { getWsInstance } from "../../ws-server";
 
+import { logger } from "./shared";
+
 export const baremesRouter = Router();
 
 /**

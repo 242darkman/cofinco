@@ -22,6 +22,8 @@ import { Actions, Subjects } from "@shared/ability";
 import { onboardingService } from "../../services/onboarding-service";
 import { getWsInstance } from "../../ws-server";
 
+import { logger } from "./shared";
+
 export const onboardingRouter = Router();
 
 /**

@@ -25,6 +25,8 @@ import { getWsInstance } from "../../ws-server";
 import * as hrStorage from "../../storage/hr";
 import { scoreCandidature, scoreAllCandidatures } from "../../services/candidature-scoring-service";
 
+import { logger } from "./shared";
+
 export const jobOffersRouter = Router();
 
 // =============================================================================

@@ -21,7 +21,7 @@ import { getWsInstance } from "../../ws-server";
 import { StorageService } from "../../services/storage-service";
 import { scoreCandidature, scoreAllCandidatures } from "../../services/candidature-scoring-service";
 import { normalizePhone } from "@shared/utils/phone";
-import { docUpload } from "./shared";
+import { logger, docUpload } from "./shared";
 
 export const candidaturesRouter = Router();
 

@@ -21,7 +21,7 @@ import { attachAbility, requireAbility } from "../../authorization";
 import { Actions, Subjects } from "@shared/ability";
 import { storage } from "../../storage";
 import * as hrStorage from "../../storage/hr";
-import { bankStatementUpload } from "./shared";
+import { logger, bankStatementUpload } from "./shared";
 
 export const paieReconciliationRouter = Router();
 

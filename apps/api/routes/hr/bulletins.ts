@@ -20,7 +20,7 @@ import { attachAbility, requireAbility } from "../../authorization";
 import { Actions, Subjects } from "@shared/ability";
 import { users } from "@shared/schema";
 import { getWsInstance } from "../../ws-server";
-import { computeAnciennete } from "./shared";
+import { logger, computeAnciennete } from "./shared";
 
 export const bulletinsRouter = Router();
 

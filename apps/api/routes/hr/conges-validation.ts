@@ -18,7 +18,7 @@ import { Actions, Subjects } from "@shared/ability";
 import { storage } from "../../storage";
 import { hrService } from "../../services/hr-service";
 import { dispatchDomainEvent } from "../../services/notifications/domain-events/event-registry";
-import { broadcastHrUpdate, successResponse, errorResponse } from "./shared";
+import { logger, broadcastHrUpdate, successResponse, errorResponse } from "./shared";
 
 export const congesValidationRouter = Router();
 

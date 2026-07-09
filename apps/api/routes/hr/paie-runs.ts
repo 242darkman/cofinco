@@ -25,7 +25,7 @@ import { Actions, Subjects } from "@shared/ability";
 import { storage } from "../../storage";
 import { getTransferPreview, generateTransferFile, generateTransferXlsx, createPaymentBatches } from "../../services/payroll-transfer-service";
 import * as hrStorage from "../../storage/hr";
-import { broadcastHrUpdate, successResponse, errorResponse } from "./shared";
+import { logger, broadcastHrUpdate, successResponse, errorResponse } from "./shared";
 
 export const paieRunsRouter = Router();
 

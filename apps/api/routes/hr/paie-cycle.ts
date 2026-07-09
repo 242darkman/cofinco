@@ -20,7 +20,7 @@ import { postRunEngagement, postRunPayment, reverseRunGL, postAdvancePaymentGL }
 import { generatePayrollRun } from "../../services/payroll-engine";
 import { users } from "@shared/schema";
 import { normalizePhone } from "@shared/utils/phone";
-import { broadcastHrUpdate, successResponse, errorResponse, generatePdfsAndSendEmails } from "./shared";
+import { logger, broadcastHrUpdate, successResponse, errorResponse, generatePdfsAndSendEmails } from "./shared";
 
 export const paieCycleRouter = Router();
 
@@ -228,7 +228,7 @@ paieCycleRouter.post("/paie/schedule", getAuthUser, attachAbility, requireAbilit
         )
       );
 
-    const { createPaymentJobs } = await import("../services/salary-payment-service");
+    const { createPaymentJobs } = await import("../../services/salary-payment-service");
 
     const jobsResult = await createPaymentJobs({
       runId,

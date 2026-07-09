@@ -18,7 +18,7 @@ import { attachAbility, requireAbility } from "../../authorization";
 import { Actions, Subjects } from "@shared/ability";
 import { storage } from "../../storage";
 import * as hrStorage from "../../storage/hr";
-import { successResponse, errorResponse } from "./shared";
+import { logger, successResponse, errorResponse } from "./shared";
 
 export const rapportsRouter = Router();
 

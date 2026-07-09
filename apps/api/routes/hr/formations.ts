@@ -21,7 +21,7 @@ import { getAuthUser } from "../../middleware";
 import { attachAbility, requireAbility } from "../../authorization";
 import { Actions, Subjects } from "@shared/ability";
 import { getWsInstance } from "../../ws-server";
-import { broadcastHrEvent, successResponse, errorResponse } from "./shared";
+import { logger, broadcastHrEvent, successResponse, errorResponse } from "./shared";
 
 export const formationsRouter = Router();
 

@@ -18,7 +18,7 @@ import { storage } from "../../storage";
 import { hrService } from "../../services/hr-service";
 import { users } from "@shared/schema";
 import { dispatchDomainEvent } from "../../services/notifications/domain-events/event-registry";
-import { broadcastHrUpdate, successResponse, errorResponse } from "./shared";
+import { logger, broadcastHrUpdate, successResponse, errorResponse } from "./shared";
 
 export const congesRouter = Router();
 

@@ -26,6 +26,8 @@ import { getWsInstance } from "../../ws-server";
 import { generateCampaignEvaluations, computeEvaluationScore, finalizeEvaluation } from "../../services/evaluation-service";
 import * as hrStorage from "../../storage/hr";
 
+import { logger } from "./shared";
+
 export const evaluationsRouter = Router();
 
 // =============================================================================

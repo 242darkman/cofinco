@@ -22,7 +22,7 @@ import { Actions, Subjects } from "@shared/ability";
 import { sanctionEscalationService } from "../../services/sanction-escalation-service";
 import { getWsInstance } from "../../ws-server";
 import { StorageService } from "../../services/storage-service";
-import { docUpload } from "./shared";
+import { logger, docUpload } from "./shared";
 
 export const sanctionsWorkflowRouter = Router();
 

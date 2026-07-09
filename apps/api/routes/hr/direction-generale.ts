@@ -16,6 +16,8 @@ import { hrService } from "../../services/hr-service";
 import { z } from "zod";
 import * as hrStorage from "../../storage/hr";
 
+import { logger } from "./shared";
+
 export const directionGeneraleRouter = Router();
 
 /**

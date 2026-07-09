@@ -21,6 +21,8 @@ import { Actions, Subjects } from "@shared/ability";
 import { storage } from "../../storage";
 import { getWsInstance } from "../../ws-server";
 
+import { logger } from "./shared";
+
 export const avantagesRouter = Router();
 
 /**

@@ -17,7 +17,7 @@ import { getAuthUser } from "../../middleware";
 import { attachAbility, requireAbility } from "../../authorization";
 import { Actions, Subjects } from "@shared/ability";
 import { getWsInstance } from "../../ws-server";
-import { broadcastHrUpdate } from "./shared";
+import { logger, broadcastHrUpdate } from "./shared";
 
 export const formationsSuiviRouter = Router();
 

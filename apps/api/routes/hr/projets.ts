@@ -25,6 +25,8 @@ import { attachAbility, requireAbility } from "../../authorization";
 import { Actions, Subjects } from "@shared/ability";
 import * as hrStorage from "../../storage/hr";
 
+import { logger } from "./shared";
+
 export const projetsRouter = Router();
 
 /**

@@ -2,6 +2,7 @@
  * Utilitaires partagés des routes RH : uploads multer, diffusion WebSocket,
  * réponses normalisées, calcul d'ancienneté et génération des bulletins PDF.
  */
+import { createLogger } from "../../lib/logger";
 import { Router, type Request, type Response } from "express";
 import { db } from "../../db";
 import { bulletinsPaie, presences, employes, leaveBalances, jobPositions, payslipLines, conventionsCollectives, qualificationCoefficients } from "@shared/schema";
@@ -15,6 +16,9 @@ import { getWsInstance } from "../../ws-server";
 import { enqueueNotification, sendInAppNotification } from "../../services/notifications/notification-service";
 import multer from "multer";
 import { StorageService } from "../../services/storage-service";
+/** Logger commun aux routes RH. */
+export const logger = createLogger("Routes:HR");
+
 export const csvUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max

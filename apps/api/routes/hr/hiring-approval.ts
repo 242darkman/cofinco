@@ -17,6 +17,8 @@ import { Actions, Subjects } from "@shared/ability";
 import { hiringApprovalService } from "../../services/hiring-approval-service";
 import { getWsInstance } from "../../ws-server";
 
+import { logger } from "./shared";
+
 export const hiringApprovalRouter = Router();
 
 /**
