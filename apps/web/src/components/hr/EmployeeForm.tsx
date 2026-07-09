@@ -7,7 +7,7 @@ import { toast } from '../../lib/toast';
 import { useEntityUpload } from '../../hooks/useEntityUpload';
 import { StatutUser } from '@shared/enum/status-constants';
 import { normalizePhone } from '@shared/utils/phone';
-import { agenceApi, paysApi, localityApi, villeApi } from '../../lib/api-client';
+import { agenceApi, paysApi, villeApi } from '../../lib/api-client';
 import StepIdentite from './employee-wizard/StepIdentite';
 import StepDocuments from './employee-wizard/StepDocuments';
 import StepContrat from './employee-wizard/StepContrat';
@@ -78,13 +78,6 @@ interface PaysOption {
   iso2: string | null;
 }
 
-interface LocalityOption {
-  id: string;
-  type: 'CITY' | 'DISTRICT';
-  name: string;
-  regionName?: string | null;
-}
-
 interface EmployeeFormProps {
   isOpen: boolean;
   onClose: () => void;
@@ -143,9 +136,6 @@ export default function EmployeeForm({
 
   // Geography data
   const [paysList, setPaysList] = useState<PaysOption[]>([]);
-  const [localitiesList, setLocalitiesList] = useState<LocalityOption[]>([]);
-  const [localitiesLoading, setLocalitiesLoading] = useState(false);
-  const localitiesCacheRef = useRef<Record<string, LocalityOption[]>>({});
 
   // Ville (address city) search
   const [villesList, setVillesList] = useState<Array<{ id: string; nom: string; regionNom: string | null }>>([]);
@@ -221,24 +211,6 @@ export default function EmployeeForm({
   // --- Update field ---
   const updateField = useCallback((field: string, value: string | null) => {
     setFormData(prev => ({ ...prev, [field]: value ?? '' }));
-  }, []);
-
-  // --- Fetch localities ---
-  const fetchLocalitiesByPays = useCallback(async (paysId: string) => {
-    if (localitiesCacheRef.current[paysId]) {
-      setLocalitiesList(localitiesCacheRef.current[paysId]);
-      return;
-    }
-    setLocalitiesLoading(true);
-    try {
-      const data = await localityApi.getAll({ paysId, limit: 500 });
-      localitiesCacheRef.current[paysId] = data;
-      setLocalitiesList(data);
-    } catch {
-      setLocalitiesList([]);
-    } finally {
-      setLocalitiesLoading(false);
-    }
   }, []);
 
   // --- Fetch villes for address city ---
@@ -557,14 +529,6 @@ export default function EmployeeForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedJobPositionId, jobPositions]);
 
-  // Load localities for editing employee's paysNaissanceId
-  useEffect(() => {
-    if (isOpen && editingEmploye && initialData.paysNaissanceId) {
-      fetchLocalitiesByPays(initialData.paysNaissanceId);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, editingEmploye?.id]);
-
   // Load unlinked users (creation mode only)
   useEffect(() => {
     if (editingEmploye) return;
@@ -729,9 +693,6 @@ export default function EmployeeForm({
             handlePhotoUpload={handlePhotoUpload}
             isUploading={isUploading}
             paysList={paysList}
-            localitiesList={localitiesList}
-            localitiesLoading={localitiesLoading}
-            fetchLocalitiesByPays={fetchLocalitiesByPays}
             villesList={villesList}
             villesLoading={villesLoading}
             onVilleSearch={handleVilleSearch}

@@ -2067,6 +2067,26 @@ export const localityApi = {
   },
 };
 
+// Référentiel MONDIAL de villes (lieu de naissance des employés), filtré par pays.
+// Distinct de villeApi (villes opérationnelles Congo).
+export interface ReferenceCityOption {
+  id: string;
+  nom: string;
+  nomAscii: string | null;
+  admin1Code: string | null;
+  population: number | null;
+  latitude: string | null;
+  longitude: string | null;
+  paysId: string | null;
+}
+
+export const referenceCityApi = {
+  search: (params: { paysId: string; search?: string; limit?: number }) => {
+    const q = buildQuery(params as Record<string, unknown>);
+    return request<ReferenceCityOption[]>(`/reference-cities${q ? `?${q}` : ''}`);
+  },
+};
+
 // Prospection Primes API
 export const prospectionPrimeApi = {
   getAll: (params?: { page?: number; perPage?: number; agentId?: string; statut?: string; periode?: string; agenceId?: string }) =>

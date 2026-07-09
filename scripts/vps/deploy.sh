@@ -114,7 +114,7 @@ docker run --rm \
   -e "DATABASE_URL=$DB_URL_LOCAL" \
   -v "$APP_DIR/data/geonames:/geonames_cache" \
   "$INIT_IMAGE" \
-  "cp /geonames_cache/*.txt /app/seeds/ 2>/dev/null || true; sh scripts/download-geonames.sh; cp /app/seeds/allCountries.txt /app/seeds/cities5000.txt /geonames_cache/ 2>/dev/null || true; npx drizzle-kit push --force && node --import tsx scripts/ensure-sql.ts && node --import tsx seeds/seed-prod.ts" \
+  "cp /geonames_cache/*.txt /app/seeds/ 2>/dev/null || true; sh scripts/download-geonames.sh; cp /app/seeds/CG.txt /app/seeds/cities5000.txt /geonames_cache/ 2>/dev/null || true; npx drizzle-kit push --force && node --import tsx scripts/ensure-sql.ts && node --import tsx seeds/seed-prod.ts" \
   2>&1 | while read -r line; do log "  [db-init] $line"; done
 
 INIT_EXIT=$?

@@ -27,6 +27,7 @@ infra/certs/*.key
 # GeoNames data files (download on demand from https://download.geonames.org/export/dump/)
 seeds/allCountries.txt
 seeds/cities5000.txt
+seeds/CG.txt
 
 # Test artifacts
 playwright-report

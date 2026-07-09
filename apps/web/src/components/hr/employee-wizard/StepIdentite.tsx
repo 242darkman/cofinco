@@ -3,6 +3,7 @@ import { User, Upload, Link, Building2, AlertTriangle, Globe, MapPin, Heart } fr
 import FormField from '../../ui/FormField';
 import SelectField from '../../ui/SelectField';
 import SearchableSelect from '../../ui/SearchableSelect';
+import BirthPlaceField, { type BirthPlaceValue } from './BirthPlaceField';
 import { resolveStorageUrl, formatPhoneInput, stripPhoneFormat } from '@/lib/format';
 
 const SITUATION_FAMILIALE_OPTIONS = [
@@ -43,9 +44,6 @@ interface StepIdentiteProps {
   isUploading: boolean;
   // Geography reference data
   paysList: Array<{ id: string; nomFr: string; nomEn: string; iso2: string | null }>;
-  localitiesList: Array<{ id: string; type: 'CITY' | 'DISTRICT'; name: string; regionName?: string | null }>;
-  localitiesLoading: boolean;
-  fetchLocalitiesByPays: (paysId: string) => void;
   // Ville (address city) search
   villesList: Array<{ id: string; nom: string; regionNom: string | null }>;
   villesLoading: boolean;
@@ -70,9 +68,6 @@ export default function StepIdentite({
   handlePhotoUpload,
   isUploading,
   paysList,
-  localitiesList,
-  localitiesLoading,
-  fetchLocalitiesByPays,
   villesList,
   villesLoading,
   onVilleSearch,
@@ -86,13 +81,6 @@ export default function StepIdentite({
     value: p.id,
     label: p.nomFr || p.nomEn,
     emoji: p.iso2 ? String.fromCodePoint(...[...p.iso2.toUpperCase()].map(c => c.charCodeAt(0) + 127397)) : undefined,
-  }));
-
-  // Prepare localities options
-  const lieuNaissanceOptions = localitiesList.map(loc => ({
-    value: loc.id,
-    label: loc.name,
-    subLabel: [loc.type === 'DISTRICT' ? 'District' : null, loc.regionName].filter(Boolean).join(' · ') || undefined,
   }));
 
   // Prepare ville options for address city
@@ -111,36 +99,17 @@ export default function StepIdentite({
     image: u.photoProfile || undefined,
   }));
 
-  // Handle pays de naissance change
+  // Handle pays de naissance change — le lieu de naissance est réinitialisé et
+  // rechargé par BirthPlaceField (qui réagit au pays via son hook interne).
   const handlePaysNaissanceChange = (value: string | number) => {
     const paysId = String(value);
     updateField('paysNaissanceId', paysId);
-    // Clear lieu de naissance when pays changes
     updateField('lieuNaissanceLocalityId', null);
     updateField('lieuNaissanceLocalityType', null);
     updateField('lieuNaissance', null);
-    // Fetch localities for new pays
-    if (paysId) {
-      fetchLocalitiesByPays(paysId);
-      // Auto-set nationalité if empty
-      if (!formData.nationaliteId) {
-        updateField('nationaliteId', paysId);
-      }
-    }
-  };
-
-  // Handle lieu de naissance change
-  const handleLieuNaissanceChange = (value: string | number) => {
-    const localityId = String(value);
-    const locality = localitiesList.find(l => l.id === localityId);
-    if (locality) {
-      updateField('lieuNaissanceLocalityId', localityId);
-      updateField('lieuNaissanceLocalityType', locality.type);
-      updateField('lieuNaissance', locality.name);
-    } else {
-      updateField('lieuNaissanceLocalityId', null);
-      updateField('lieuNaissanceLocalityType', null);
-      updateField('lieuNaissance', null);
+    // Auto-renseigne la nationalité si vide
+    if (paysId && !formData.nationaliteId) {
+      updateField('nationaliteId', paysId);
     }
   };
 
@@ -417,21 +386,16 @@ export default function StepIdentite({
             error={validationErrors.paysNaissanceId}
             showAvatarInTrigger={false}
           />
-          <SearchableSelect
-            label="Lieu de naissance"
-            name="lieuNaissanceLocalityId"
-            options={lieuNaissanceOptions}
-            value={formData.lieuNaissanceLocalityId || ''}
-            onChange={handleLieuNaissanceChange}
-            placeholder={
-              !formData.paysNaissanceId
-                ? 'Sélectionnez d\'abord un pays'
-                : 'Rechercher une ville...'
-            }
-            disabled={!formData.paysNaissanceId}
-            isLoading={localitiesLoading}
+          <BirthPlaceField
+            paysId={formData.paysNaissanceId || null}
+            localityId={formData.lieuNaissanceLocalityId || null}
+            lieuNaissance={formData.lieuNaissance || ''}
+            onChange={(v: BirthPlaceValue) => {
+              updateField('lieuNaissanceLocalityId', v.lieuNaissanceLocalityId);
+              updateField('lieuNaissanceLocalityType', v.lieuNaissanceLocalityType);
+              updateField('lieuNaissance', v.lieuNaissance);
+            }}
             error={validationErrors.lieuNaissanceLocalityId}
-            showAvatarInTrigger={false}
           />
         </div>
 

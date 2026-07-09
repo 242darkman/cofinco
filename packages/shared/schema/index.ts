@@ -1,6 +1,7 @@
 // Export all modules
 export * from "./pays";
 export * from "./geography";
+export * from "./villes-reference";
 export * from "./auth";
 export * from "./departments";
 export * from "./catalog";

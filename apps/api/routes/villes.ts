@@ -1,10 +1,10 @@
 import type { Express } from "express";
 import { createLogger } from "../lib/logger";
-import { departements, villes, pays } from "@shared/schema";
+import { departements, villes, pays, villesReference } from "@shared/schema";
 import { regions } from "@shared/schema/geography";
 import { requireAuth } from "../auth";
 import { db } from "../db";
-import { eq, and, ilike, desc, sql } from "drizzle-orm";
+import { eq, and, or, ilike, desc, sql } from "drizzle-orm";
 
 const logger = createLogger("Villes");
 
@@ -338,6 +338,49 @@ export function registerVilleRoutes(app: Express) {
     } catch (error) {
       logger.error({ err: error }, "Error fetching ville");
       res.status(500).json({ message: "Erreur lors du chargement de la ville" });
+    }
+  });
+
+  // ===== VILLES DE RÉFÉRENCE (MONDE) =====
+
+  // GET /api/reference-cities - Autocomplétion du lieu de naissance (référentiel mondial).
+  // Filtre `paysId` requis + préfixe `search` (accent-tolérant via nomAscii). requireAuth
+  // seul, comme tout le référentiel géographique. Distinct des villes opérationnelles Congo.
+  app.get("/api/reference-cities", requireAuth, async (req, res) => {
+    try {
+      const { paysId, search, limit: limitQ } = req.query as Record<string, string>;
+      if (!paysId) {
+        return res.status(400).json({ message: "paysId requis" });
+      }
+      const conditions = [eq(villesReference.paysId, paysId)];
+      const term = search?.trim();
+      if (term && term.length >= 2) {
+        const searchCond = or(
+          ilike(villesReference.nomAscii, `${term}%`),
+          ilike(villesReference.nom, `${term}%`),
+        );
+        if (searchCond) conditions.push(searchCond);
+      }
+      const maxRows = limitQ ? Math.min(parseInt(limitQ, 10) || 30, 50) : 30;
+      const rows = await db
+        .select({
+          id: villesReference.id,
+          nom: villesReference.nom,
+          nomAscii: villesReference.nomAscii,
+          admin1Code: villesReference.admin1Code,
+          population: villesReference.population,
+          latitude: villesReference.latitude,
+          longitude: villesReference.longitude,
+          paysId: villesReference.paysId,
+        })
+        .from(villesReference)
+        .where(and(...conditions))
+        .orderBy(desc(villesReference.population), villesReference.nom)
+        .limit(maxRows);
+      res.json(rows);
+    } catch (error) {
+      logger.error({ err: error }, "Error listing reference cities");
+      res.status(500).json({ message: "Erreur lors du chargement des villes de référence" });
     }
   });
 }

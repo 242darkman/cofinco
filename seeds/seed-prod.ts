@@ -89,6 +89,7 @@ import {
 } from '@shared/schema';
 import { pays } from '@shared/schema/pays';
 import { seedRegions, migrateCongoDeptsToRegions, seedDepartementsADM2, cleanupLegacyDepts, loadGeonamesStaging, enrichFromStaging } from './seed-geography-world';
+import { seedVillesReference } from './seed-villes-reference';
 import { departments, jobPositions, employes, payrollConfig, conventionsCollectives, qualificationCoefficients, chargeDefinitions, rubriqueDefinitions, payrollGlMapping, irppBaremes, evaluationTemplates, evaluationCriteria, hrAlertConfig } from '@shared/schema';
 import { accountingRules, baremeProvisions, cobacSeuils } from '@shared/schema/accounting';
 import { centresCouts, lignesProduits } from '@shared/schema/analytique';
@@ -5567,9 +5568,14 @@ async function seedProd() {
           report.steps.push({ table: r.step, action: r.action as SeedAction, count: r.count, details: r.details });
         }
       } else {
-        logger.warn('GeoNames staging unavailable (seeds/allCountries.txt missing) — cities not seeded from GeoNames');
+        logger.warn('GeoNames staging unavailable (seeds/CG.txt missing) — cities not seeded from GeoNames');
       }
     }
+
+    // Référentiel MONDIAL de villes (lieu de naissance des employés) — depuis seeds/cities5000.txt.
+    // Distinct de la géographie opérationnelle Congo ci-dessus ; alimente l'autocomplétion filtrée par pays.
+    const refCitiesResult = await seedVillesReference(DRY_RUN);
+    report.steps.push({ table: 'villes_reference', action: refCitiesResult.action as SeedAction, count: refCitiesResult.count, details: refCitiesResult.details });
 
     // Congo-specific business data (zones, arrondissements, marchés, agence Siège)
     // Links to cities already seeded by GeoNames above
