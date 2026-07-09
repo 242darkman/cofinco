@@ -195,7 +195,6 @@
   "apps/web/src/components/finance/caisse/CaisseRapprochement.tsx": 1328,
   "apps/web/src/components/finance/caisse/CaisseSupervision.tsx": 1542,
   "apps/web/src/components/finance/caisse/CaisseTransferts.tsx": 846,
-  "apps/web/src/components/finance/caisse/CoffreFortDashboard.tsx": 1848,
   "apps/web/src/components/finance/caisse/PendingDisbursements.tsx": 449,
   "apps/web/src/components/finance/caisse/PredictiveBilletagePanel.tsx": 487,
   "apps/web/src/components/finance/caisse/ScheduledCaisseTransfersPanel.tsx": 476,
