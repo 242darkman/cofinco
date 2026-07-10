@@ -6,11 +6,8 @@ import { requireAuth } from "../auth";
 import { attachAbility, requireAbility, hasAbility, Actions, Subjects } from "../authorization";
 import { requireAgenceIdAccess } from "../middleware";
 import { createLogger } from "../lib/logger";
-import { getSnapshot, upsertSnapshot, listSnapshotPeriods } from "../services/kpi/kpi-store";
-import { computeKpiPayload } from "../services/kpi/kpi-engine";
-import { db } from "../db";
-import { agences } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { getSnapshot, listSnapshotPeriods } from "../services/kpi/kpi-store";
+import { refreshAgencyScope, refreshAllScopes } from "../services/kpi/kpi-refresh-service";
 import type { KpiPeriodType, KpiScopeType } from "@shared/schema/kpi";
 
 const logger = createLogger('Routes:KPI');
@@ -133,62 +130,20 @@ export function registerKpiRoutes(app: Express) {
 
         if (agencyId) {
           // Single agency calculation
-          const { payload, metadata } = await computeKpiPayload({
-            periodType, periodKey, agencyId, generatedBy: userId,
+          const snapshot = await refreshAgencyScope({
+            periodType, periodKey, agencyId, generatedBy: userId, source: 'manual',
           });
-
-          const snapshot = await upsertSnapshot({
-            periodType, periodKey,
-            scopeType: 'AGENCY',
-            agencyId,
-            payload,
-            generatedBy: userId,
-            metadata,
-          });
-
           return res.json({ data: snapshot, message: 'KPI recalculé avec succès pour cette agence' });
         }
 
-        // All agencies + consolidated
-        const allAgencies = await db
-          .select({ id: agences.id, nom: agences.nom })
-          .from(agences)
-          .where(eq(agences.statut, 'ACTIVE'));
-
-        const results = [];
-
-        // Compute per agency in sequence to avoid overwhelming DB
-        for (const agency of allAgencies) {
-          const { payload, metadata } = await computeKpiPayload({
-            periodType, periodKey, agencyId: agency.id, generatedBy: userId,
-          });
-          const snapshot = await upsertSnapshot({
-            periodType, periodKey,
-            scopeType: 'AGENCY',
-            agencyId: agency.id,
-            payload,
-            generatedBy: userId,
-            metadata,
-          });
-          results.push({ agencyId: agency.id, agencyName: agency.nom, version: (snapshot as any).version });
-        }
-
-        // Compute consolidated (no agency filter)
-        const { payload: consolidatedPayload, metadata: consolidatedMeta } = await computeKpiPayload({
-          periodType, periodKey, agencyId: null, generatedBy: userId,
-        });
-        await upsertSnapshot({
-          periodType, periodKey,
-          scopeType: 'CONSOLIDATED',
-          agencyId: null,
-          payload: consolidatedPayload,
-          generatedBy: userId,
-          metadata: consolidatedMeta,
+        // All agencies + consolidated, avec contrôle consolidé = somme des agences
+        const result = await refreshAllScopes({
+          periodType, periodKey, generatedBy: userId, source: 'manual',
         });
 
         res.json({
-          data: { agencies: results, consolidated: true },
-          message: `KPI recalculé pour ${allAgencies.length} agence(s) + vue consolidée`,
+          data: { agencies: result.agencies, consolidated: true, warnings: result.consolidated.warnings },
+          message: `KPI recalculé pour ${result.agencies.length} agence(s) + vue consolidée`,
         });
       } catch (error) {
         logger.error({ err: error }, 'Error recalculating KPI');

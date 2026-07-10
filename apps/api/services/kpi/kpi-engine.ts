@@ -1,9 +1,18 @@
 /**
  * KPI Engine — Orchestrates computation of all KPI domains
  *
- * Runs all domain queries in parallel and computes deltas vs previous period.
+ * Toutes les requêtes (période courante + période précédente) s'exécutent
+ * dans UNE transaction PostgreSQL REPEATABLE READ en lecture seule : chaque
+ * snapshot KPI reflète donc un instantané MVCC unique de la base (cohérence
+ * point-in-time entre domaines), même si des opérations financières sont
+ * postées pendant le calcul.
+ *
+ * Les deltas sont calculés en Decimal (aucune arithmétique flottante JS sur
+ * des montants — règle AGENTS.md §9).
  */
+import { db } from "../../db";
 import { createLogger } from "../../lib/logger";
+import { parsePeriodRange, getPreviousPeriodKey, computeDelta } from "./kpi-periods";
 import type {
   KpiPayload,
   KpiCreditPayload,
@@ -26,49 +35,13 @@ import {
   queryTresorerieKpis,
   queryClientsKpis,
   queryRhProductiviteKpis,
+  type KpiDb,
 } from "./kpi-queries";
 
 const logger = createLogger('KpiEngine');
 
-// =====================
-// Period helpers
-// =====================
-
-export function parsePeriodRange(periodType: KpiPeriodType, periodKey: string): { start: Date; end: Date } {
-  if (periodType === 'MONTH') {
-    // periodKey = '2026-02'
-    const [year, month] = periodKey.split('-').map(Number);
-    const start = new Date(year, month - 1, 1);
-    const end = new Date(year, month, 1); // First day of next month
-    return { start, end };
-  }
-  // YEAR — periodKey = '2026'
-  const year = Number(periodKey);
-  return {
-    start: new Date(year, 0, 1),
-    end: new Date(year + 1, 0, 1),
-  };
-}
-
-export function getPreviousPeriodKey(periodType: KpiPeriodType, periodKey: string): string {
-  if (periodType === 'MONTH') {
-    const [year, month] = periodKey.split('-').map(Number);
-    if (month === 1) return `${year - 1}-12`;
-    return `${year}-${String(month - 1).padStart(2, '0')}`;
-  }
-  return String(Number(periodKey) - 1);
-}
-
-// =====================
-// Delta computation
-// =====================
-
-function computeDelta(current: number, previous: number): KpiDelta {
-  return {
-    value: Math.round((current - previous) * 100) / 100,
-    percent: previous !== 0 ? Math.round(((current - previous) / Math.abs(previous)) * 10000) / 100 : 0,
-  };
-}
+// Helpers purs (périodes, deltas) — ré-exportés pour compatibilité
+export { parsePeriodRange, getPreviousPeriodKey, computeDelta } from "./kpi-periods";
 
 function computeDomainDeltas<T extends Record<string, any>>(
   current: T,
@@ -93,6 +66,39 @@ export interface ComputeOptions {
   periodKey: string;
   agencyId?: string | null;
   generatedBy?: string;
+  /** Origine du calcul : bouton admin (manual) ou worker/cron (scheduled) */
+  source?: KpiMetadata['source'];
+}
+
+interface DomainResults {
+  credit: KpiCreditPayload;
+  risque: KpiRisquePayload;
+  tontinesEpargne: KpiTontinesEpargnePayload;
+  rentabilite: KpiRentabilitePayload;
+  tresorerie: KpiTresoreriePayload;
+  clients: KpiClientsPayload;
+  rhProductivite: KpiRhProductivitePayload;
+}
+
+/**
+ * Exécute les 7 domaines séquentiellement sur l'exécuteur fourni.
+ * Séquentiel : dans une transaction, une seule connexion est disponible.
+ */
+async function queryAllDomains(
+  agId: string | undefined,
+  start: Date,
+  end: Date,
+  dbx: KpiDb,
+): Promise<DomainResults> {
+  return {
+    credit: await queryCreditKpis(agId, start, end, dbx),
+    risque: await queryRisqueKpis(agId, start, end, dbx),
+    tontinesEpargne: await queryTontinesEpargneKpis(agId, start, end, dbx),
+    rentabilite: await queryRentabiliteKpis(agId, start, end, dbx),
+    tresorerie: await queryTresorerieKpis(agId, start, end, dbx),
+    clients: await queryClientsKpis(agId, start, end, dbx),
+    rhProductivite: await queryRhProductiviteKpis(agId, start, end, dbx),
+  };
 }
 
 export async function computeKpiPayload(options: ComputeOptions): Promise<{ payload: KpiPayload; metadata: KpiMetadata }> {
@@ -103,30 +109,18 @@ export async function computeKpiPayload(options: ComputeOptions): Promise<{ payl
 
   logger.info({ periodType, periodKey, agencyId, start, end }, 'Computing KPI payload');
 
-  // Current period — all domains in parallel
-  const [credit, risque, tontinesEpargne, rentabilite, tresorerie, clients, rhProductivite] = await Promise.all([
-    queryCreditKpis(agId, start, end),
-    queryRisqueKpis(agId, start, end),
-    queryTontinesEpargneKpis(agId, start, end),
-    queryRentabiliteKpis(agId, start, end),
-    queryTresorerieKpis(agId, start, end),
-    queryClientsKpis(agId, start, end),
-    queryRhProductiviteKpis(agId, start, end),
-  ]);
-
-  // Previous period for deltas
   const prevPeriodKey = getPreviousPeriodKey(periodType, periodKey);
   const { start: prevStart, end: prevEnd } = parsePeriodRange(periodType, prevPeriodKey);
 
-  const [prevCredit, prevRisque, prevTontinesEpargne, prevRentabilite, prevTresorerie, prevClients, prevRh] = await Promise.all([
-    queryCreditKpis(agId, prevStart, prevEnd),
-    queryRisqueKpis(agId, prevStart, prevEnd),
-    queryTontinesEpargneKpis(agId, prevStart, prevEnd),
-    queryRentabiliteKpis(agId, prevStart, prevEnd),
-    queryTresorerieKpis(agId, prevStart, prevEnd),
-    queryClientsKpis(agId, prevStart, prevEnd),
-    queryRhProductiviteKpis(agId, prevStart, prevEnd),
-  ]);
+  // Vue point-in-time unique pour TOUTES les requêtes (courante + précédente)
+  const { current, previous } = await db.transaction(
+    async (tx) => {
+      const currentResults = await queryAllDomains(agId, start, end, tx);
+      const previousResults = await queryAllDomains(agId, prevStart, prevEnd, tx);
+      return { current: currentResults, previous: previousResults };
+    },
+    { isolationLevel: 'repeatable read', accessMode: 'read only' },
+  );
 
   // Compute deltas
   const creditKeys: (keyof KpiCreditPayload)[] = ['encoursTotalActif', 'nombreCreditsActifs', 'decaissementsPeriode', 'nombreDecaissements', 'tauxApprobation', 'panierMoyen'];
@@ -138,22 +132,22 @@ export async function computeKpiPayload(options: ComputeOptions): Promise<{ payl
   const rhKeys: (keyof KpiRhProductivitePayload)[] = ['agentsActifs', 'clientsParAgent', 'encoursParAgent', 'decaissementsParAgent', 'masseSalariale'];
 
   const deltas: KpiDeltas = {
-    credit: computeDomainDeltas(credit, prevCredit, creditKeys),
-    risque: computeDomainDeltas(risque, prevRisque, risqueKeys),
-    tontinesEpargne: computeDomainDeltas(tontinesEpargne, prevTontinesEpargne, tontineKeys),
-    rentabilite: computeDomainDeltas(rentabilite, prevRentabilite, rentabiliteKeys),
-    tresorerie: computeDomainDeltas(tresorerie, prevTresorerie, tresorerieKeys),
-    clients: computeDomainDeltas(clients, prevClients, clientsKeys),
-    rhProductivite: computeDomainDeltas(rhProductivite, prevRh, rhKeys),
+    credit: computeDomainDeltas(current.credit, previous.credit, creditKeys),
+    risque: computeDomainDeltas(current.risque, previous.risque, risqueKeys),
+    tontinesEpargne: computeDomainDeltas(current.tontinesEpargne, previous.tontinesEpargne, tontineKeys),
+    rentabilite: computeDomainDeltas(current.rentabilite, previous.rentabilite, rentabiliteKeys),
+    tresorerie: computeDomainDeltas(current.tresorerie, previous.tresorerie, tresorerieKeys),
+    clients: computeDomainDeltas(current.clients, previous.clients, clientsKeys),
+    rhProductivite: computeDomainDeltas(current.rhProductivite, previous.rhProductivite, rhKeys),
   };
 
   const computeDurationMs = Date.now() - startMs;
   logger.info({ computeDurationMs, periodKey, agencyId }, 'KPI computation complete');
 
   return {
-    payload: { credit, risque, tontinesEpargne, rentabilite, tresorerie, clients, rhProductivite, deltas },
+    payload: { ...current, deltas },
     metadata: {
-      source: 'manual',
+      source: options.source ?? 'manual',
       triggeredBy: options.generatedBy,
       computeDurationMs,
       warnings: [],

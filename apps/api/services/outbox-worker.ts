@@ -3,6 +3,7 @@ import { evenementsOutbox } from "@shared/schema";
 import { eq, isNull, asc, sql } from "drizzle-orm";
 import { getWsInstance } from "../ws-server";
 import { createLogger } from "../lib/logger";
+import { markKpiDirty } from "./kpi/kpi-refresh-worker";
 import type pg from "pg";
 
 const logger = createLogger('Outbox');
@@ -103,6 +104,9 @@ async function processOutboxEvents(): Promise<number> {
 
     if (publishedCount > 0) {
       logger.info({ count: publishedCount }, 'Published events');
+      // Tout événement métier publié rend les KPI de la période courante
+      // obsolètes : marquage dirty (le worker KPI debounce et recalcule).
+      markKpiDirty('outbox-events');
     }
 
     return publishedCount;

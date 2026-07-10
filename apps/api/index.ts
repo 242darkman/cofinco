@@ -22,6 +22,8 @@ import { csrfProtection } from "./middleware/csrf";
 import { etagMiddleware } from "./middleware/etag";
 import { eq } from "drizzle-orm";
 import { startOutboxWorker } from "./services/outbox-worker";
+import { startKpiRefreshWorker } from "./services/kpi/kpi-refresh-worker";
+import { startKpiRefreshCron } from "./cron/kpi-refresh-scheduler";
 import { startNotificationWorker } from "./services/notifications/notification-worker";
 import { startReminderProcessor } from "./services/notifications/reminder-processor";
 import { SmtpEmailProvider } from "./services/notifications/providers/email.provider";
@@ -337,9 +339,18 @@ app.get("/api/health", async (_req, res) => {
   if (cronDisabled) {
     logger.warn('DISABLE_CRON_JOBS=true — running as stateless API server (no cron jobs, no background workers)');
   } else {
+    // Start the KPI refresh worker BEFORE the outbox worker so the very
+    // first published events can already mark KPI snapshots dirty
+    startKpiRefreshWorker();
+    logger.info('KPI refresh worker started (debounced real-time snapshots)');
+
     // Start the outbox worker for reliable real-time event publishing
     startOutboxWorker();
     logger.info('Outbox real-time event worker started');
+
+    // Safety-net cron: guarantees current-period KPI freshness even without events
+    startKpiRefreshCron();
+    logger.info('KPI refresh cron started (safety net)');
 
     // Start the notification delivery worker (SMS/Email queue processor)
     startNotificationWorker();
