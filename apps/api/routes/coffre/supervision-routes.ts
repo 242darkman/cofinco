@@ -16,7 +16,7 @@ import { dispatchDomainEvent } from "../../services/notifications/domain-events/
 import { handleInsufficientFundsError } from "../../middleware/financial-validation";
 import { getSnapshotHistory, getSnapshotDateRange } from "../../services/coffre/snapshot-service";
 
-import { sessionOpeningService } from "../../services/caisse/session-opening-service";
+import { getPendingOpeningRequests } from "../../services/caisse/session-opening-queries";
 export const supervisionCoffreRouter = Router();
 const logger = createLogger('Routes:Coffre:supervision-routes');
 const service = new TransfertCoffreService();
@@ -318,7 +318,7 @@ supervisionCoffreRouter.get(
         return res.status(400).json({ error: "agenceId requis" });
       }
 
-      const requests = await sessionOpeningService.getPendingOpeningRequests(agenceId);
+      const requests = await getPendingOpeningRequests(agenceId);
       res.json(requests);
     } catch (e: any) {
       res.status(500).json({ error: e.message });

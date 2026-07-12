@@ -17,7 +17,10 @@ import { logAudit } from "../../audit";
 import { normalizeKeysDeep, coerceValueToSchema } from "../utils";
 import { getWsInstance } from "../../ws-server";
 import { eq, desc, and, sql, count, inArray } from "drizzle-orm";
-import { sessionOpeningService } from "../../services/caisse/session-opening-service";
+import { requestSessionOpening } from "../../services/caisse/session-opening-request";
+import { openDirectWithExistingFunds } from "../../services/caisse/session-opening-direct";
+import { receiveFundsAndOpen } from "../../services/caisse/session-opening-receipt";
+import { cancelOpeningRequest } from "../../services/caisse/session-opening-cancel";
 import { sessionClosingService } from "../../services/caisse/session-closing-service";
 import { accessControlService } from "../../services/caisse/access-control-service";
 import { D, roundMoney } from "../../lib/money";
@@ -67,7 +70,7 @@ export function registerSessionsCaisseRequestOpeningRoutes(app: Express) {
       }
     }
 
-    const result = await sessionOpeningService.requestSessionOpening({
+    const result = await requestSessionOpening({
       caissierId: user.id,
       caisseId: data.caisseId,
       agenceId: data.agenceId || user.agenceId,
@@ -150,7 +153,7 @@ export function registerSessionsCaisseRequestOpeningRoutes(app: Express) {
       }
     }
 
-    const result = await sessionOpeningService.openDirectWithExistingFunds({
+    const result = await openDirectWithExistingFunds({
       caissierId: user.id,
       caisseId: data.caisseId,
       agenceId: data.agenceId || user.agenceId,
@@ -211,7 +214,7 @@ export function registerSessionsCaisseRequestOpeningRoutes(app: Express) {
       return res.status(400).json({ message: "Le billetage de réception est obligatoire." });
     }
 
-    const result = await sessionOpeningService.receiveFundsAndOpen({
+    const result = await receiveFundsAndOpen({
       sessionId: id,
       caissierId: user.id,
       billetageReception: data.billetageReception,
@@ -266,7 +269,7 @@ export function registerSessionsCaisseRequestOpeningRoutes(app: Express) {
     const user = req.session.user!;
     const data = normalizeKeysDeep(req.body) as any;
 
-    const result = await sessionOpeningService.cancelOpeningRequest({
+    const result = await cancelOpeningRequest({
       sessionId: id,
       userId: user.id,
       reason: data.reason,

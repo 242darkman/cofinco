@@ -30,7 +30,6 @@
   "apps/api/services/caisse/ecart-approval-service.ts": 409,
   "apps/api/services/caisse/reconciliation-service.ts": 469,
   "apps/api/services/caisse/session-closing-service.ts": 1502,
-  "apps/api/services/caisse/session-opening-service.ts": 1600,
   "apps/api/services/caisse/session-service.ts": 1202,
   "apps/api/services/caisse/transaction-reversal-service.ts": 441,
   "apps/api/services/client-alerts.ts": 915,

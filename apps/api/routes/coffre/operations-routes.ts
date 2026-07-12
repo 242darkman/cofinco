@@ -16,7 +16,7 @@ import { dispatchDomainEvent } from "../../services/notifications/domain-events/
 import { handleInsufficientFundsError } from "../../middleware/financial-validation";
 import { getSnapshotHistory, getSnapshotDateRange } from "../../services/coffre/snapshot-service";
 
-import { sessionOpeningService } from "../../services/caisse/session-opening-service";
+import { validateOpeningTransfer } from "../../services/caisse/session-opening-validation";
 export const operationsCoffreRouter = Router();
 const logger = createLogger('Routes:Coffre:operations-routes');
 const service = new TransfertCoffreService();
@@ -279,7 +279,7 @@ operationsCoffreRouter.post(
         return res.status(400).json({ error: "La raison du rejet est obligatoire" });
       }
 
-      const result = await sessionOpeningService.validateOpeningTransfer({
+      const result = await validateOpeningTransfer({
         transfertId: id,
         validatorId: user.id,
         approved: body.approved,
