@@ -63,7 +63,6 @@
   "apps/api/services/exercice-cloture-service.ts": 674,
   "apps/api/services/financial-monitoring-service.ts": 500,
   "apps/api/services/gl-reporting-service.ts": 741,
-  "apps/api/services/global-transaction-service.ts": 561,
   "apps/api/services/hr-accounting-service.ts": 535,
   "apps/api/services/hr-service.ts": 431,
   "apps/api/services/ledger.ts": 1022,
