@@ -57,7 +57,6 @@
   "apps/api/services/transfert-inter-coffres/business-rules.ts": 424,
   "apps/api/services/treasury/encaisse-service.ts": 413,
   "apps/api/services/treasury/gl-balance-reader.ts": 629,
-  "apps/api/storage/clients.ts": 1330,
   "apps/api/storage/employes.ts": 982,
   "apps/api/storage/finance-enhanced.ts": 514,
   "apps/api/storage/hr.ts": 2033,
