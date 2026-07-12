@@ -21,7 +21,7 @@ import { requestSessionOpening } from "../../services/caisse/session-opening-req
 import { openDirectWithExistingFunds } from "../../services/caisse/session-opening-direct";
 import { receiveFundsAndOpen } from "../../services/caisse/session-opening-receipt";
 import { cancelOpeningRequest } from "../../services/caisse/session-opening-cancel";
-import { sessionClosingService } from "../../services/caisse/session-closing-service";
+import { initiateClose } from "../../services/caisse/session-closing-initiate";
 import { accessControlService } from "../../services/caisse/access-control-service";
 import { D, roundMoney } from "../../lib/money";
 
@@ -322,7 +322,7 @@ export function registerSessionsCaisseRequestOpeningRoutes(app: Express) {
     const { id } = req.params;
     const user = req.session.user!;
 
-    const result = await sessionClosingService.initiateClose({
+    const result = await initiateClose({
       sessionId: id,
       caissierId: user.id,
       ipAddress: req.ip,
