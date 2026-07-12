@@ -1,7 +1,8 @@
 /**
- * Reevaluation Validation Service
- * 
- * Contains all business rules for validating reevaluation eligibility and state transitions.
+ * Service de validation des réévaluations de crédit.
+ *
+ * Centralise les règles d'éligibilité et les transitions autorisées afin que
+ * les routes et services applicatifs ne dupliquent pas la logique métier.
  */
 
 import { differenceInDays, addDays } from 'date-fns';
@@ -10,51 +11,26 @@ import {
   StatutDemande,
   StatutReevaluation,
 } from "@shared/enum/status-constants";
+import type {
+  CreateReevaluationPayload,
+  ElementNouveau,
+  ReevaluationEligibilitySummary,
+  ValidationResult,
+} from './reevaluation-validation-types';
 
-// Type definitions
-export interface ValidationResult {
-  valid: boolean;
-  code?: string;
-  message?: string;
-  details?: Record<string, any>;
-}
-
-export interface ElementNouveau {
-  type: string;
-  description: string;
-  valeurAjoutee?: number;
-  documents?: string[];
-}
-
-export interface CreateReevaluationPayload {
-  elementsNouveaux: ElementNouveau[];
-  justification: string;
-  nouveauMontantDemande?: number;
-  nouvelleDureeValeur?: number;
-  nouvelleDureeUnite?: string;
-  nouvelleFrequence?: string;
-  garantiesAdditionnelles?: Array<{
-    type: string;
-    description: string;
-    valeurEstimee: number;
-    documents?: string[];
-  }>;
-  coEmprunteur?: {
-    clientId?: string;
-    nom?: string;
-    relation: string;
-    revenusMensuels: number;
-    consentement: boolean;
-  };
-  documentsJoints?: string[];
-}
+export type {
+  CreateReevaluationPayload,
+  ElementNouveau,
+  ReevaluationEligibilitySummary,
+  ValidationResult,
+} from './reevaluation-validation-types';
 
 /**
- * All validation rules for reevaluation workflow
+ * Catalogue des règles métier du workflow de réévaluation.
  */
 export const REEVALUATION_RULES = {
   /**
-   * Rule 1: Demande must be in "Rejetée" status (or "Réévaluation en cours" if already created)
+   * Vérifie que la demande est dans un statut compatible avec la réévaluation.
    */
   validateDemandeStatus: (demande: DemandeCredit): ValidationResult => {
     // Statuts valides pour une réévaluation:
@@ -72,7 +48,7 @@ export const REEVALUATION_RULES = {
   },
 
   /**
-   * Rule 2: Minimum delay since rejection
+   * Vérifie le délai minimal entre le rejet et la nouvelle analyse.
    */
   validateDelaiMinimum: (dateRejet: Date | null, config: ConfigReevaluation): ValidationResult => {
     if (!dateRejet) {
@@ -100,7 +76,7 @@ export const REEVALUATION_RULES = {
   },
 
   /**
-   * Rule 3: Maximum number of reevaluations not exceeded
+   * Vérifie que le nombre maximal de réévaluations n'est pas dépassé.
    */
   validateNombreMax: (demande: DemandeCredit, config: ConfigReevaluation): ValidationResult => {
     const nombreActuel = demande.nombreReevaluations ?? 0;
@@ -119,7 +95,7 @@ export const REEVALUATION_RULES = {
   },
 
   /**
-   * Rule 4: Rejection motif is not blacklisted
+   * Vérifie que le motif de rejet autorise une réévaluation.
    */
   validateMotifReevaluable: (motifRejet: string | null, config: ConfigReevaluation): ValidationResult => {
     if (!motifRejet) {
@@ -146,7 +122,7 @@ export const REEVALUATION_RULES = {
   },
 
   /**
-   * Rule 5: No reevaluation already in progress
+   * Vérifie qu'aucune autre réévaluation n'est déjà ouverte.
    */
   validatePasDeReevaluationEnCours: (demande: DemandeCredit): ValidationResult => {
     if (demande.reevaluationEnCours) {
@@ -160,7 +136,7 @@ export const REEVALUATION_RULES = {
   },
 
   /**
-   * Rule 6: Fees must not have been refunded (or must be repaid if refunded)
+   * Vérifie l'état des frais de dossier remboursés.
    */
   validateFraisNonRembourses: (
     demande: DemandeCredit,
@@ -178,7 +154,7 @@ export const REEVALUATION_RULES = {
   },
 
   /**
-   * Rule 7: New elements are required
+   * Vérifie la présence des éléments nouveaux exigés par la configuration.
    */
   validateElementsNouveaux: (
     elementsNouveaux: ElementNouveau[] | undefined, 
@@ -195,7 +171,7 @@ export const REEVALUATION_RULES = {
   },
 
   /**
-   * Rule 8: Justification minimum length
+   * Vérifie la longueur minimale de la justification métier.
    */
   validateJustification: (justification: string | undefined): ValidationResult => {
     const MIN_LENGTH = 10;
@@ -216,7 +192,7 @@ export const REEVALUATION_RULES = {
   },
 
   /**
-   * Rule 9: Minimum number of documents
+   * Vérifie le nombre minimal de justificatifs.
    */
   validateDocuments: (documents: string[] | undefined, config: ConfigReevaluation): ValidationResult => {
     const nbDocuments = documents?.length || 0;
@@ -235,7 +211,7 @@ export const REEVALUATION_RULES = {
   },
 
   /**
-   * Rule 10: Reevaluation is not locked
+   * Vérifie que la réévaluation n'est pas verrouillée.
    */
   validateNonVerrouille: (reevaluation: ReevaluationCredit): ValidationResult => {
     if (reevaluation.verrouille) {
@@ -252,7 +228,7 @@ export const REEVALUATION_RULES = {
   },
 
   /**
-   * Rule 11: Valid state transitions
+   * Vérifie qu'une transition de statut est explicitement autorisée.
    */
   validateTransition: (
     statutActuel: string,
@@ -289,7 +265,9 @@ export const REEVALUATION_RULES = {
 };
 
 /**
- * Validates all rules for creating a new reevaluation
+ * Exécute toutes les règles nécessaires à la création d'une réévaluation.
+ *
+ * @returns Un indicateur global et la liste détaillée des refus.
  */
 export async function validateReevaluationCreation(
   demande: DemandeCredit,
@@ -299,7 +277,6 @@ export async function validateReevaluationCreation(
 ): Promise<{ valid: boolean; errors: ValidationResult[] }> {
   const errors: ValidationResult[] = [];
 
-  // Apply all rules
   const rules = [
     () => REEVALUATION_RULES.validateDemandeStatus(demande),
     () => REEVALUATION_RULES.validateDelaiMinimum(demande.dateRejet, config),
@@ -326,25 +303,13 @@ export async function validateReevaluationCreation(
 }
 
 /**
- * Quick eligibility check (returns summary for UI display)
+ * Calcule une synthèse d'éligibilité destinée à l'affichage rapide.
  */
 export function checkEligibilityQuick(
   demande: DemandeCredit,
   config: ConfigReevaluation,
   hasRefundPaid: boolean = false
-): {
-  estEligible: boolean;
-  delaiOk: boolean;
-  nombreOk: boolean;
-  motifBlackliste: boolean;
-  reevaluationEnCours: boolean;
-  fraisRemboursesNonRepayes: boolean;
-  joursDepuisRejet: number;
-  delaiMinimum: number;
-  nombreReevaluations: number;
-  maxAutorise: number;
-  motifRefus?: string;
-} {
+): ReevaluationEligibilitySummary {
   const joursDepuisRejet = demande.dateRejet
     ? differenceInDays(new Date(), demande.dateRejet)
     : 0;
