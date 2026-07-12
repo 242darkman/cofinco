@@ -14,7 +14,9 @@ import { requireAuth } from "../auth";
 import { attachAbility, requireAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
 import { logAudit } from "../audit";
-import { CoffresFortsService } from "../services/transfert-inter-coffres";
+import * as coffresQueries from "../services/transfert-inter-coffres/coffres-queries";
+import * as coffresOperations from "../services/transfert-inter-coffres/coffres-operations";
+import * as coffresCreation from "../services/transfert-inter-coffres/coffres-creation";
 import {
   agencyMigrations,
   migrationPreFlightChecks,
@@ -193,7 +195,7 @@ export function registerAgencesRoutes(app: Express) {
     try {
       const data = req.body;
       const userId = req.session?.userId;
-      const coffresService = new CoffresFortsService();
+
 
       // Vérifier que le code_agence est unique
       const existing = await db

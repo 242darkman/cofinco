@@ -28,11 +28,14 @@ import { dispatchDomainEvent } from "../../services/notifications/domain-events/
 import { generateCreditReminderSchedule } from "../../services/notifications/credit-reminder-service";
 import { db } from "../../db";
 import { getWsInstance } from "../../ws-server";
-import { eq, desc, and, sql, count, inArray } from "drizzle-orm";
-import { initiatePayout } from "../../services/mobile-money/payment-service";
+import { eq } from "drizzle-orm";
 import { currencySymbol } from "@shared/config/currency";
-import { generateCreditSchedule } from "../../storage/finance";
 import { logger } from "./shared";
+import {
+  processCashDisbursement,
+  processMobileMoneyDisbursement,
+  processAccountDisbursement
+} from "../../services/finance/decaissement-service";
 
 export function registerCreditsDecaissementRoutes(app: Express) {
   // Décaissement de crédit (crée le crédit + gère le canal de décaissement)
@@ -176,149 +179,43 @@ export function registerCreditsDecaissementRoutes(app: Express) {
       let nouveauSolde = parseFloat(compteCourant.soldeCourant || '0');
       let message = '';
 
+      const params = {
+        credit,
+        demande,
+        compteCourant,
+        montantDecaissement,
+        numeroCredit,
+        clientName,
+        estProgramme,
+        dateDecaissement,
+        user,
+        provider: (data.provider?.toUpperCase() || '') as string
+      };
+
       // 6. Traitement selon le canal de décaissement
       switch (disbursementChannel) {
         case 'CASH':
-          // ===== CANAL ESPÈCES =====
-          // Ne pas toucher à l'argent maintenant
-          // Émettre une notification WebSocket vers le dashboard caisse
-          const wsInstance = getWsInstance();
-          if (wsInstance) {
-            // Notification spécifique pour le dashboard caisse
-            wsInstance.broadcast({
-              type: "CAISSE_UPDATE",
-              payload: {
-                subtype: 'NEW_LOAN_DISBURSEMENT',
-                creditId: credit.id,
-                numeroCredit,
-                clientName,
-                clientId: demande.clientId,
-                montant: montantDecaissement,
-                agenceId: compteCourant.agenceId,
-                timestamp: new Date().toISOString()
-              }
-            });
-          }
-          message = `Ordre de paiement envoyé à la caisse. Le client ${clientName} doit se présenter au guichet pour récupérer ${montantDecaissement.toLocaleString()} ${currencySymbol()}.`;
+          const resCash = await processCashDisbursement(params);
+          message = resCash.message;
+          nouveauSolde = resCash.nouveauSolde;
           break;
 
         case 'MOBILE_MONEY': {
-          // ===== CANAL MOBILE MONEY (PawaPay) =====
-          const mobilePhone = client?.telephone;
-          if (!mobilePhone) {
-            await storage.updateCredit(credit.id, { statut: StatutCredit.CANCELLED as StatutCreditDz, disbursementStatus: 'FAILED' as DisbursementStatusDz });
-            return res.status(400).json({ message: "Le client n'a pas de numéro de téléphone enregistré. Décaissement Mobile Money impossible." });
-          }
-
-          const provider = (data.provider?.toUpperCase() || '') as 'MTN' | 'AIRTEL';
-          if (!provider || !['MTN', 'AIRTEL'].includes(provider)) {
-            await storage.updateCredit(credit.id, { statut: StatutCredit.CANCELLED as StatutCreditDz, disbursementStatus: 'FAILED' as DisbursementStatusDz });
-            return res.status(400).json({ message: "Opérateur Mobile Money requis (MTN ou AIRTEL)." });
-          }
-
           try {
-            const payoutIntent = await initiatePayout({
-              provider,
-              amount: montantDecaissement,
-              phone: mobilePhone,
-              clientId: demande.clientId,
-              compteId: compteCourant.id,
-              creditId: credit.id,
-              description: `Décaissement crédit ${numeroCredit}`,
-              agenceId: compteCourant.agenceId || undefined,
-              idempotencyKey: `disburse-${credit.id}`,
-            }, user?.id);
-
-            message = `Paiement Mobile Money ${provider} initié pour ${montantDecaissement.toLocaleString()} ${currencySymbol()} vers ${mobilePhone}. Le crédit sera activé après confirmation du transfert.`;
-            logger.info({ creditId: credit.id, intentId: payoutIntent.id, provider }, 'Mobile Money disbursement initiated');
-          } catch (payoutError) {
-            logger.error({ err: payoutError, creditId: credit.id }, 'Mobile Money disbursement failed');
-            await storage.updateCredit(credit.id, { statut: StatutCredit.CANCELLED as StatutCreditDz, disbursementStatus: 'FAILED' as DisbursementStatusDz });
-            const errorMsg = payoutError instanceof Error ? payoutError.message : 'Erreur inconnue';
-            return res.status(500).json({ message: `Échec du décaissement Mobile Money: ${errorMsg}` });
+            const resMomo = await processMobileMoneyDisbursement(params);
+            message = resMomo.message;
+            nouveauSolde = resMomo.nouveauSolde;
+          } catch (payoutError: any) {
+            return res.status(500).json({ message: payoutError.message || `Échec du décaissement Mobile Money` });
           }
           break;
         }
 
         case 'ACCOUNT':
         default:
-          // ===== CANAL COMPTE (flux existant) =====
-          if (!estProgramme) {
-            try {
-              const result = await storage.createDecaissementWithLedger({
-                creditId: credit.id,
-                compteId: compteCourant.id,
-                montant: montantDecaissement.toString(),
-                numeroCredit
-              }, user?.id);
-
-              nouveauSolde += montantDecaissement;
-
-              // Succès: Activer le crédit et marquer le décaissement comme complété
-              await storage.updateCredit(credit.id, {
-                statut: StatutCredit.ACTIVE as StatutCreditDz,
-                disbursementStatus: 'COMPLETED' as DisbursementStatusDz,
-                disbursedAt: new Date(),
-                disbursedBy: user?.id
-              });
-
-              // Générer l'échéancier automatiquement à l'activation (obligatoire)
-              try {
-                await generateCreditSchedule(credit.id);
-              } catch (scheduleErr) {
-                // Échéancier obligatoire — rétrograder le crédit
-                logger.error({ err: scheduleErr, creditId: credit.id }, 'Échec génération échéancier — crédit rétrogradé à PENDING');
-                await storage.updateCredit(credit.id, {
-                  statut: StatutCredit.PENDING as StatutCreditDz,
-                  disbursementStatus: 'FAILED' as DisbursementStatusDz,
-                });
-                return res.status(500).json({
-                  message: "Le décaissement a été effectué mais la génération de l'échéancier a échoué. Le crédit est en attente de correction manuelle.",
-                });
-              }
-
-              // Score event: INITIAL_SCORE for newly disbursed credit
-              try {
-                const { recordScoreEvent } = await import('../../services/scoring-engine');
-                await recordScoreEvent({
-                  clientId: demande.clientId,
-                  agenceId: credit.agenceId ?? undefined,
-                  eventType: 'INITIAL_SCORE',
-                  refId: credit.id,
-                  refType: 'credit',
-                  montant: montantDecaissement,
-                  createdBy: user?.id,
-                });
-              } catch (scoreErr) {
-                logger.warn({ err: scoreErr, creditId: credit.id }, 'Score event INITIAL_SCORE failed (non-blocking)');
-              }
-
-            } catch (err: any) {
-              logger.error({ err, creditId: credit.id }, 'Erreur Ledger lors du décaissement');
-
-              // ROLLBACK: Annuler le crédit créé puisque le transfert a échoué
-              // (PENDING → CANCELLED est autorisé par la state machine)
-              try {
-                await storage.updateCredit(credit.id, {
-                  statut: StatutCredit.CANCELLED as StatutCreditDz,
-                  disbursementStatus: 'PENDING' as DisbursementStatusDz
-                });
-                logger.info({ creditId: credit.id }, 'Crédit annulé après échec du décaissement');
-              } catch (cleanupErr) {
-                logger.error({ err: cleanupErr, creditId: credit.id }, 'Échec annulation crédit orphelin');
-              }
-
-              // Re-throw business errors (coffre guards, insufficient funds) as-is
-              // so the outer catch can handle them with structured responses
-              if (isCoffreCaisseError(err) || err instanceof DecaissementInsufficientFundsError) {
-                throw err;
-              }
-              throw new Error(`Erreur lors du décaissement effectif: ${err.message}`);
-            }
-          }
-          message = estProgramme
-            ? `Décaissement programmé pour le ${new Date(dateDecaissement).toLocaleDateString('fr-FR')}. Crédit ${numeroCredit} créé en attente.`
-            : `Crédit ${numeroCredit} décaissé. ${montantDecaissement.toLocaleString()} ${currencySymbol()} crédités sur le compte ${compteCourant.numeroCompte}`;
+          const resAccount = await processAccountDisbursement(params);
+          message = resAccount.message;
+          nouveauSolde = resAccount.nouveauSolde;
           break;
       }
 

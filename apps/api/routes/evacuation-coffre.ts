@@ -4,13 +4,25 @@ import { createLogger } from "../lib/logger";
 import { requireAuth } from "../auth";
 import { attachAbility, requireAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
-import { EvacuationCoffreService } from "../services/evacuation-coffre";
 import { currencyCode } from "@shared/config/currency";
+
+import { listEvacuations, getEvacuationDetails, getAuditLogs, getStatistics } from "../services/evacuation-coffre/queries";
+import { createEvacuation } from "../services/evacuation-coffre/creation";
+import {
+  submitEvacuation,
+  approveEvacuation,
+  rejectEvacuation,
+  prepareEvacuation,
+  dispatchEvacuation,
+  depositEvacuation,
+  reconcileEvacuation,
+  cancelEvacuation
+} from "../services/evacuation-coffre/workflow";
+import { getConfig, updateConfig } from "../services/evacuation-coffre/config";
 
 const logger = createLogger("Routes:EvacuationCoffre");
 
 export const evacuationCoffreRouter = Router();
-const service = new EvacuationCoffreService();
 
 evacuationCoffreRouter.use(requireAuth);
 
@@ -23,7 +35,7 @@ evacuationCoffreRouter.get("/", async (req, res) => {
   try {
     const { page, limit, statut, coffreSourceId, typeDestination, agenceId, dateDebut, dateFin, search, sortBy, sortOrder } = req.query;
 
-    const result = await service.listEvacuations({
+    const result = await listEvacuations({
       page: page ? parseInt(page as string) : undefined,
       limit: limit ? parseInt(limit as string) : undefined,
       statut: statut as string,
@@ -74,7 +86,7 @@ evacuationCoffreRouter.post("/", attachAbility, requireAbility(Actions.CREATE, S
 
     const data = schema.parse(req.body);
 
-    const result = await service.createEvacuation({
+    const result = await createEvacuation({
       ...data,
       userId,
       userRole,
@@ -97,7 +109,7 @@ evacuationCoffreRouter.post("/", attachAbility, requireAbility(Actions.CREATE, S
 evacuationCoffreRouter.get("/stats", async (req, res) => {
   try {
     const { agenceId } = req.query;
-    const result = await service.getStatistics(agenceId as string);
+    const result = await getStatistics(agenceId as string);
     res.json(result);
   } catch (error: any) {
     logger.error({ err: error }, "Erreur GET /stats");
@@ -109,7 +121,7 @@ evacuationCoffreRouter.get("/stats", async (req, res) => {
 evacuationCoffreRouter.get("/config/:agenceId?", async (req, res) => {
   try {
     const { agenceId } = req.params;
-    const result = await service.getConfig(agenceId);
+    const result = await getConfig(agenceId);
     res.json(result);
   } catch (error: any) {
     logger.error({ err: error }, "Erreur GET /config");
@@ -121,7 +133,7 @@ evacuationCoffreRouter.get("/config/:agenceId?", async (req, res) => {
 evacuationCoffreRouter.put("/config/:agenceId", attachAbility, requireAbility(Actions.MANAGE, Subjects.EVACUATION_COFFRE), async (req, res) => {
   try {
     const { agenceId } = req.params;
-    const result = await service.updateConfig(agenceId, req.body);
+    const result = await updateConfig(agenceId, req.body);
     res.json(result);
   } catch (error: any) {
     logger.error({ err: error }, "Erreur PUT /config");
@@ -133,7 +145,7 @@ evacuationCoffreRouter.put("/config/:agenceId", attachAbility, requireAbility(Ac
 evacuationCoffreRouter.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await service.getEvacuationDetails(id);
+    const result = await getEvacuationDetails(id);
     if (!result.success) {
       return res.status(404).json(result);
     }
@@ -148,7 +160,7 @@ evacuationCoffreRouter.get("/:id", async (req, res) => {
 evacuationCoffreRouter.get("/:id/audit-logs", async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await service.getAuditLogs(id);
+    const result = await getAuditLogs(id);
     res.json(result);
   } catch (error: any) {
     logger.error({ err: error }, "Erreur GET /:id/audit-logs");
@@ -163,7 +175,7 @@ evacuationCoffreRouter.post("/:id/submit", async (req, res) => {
     const userRole = req.user?.role ?? '';
     if (!userId) return res.status(401).json({ success: false, error: "Non authentifié" });
 
-    const result = await service.submitEvacuation({
+    const result = await submitEvacuation({
       evacuationId: req.params.id,
       userId,
       userRole,
@@ -188,7 +200,7 @@ evacuationCoffreRouter.post("/:id/approve", attachAbility, requireAbility(Action
 
     const { commentaire } = req.body || {};
 
-    const result = await service.approveEvacuation({
+    const result = await approveEvacuation({
       evacuationId: req.params.id,
       userId,
       userRole,
@@ -215,7 +227,7 @@ evacuationCoffreRouter.post("/:id/reject", attachAbility, requireAbility(Actions
     const schema = z.object({ reason: z.string().min(10) });
     const { reason } = schema.parse(req.body);
 
-    const result = await service.rejectEvacuation({
+    const result = await rejectEvacuation({
       evacuationId: req.params.id,
       userId,
       userRole,
@@ -249,7 +261,7 @@ evacuationCoffreRouter.post("/:id/prepare", attachAbility, requireAbility(Action
 
     const data = schema.parse(req.body);
 
-    const result = await service.prepareEvacuation({
+    const result = await prepareEvacuation({
       evacuationId: req.params.id,
       userId,
       userRole,
@@ -285,7 +297,7 @@ evacuationCoffreRouter.post("/:id/dispatch", attachAbility, requireAbility(Actio
 
     const data = schema.parse(req.body);
 
-    const result = await service.dispatchEvacuation({
+    const result = await dispatchEvacuation({
       evacuationId: req.params.id,
       userId,
       userRole,
@@ -319,7 +331,7 @@ evacuationCoffreRouter.post("/:id/deposit", attachAbility, requireAbility(Action
 
     const data = schema.parse(req.body);
 
-    const result = await service.depositEvacuation({
+    const result = await depositEvacuation({
       evacuationId: req.params.id,
       userId,
       userRole,
@@ -351,7 +363,7 @@ evacuationCoffreRouter.post("/:id/reconcile", attachAbility, requireAbility(Acti
 
     const data = schema.parse(req.body);
 
-    const result = await service.reconcileEvacuation({
+    const result = await reconcileEvacuation({
       evacuationId: req.params.id,
       userId,
       userRole,
@@ -378,7 +390,7 @@ evacuationCoffreRouter.post("/:id/cancel", async (req, res) => {
     const schema = z.object({ reason: z.string().min(10) });
     const { reason } = schema.parse(req.body);
 
-    const result = await service.cancelEvacuation({
+    const result = await cancelEvacuation({
       evacuationId: req.params.id,
       userId,
       userRole,

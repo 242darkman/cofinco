@@ -40,8 +40,17 @@ import { evacuationCoffreRouter } from "./routes/evacuation-coffre";
 import { registerStoragePublicRoutes } from "./routes/storage/public";
 import { registerStorageDocumentsRoutes } from "./routes/storage/documents";
 import { registerStorageEntitiesRoutes } from "./routes/storage/entities";
-import { regularisationRouter } from "./routes/regularisation";
-import { paymentsRouter, webhooksRouter } from "./routes/payments";
+import { registerRegularisationListRoutes } from "./routes/regularisation/list";
+import { registerRegularisationStatsRoutes } from "./routes/regularisation/stats";
+import { registerRegularisationDetailsRoutes } from "./routes/regularisation/details";
+import { registerRegularisationActionsRoutes } from "./routes/regularisation/actions";
+
+import { registerPaymentsWebhooksRoutes } from "./routes/payments/webhooks";
+import { registerPaymentsCollectionRoutes } from "./routes/payments/collection";
+import { registerPaymentsPayoutRoutes } from "./routes/payments/payout";
+import { registerPaymentsReconciliationRoutes } from "./routes/payments/reconciliation";
+import { registerPaymentsManagementRoutes } from "./routes/payments/management";
+
 import { paymentsTestRouter } from "./routes/payments-test";
 import balancesRouter from "./routes/balances";
 import permissionAnalyticsRouter from "./routes/permission-analytics";
@@ -79,12 +88,20 @@ export function registerRoutes(app: Express): Server {
   app.use("/api/evacuations-coffre", evacuationCoffreRouter);
   app.use("/api/transactions", transactionsRouter);
 
-  // Admin - Regularisation Module (gestion des tâches de régularisation)
-  app.use("/api/admin/regularisations", regularisationRouter);
+  // Regularisation (Admin only)
+  registerRegularisationListRoutes(app);
+  registerRegularisationStatsRoutes(app);
+  registerRegularisationDetailsRoutes(app);
+  registerRegularisationActionsRoutes(app);
 
   // Mobile Money Payments & Webhooks
-  app.use("/api/payments", paymentsRouter);
-  app.use("/api/webhooks", webhooksRouter); // Webhooks pawaPay (router dédié, sans auth)
+  registerPaymentsWebhooksRoutes(app);
+  registerPaymentsCollectionRoutes(app);
+  registerPaymentsPayoutRoutes(app);
+  registerPaymentsReconciliationRoutes(app);
+  registerPaymentsManagementRoutes(app);
+
+  // Pour les tests en dev
   app.use("/api/payments-test", paymentsTestRouter); // Test endpoints (dev only)
 
   // Storage API
