@@ -18,13 +18,6 @@ import type {
   ValidationResult,
 } from './reevaluation-validation-types';
 
-export type {
-  CreateReevaluationPayload,
-  ElementNouveau,
-  ReevaluationEligibilitySummary,
-  ValidationResult,
-} from './reevaluation-validation-types';
-
 /**
  * Catalogue des règles métier du workflow de réévaluation.
  */

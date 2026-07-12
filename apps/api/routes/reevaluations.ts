@@ -3,7 +3,6 @@
  *
  * Handles all HTTP endpoints for credit reevaluation workflow.
  */
-
 import type { Express, Request, Response } from "express";
 import { createLogger } from "../lib/logger";
 import { z } from "zod";
@@ -28,7 +27,8 @@ import {
   getConfigReevaluation,
   hasRefundBeenPaid
 } from "../services/reevaluation-service";
-import { checkEligibilityQuick, CreateReevaluationPayload } from "../services/reevaluation-validator";
+import { checkEligibilityQuick } from "../services/reevaluation-validator";
+import type { CreateReevaluationPayload } from "../services/reevaluation-validation-types";
 import { db } from "../db";
 import { reevaluationsCredit, enquetesComplementaires, demandesCredit, enquetesCredit, credits } from "@shared/schema/finance";
 import { clients } from "@shared/schema/clients";

@@ -1,59 +1,32 @@
 /**
- * Lettrage Service — Account Reconciliation for Tier Accounts
+ * Service de lettrage des comptes de tiers.
  *
- * Provides manual and automatic matching (lettrage) of debit/credit lines
- * on tier accounts (class 4: 411xxx, 401xxx).
- * Also provides balance âgée (aging analysis) for unmatched lines.
+ * Fournit le lettrage manuel et automatique des lignes débit/crédit sur les
+ * comptes de classe 4, ainsi que la balance âgée des lignes non lettrées.
  */
 
 import { db } from "../db";
-import { eq, and, sql, isNull, inArray, gte, lte } from "drizzle-orm";
-import { lignesEcritures, ecritures, planComptable, EntryStatus } from "@shared/schema";
+import { eq, and, sql, isNull, inArray } from "drizzle-orm";
+import { lignesEcritures, ecritures, EntryStatus } from "@shared/schema";
 import { createLogger } from "../lib/logger";
+import { incrementLettrageKey } from "./lettrage-key";
+import type {
+  BalanceAgeeEntry,
+  BalanceAgeeTranche,
+  LettrageResult,
+  LigneNonLettree,
+} from "./lettrage-types";
 
 const logger = createLogger('LettrageService');
 
-// ============================================================================
-// TYPES
-// ============================================================================
-
-export interface LettrageResult {
-  lettrageKey: string;
-  totalDebit: number;
-  totalCredit: number;
-  lignesCount: number;
-}
-
-export interface BalanceAgeeEntry {
-  tranche: string;
-  joursMin: number;
-  joursMax: number | null;
-  nbLignes: number;
-  totalDebit: number;
-  totalCredit: number;
-  solde: number;
-}
-
-export interface LigneNonLettree {
-  id: string;
-  ecritureId: string;
-  dateEcriture: string;
-  numeroPiece: string;
-  libelle: string;
-  debit: number;
-  credit: number;
-  numeroCompte: string;
-  refExterne: string | null;
-  metadata: Record<string, unknown> | null;
-}
-
-// ============================================================================
-// LETTRAGE MANUEL
-// ============================================================================
+const LETTRAGE_TOLERANCE = 1;
+const AUTO_MATCH_TOLERANCE = 0.01;
 
 /**
- * Match (lettrer) a set of entry lines.
- * All lines must be on the same account, and total debit must equal total credit.
+ * Lettre un ensemble de lignes comptables.
+ *
+ * Toutes les lignes doivent appartenir au même compte de tiers et le total
+ * débit doit équilibrer le total crédit dans la tolérance autorisée.
  */
 export async function lettrerLignes(
   ligneIds: string[],
@@ -64,7 +37,6 @@ export async function lettrerLignes(
   }
 
   return db.transaction(async (tx) => {
-    // 1. Fetch all lines
     const lignes = await tx
       .select({
         id: lignesEcritures.id,
@@ -81,37 +53,31 @@ export async function lettrerLignes(
       throw new Error(`${ligneIds.length - lignes.length} ligne(s) non trouvée(s)`);
     }
 
-    // 2. Check all lines are on the same account
     const compteIds = new Set(lignes.map(l => l.compteId));
     if (compteIds.size > 1) {
       throw new Error('Toutes les lignes doivent être sur le même compte');
     }
 
-    // 3. Check account is a tier account (class 4)
     const numeroCompte = lignes[0].numeroCompte;
     if (!isTierAccount(numeroCompte)) {
       throw new Error(`Le compte ${numeroCompte} n'est pas un compte de tiers (classe 4)`);
     }
 
-    // 4. Check no line is already matched
     const alreadyMatched = lignes.filter(l => l.lettrageKey);
     if (alreadyMatched.length > 0) {
       throw new Error(`${alreadyMatched.length} ligne(s) déjà lettrée(s)`);
     }
 
-    // 5. Verify balance (debit == credit within tolerance)
     const totalDebit = lignes.reduce((s, l) => s + parseFloat(l.debit), 0);
     const totalCredit = lignes.reduce((s, l) => s + parseFloat(l.credit), 0);
-    if (Math.abs(totalDebit - totalCredit) > 1) {
+    if (Math.abs(totalDebit - totalCredit) > LETTRAGE_TOLERANCE) {
       throw new Error(
         `Le lettrage n'est pas équilibré : débit=${totalDebit.toFixed(2)}, crédit=${totalCredit.toFixed(2)} (écart=${Math.abs(totalDebit - totalCredit).toFixed(2)})`
       );
     }
 
-    // 6. Generate next lettrage key for this account
     const lettrageKey = await getNextLettrageKey(tx, numeroCompte);
 
-    // 7. Update all lines
     const now = new Date().toISOString().split("T")[0];
     await tx
       .update(lignesEcritures)
@@ -128,12 +94,8 @@ export async function lettrerLignes(
   });
 }
 
-// ============================================================================
-// DE-LETTRAGE
-// ============================================================================
-
 /**
- * Remove matching (dé-lettrer) for a given lettrage key.
+ * Supprime le lettrage associé à une clé sur un compte donné.
  */
 export async function delettrerLignes(
   lettrageKey: string,
@@ -158,20 +120,17 @@ export async function delettrerLignes(
   return { count: result.length };
 }
 
-// ============================================================================
-// LETTRAGE AUTOMATIQUE
-// ============================================================================
-
 /**
- * Automatically match debit/credit lines with the same amount on a tier account.
- * Groups by clientId (from metadata) when available.
+ * Tente de lettrer automatiquement les lignes débit/crédit de même montant.
+ *
+ * Lorsque les métadonnées contiennent un `clientId`, le rapprochement privilégie
+ * une contrepartie du même client.
  */
 export async function autoLettrage(
   compteId: string,
   agenceId: string,
   userId: string,
 ): Promise<{ matched: number; keys: string[] }> {
-  // 1. Get all unmatched lines for this account
   const unmatched = await db
     .select({
       id: lignesEcritures.id,
@@ -195,7 +154,6 @@ export async function autoLettrage(
     return { matched: 0, keys: [] };
   }
 
-  // 2. Group by clientId (from metadata) for better matching
   const debitLines = unmatched.filter(l => parseFloat(l.debit) > 0);
   const creditLines = unmatched.filter(l => parseFloat(l.credit) > 0);
 
@@ -203,18 +161,15 @@ export async function autoLettrage(
   const keys: string[] = [];
   const usedIds = new Set<string>();
 
-  // 3. Match exact amounts
   for (const debitLine of debitLines) {
     if (usedIds.has(debitLine.id)) continue;
     const debitAmount = parseFloat(debitLine.debit);
     const debitClientId = (debitLine.metadata as Record<string, unknown>)?.clientId;
 
-    // Find matching credit with same amount (prefer same client)
     const match = creditLines.find(cl => {
       if (usedIds.has(cl.id)) return false;
       const creditAmount = parseFloat(cl.credit);
-      if (Math.abs(debitAmount - creditAmount) > 0.01) return false;
-      // Prefer same client match
+      if (Math.abs(debitAmount - creditAmount) > AUTO_MATCH_TOLERANCE) return false;
       const creditClientId = (cl.metadata as Record<string, unknown>)?.clientId;
       return debitClientId && creditClientId ? debitClientId === creditClientId : true;
     });
@@ -226,8 +181,8 @@ export async function autoLettrage(
         usedIds.add(match.id);
         totalMatched += 2;
         keys.push(result.lettrageKey);
-      } catch {
-        // Skip if lettrage fails (shouldn't happen with valid pairs)
+      } catch (error) {
+        logger.debug({ err: error, debitLineId: debitLine.id, creditLineId: match.id }, 'Auto-lettrage pair skipped');
       }
     }
   }
@@ -236,12 +191,8 @@ export async function autoLettrage(
   return { matched: totalMatched, keys };
 }
 
-// ============================================================================
-// LIGNES NON LETTREES
-// ============================================================================
-
 /**
- * Get all unmatched lines for a tier account.
+ * Retourne les lignes non lettrées d'un compte de tiers pour une agence.
  */
 export async function getLignesNonLettrees(
   compteId: string,
@@ -286,11 +237,7 @@ export async function getLignesNonLettrees(
   }));
 }
 
-// ============================================================================
-// BALANCE AGEE
-// ============================================================================
-
-const TRANCHES = [
+const BALANCE_AGEE_TRANCHES: BalanceAgeeTranche[] = [
   { label: '0-30 jours', min: 0, max: 30 },
   { label: '31-60 jours', min: 31, max: 60 },
   { label: '61-90 jours', min: 61, max: 90 },
@@ -298,7 +245,7 @@ const TRANCHES = [
 ];
 
 /**
- * Get aging analysis for unmatched lines on a tier account.
+ * Calcule la balance âgée des lignes non lettrées d'un compte de tiers.
  */
 export async function getBalanceAgee(
   compteId: string,
@@ -308,7 +255,6 @@ export async function getBalanceAgee(
   const refDate = dateReference || new Date();
   const refDateStr = refDate.toISOString().split("T")[0];
 
-  // Get all unmatched lines with their age
   const rows = await db.execute(sql`
     SELECT
       le.id,
@@ -325,7 +271,7 @@ export async function getBalanceAgee(
     ORDER BY ec.date_ecriture
   `);
 
-  const result: BalanceAgeeEntry[] = TRANCHES.map(t => ({
+  const result: BalanceAgeeEntry[] = BALANCE_AGEE_TRANCHES.map(t => ({
     tranche: t.label,
     joursMin: t.min,
     joursMax: t.max,
@@ -356,12 +302,7 @@ export async function getBalanceAgee(
   return result;
 }
 
-// ============================================================================
-// HELPERS
-// ============================================================================
-
 function isTierAccount(numeroCompte: string): boolean {
-  // Class 4 accounts: 4xxxxx (clients, fournisseurs, etc.)
   return numeroCompte.startsWith('4');
 }
 
@@ -369,7 +310,6 @@ async function getNextLettrageKey(
   tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   numeroCompte: string,
 ): Promise<string> {
-  // Find the highest existing lettrage key for this account
   const [last] = await tx
     .select({ lettrageKey: lignesEcritures.lettrageKey })
     .from(lignesEcritures)
@@ -384,23 +324,5 @@ async function getNextLettrageKey(
 
   if (!last?.lettrageKey) return 'AA';
 
-  return incrementKey(last.lettrageKey);
-}
-
-/**
- * Increment alphabetical key: AA -> AB -> ... -> AZ -> BA -> ... -> ZZ -> AAA
- */
-function incrementKey(key: string): string {
-  const chars = key.split('');
-
-  for (let i = chars.length - 1; i >= 0; i--) {
-    if (chars[i] < 'Z') {
-      chars[i] = String.fromCharCode(chars[i].charCodeAt(0) + 1);
-      return chars.join('');
-    }
-    chars[i] = 'A';
-  }
-
-  // All chars were Z — add another character
-  return 'A' + chars.join('');
+  return incrementLettrageKey(last.lettrageKey);
 }

@@ -11,8 +11,6 @@ import { createLogger } from '../lib/logger';
 import { currencySymbol, currencyLabel } from '@shared/config/currency';
 import type { PayslipPdfData } from './payslip-pdf-types';
 
-export type { PayslipPdfData, PayslipPdfLine } from './payslip-pdf-types';
-
 const logger = createLogger('PayslipPDF');
 
 type JsPDFWithAutoTable = jsPDF & {

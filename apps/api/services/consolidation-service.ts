@@ -30,14 +30,6 @@ import {
   type ResultatSectionDefinition,
 } from "./accounting-presentation-standards";
 
-export type {
-  AgencyBreakdown,
-  ConsolidatedBilan,
-  ConsolidatedCompteResultat,
-  ConsolidatedTrialBalance,
-  ConsolidationReport,
-} from "./consolidation-types";
-
 const logger = createLogger('ConsolidationService');
 
 export interface ConsolidationOptions {

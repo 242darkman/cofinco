@@ -30,80 +30,49 @@
  */
 
 import { db } from '../db';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
+import { permissionAnalyticsConfig, permissionUsageLogs } from '@shared/schema';
 import { createLogger } from '../lib/logger';
+import { toPermissionUsageLogInsert } from './permission-analytics-mappers';
+import type {
+  AnalyticsConfig,
+  PermissionCheckLog,
+  PermissionDenialStats,
+  PermissionStats,
+  UnusedPermission,
+} from './permission-analytics-types';
 
 const logger = createLogger('PermissionAnalytics');
 
-/**
- * Configuration des analytics
- */
-interface AnalyticsConfig {
-  enabled: boolean;
-  samplingRateAllowed: number;
-  samplingRateDenied: number;
-  batchSize: number;
-  flushIntervalMs: number;
-  retentionDays: number;
-}
+type ConfigKey = keyof AnalyticsConfig;
 
-/**
- * Entrée de log de vérification
- */
-export interface PermissionCheckLog {
-  userId: string;
-  userRole: string;
-  permissionCode: string;
-  action: string;
-  subject: string;
-  allowed: boolean;
-  deniedReason?: string;
-  agenceId?: string;
-  resourceId?: string;
-  resourceType?: string;
-  endpoint?: string;
-  ipAddress?: string;
-}
+const CONFIG_DB_KEYS: Record<ConfigKey, string> = {
+  enabled: 'enabled',
+  samplingRateAllowed: 'sampling_rate_allowed',
+  samplingRateDenied: 'sampling_rate_denied',
+  batchSize: 'batch_size',
+  flushIntervalMs: 'flush_interval_ms',
+  retentionDays: 'retention_days',
+};
 
-/**
- * Statistiques agrégées par permission
- */
-export interface PermissionStats {
-  permissionCode: string;
-  action: string;
-  subject: string;
-  totalChecks: number;
-  allowedCount: number;
-  deniedCount: number;
-  uniqueUsers: number;
-  allowRate: number;
-  firstCheck: Date;
-  lastCheck: Date;
-}
+const CONFIG_KEY_BY_DB_KEY: Record<string, ConfigKey> = Object.fromEntries(
+  Object.entries(CONFIG_DB_KEYS).map(([key, dbKey]) => [dbKey, key as ConfigKey]),
+);
 
-/**
- * Permission inutilisée
- */
-export interface UnusedPermission {
-  id: string;
-  code: string;
-  name: string;
-  moduleName: string;
-  createdAt: Date;
-}
+const DEFAULT_CONFIG: AnalyticsConfig = {
+  enabled: false,
+  samplingRateAllowed: 0.01,
+  samplingRateDenied: 1.0,
+  batchSize: 100,
+  flushIntervalMs: 5000,
+  retentionDays: 30,
+};
 
 /**
  * Service d'analytics des permissions
  */
 class PermissionAnalyticsService {
-  private config: AnalyticsConfig = {
-    enabled: false,
-    samplingRateAllowed: 0.01,
-    samplingRateDenied: 1.0,
-    batchSize: 100,
-    flushIntervalMs: 5000,
-    retentionDays: 30,
-  };
+  private config: AnalyticsConfig = { ...DEFAULT_CONFIG };
 
   private buffer: PermissionCheckLog[] = [];
   private flushTimer: NodeJS.Timeout | null = null;
@@ -134,31 +103,15 @@ class PermissionAnalyticsService {
    */
   private async loadConfig(): Promise<void> {
     try {
-      const result = await db.execute<{ key: string; value: any }>(
-        sql`SELECT key, value FROM permission_analytics_config`
-      );
+      const rows = await db
+        .select({
+          key: permissionAnalyticsConfig.key,
+          value: permissionAnalyticsConfig.value,
+        })
+        .from(permissionAnalyticsConfig);
 
-      for (const row of result.rows as any[]) {
-        switch (row.key) {
-          case 'enabled':
-            this.config.enabled = row.value === 'true' || row.value === true;
-            break;
-          case 'sampling_rate_allowed':
-            this.config.samplingRateAllowed = parseFloat(row.value);
-            break;
-          case 'sampling_rate_denied':
-            this.config.samplingRateDenied = parseFloat(row.value);
-            break;
-          case 'batch_size':
-            this.config.batchSize = parseInt(row.value);
-            break;
-          case 'flush_interval_ms':
-            this.config.flushIntervalMs = parseInt(row.value);
-            break;
-          case 'retention_days':
-            this.config.retentionDays = parseInt(row.value);
-            break;
-        }
+      for (const row of rows) {
+        applyConfigValue(this.config, row.key, row.value);
       }
     } catch (error) {
       // Table might not exist yet
@@ -225,31 +178,7 @@ class PermissionAnalyticsService {
     this.buffer = [];
 
     try {
-      // Construire l'insert batch
-      const values = logsToInsert.map(log => `(
-        gen_random_uuid(),
-        '${log.userId}',
-        '${log.userRole}',
-        '${log.permissionCode}',
-        '${log.action}',
-        '${log.subject}',
-        ${log.allowed},
-        ${log.deniedReason ? `'${log.deniedReason.replace(/'/g, "''")}'` : 'NULL'},
-        ${log.agenceId ? `'${log.agenceId}'` : 'NULL'},
-        ${log.resourceId ? `'${log.resourceId}'` : 'NULL'},
-        ${log.resourceType ? `'${log.resourceType}'` : 'NULL'},
-        ${log.endpoint ? `'${log.endpoint}'` : 'NULL'},
-        ${log.ipAddress ? `'${log.ipAddress}'::INET` : 'NULL'},
-        NOW()
-      )`).join(',');
-
-      await db.execute(sql.raw(`
-        INSERT INTO permission_usage_logs (
-          id, user_id, user_role, permission_code, action, subject,
-          allowed, denied_reason, agence_id, resource_id, resource_type,
-          endpoint, ip_address, checked_at
-        ) VALUES ${values}
-      `));
+      await db.insert(permissionUsageLogs).values(logsToInsert.map(toPermissionUsageLogInsert));
     } catch (error) {
       logger.error({ err: error }, 'Flush failed');
       // On ne remet pas les logs en buffer pour éviter une boucle infinie
@@ -267,23 +196,13 @@ class PermissionAnalyticsService {
    * Mettre à jour la configuration
    */
   async updateConfig(updates: Partial<AnalyticsConfig>): Promise<void> {
-    const configMap: Record<keyof AnalyticsConfig, string> = {
-      enabled: 'enabled',
-      samplingRateAllowed: 'sampling_rate_allowed',
-      samplingRateDenied: 'sampling_rate_denied',
-      batchSize: 'batch_size',
-      flushIntervalMs: 'flush_interval_ms',
-      retentionDays: 'retention_days',
-    };
-
     for (const [key, value] of Object.entries(updates)) {
-      const dbKey = configMap[key as keyof AnalyticsConfig];
+      const dbKey = CONFIG_DB_KEYS[key as keyof AnalyticsConfig];
       if (dbKey) {
-        await db.execute(sql`
-          UPDATE permission_analytics_config
-          SET value = ${JSON.stringify(value)}, updated_at = NOW()
-          WHERE key = ${dbKey}
-        `);
+        await db
+          .update(permissionAnalyticsConfig)
+          .set({ value, updatedAt: new Date() })
+          .where(eq(permissionAnalyticsConfig.key, dbKey));
       }
     }
 
@@ -326,12 +245,7 @@ class PermissionAnalyticsService {
   /**
    * Obtenir les permissions les plus refusées
    */
-  async getTopDenials(limit = 10): Promise<Array<{
-    permissionCode: string;
-    deniedCount: number;
-    uniqueUsers: number;
-    lastDenied: Date;
-  }>> {
+  async getTopDenials(limit = 10): Promise<PermissionDenialStats[]> {
     try {
       const result = await db.execute(sql`
         SELECT
@@ -345,7 +259,17 @@ class PermissionAnalyticsService {
         ORDER BY "deniedCount" DESC
         LIMIT ${limit}
       `);
-      return result.rows as any[];
+      return (result.rows as unknown as Array<{
+        permissionCode: string;
+        deniedCount: string | number;
+        uniqueUsers: string | number;
+        lastDenied: Date;
+      }>).map(row => ({
+        permissionCode: row.permissionCode,
+        deniedCount: Number(row.deniedCount),
+        uniqueUsers: Number(row.uniqueUsers),
+        lastDenied: row.lastDenied,
+      }));
     } catch (error) {
       logger.error({ err: error }, 'Failed to get denials');
       return [];
@@ -393,7 +317,7 @@ class PermissionAnalyticsService {
       const result = await db.execute<{ purge_old_permission_logs: number }>(
         sql`SELECT purge_old_permission_logs(${days})`
       );
-      const deleted = (result.rows[0] as any)?.purge_old_permission_logs ?? 0;
+      const deleted = Number(result.rows[0]?.purge_old_permission_logs ?? 0);
       logger.info({ deleted }, 'Purged old logs');
       return deleted;
     } catch (error) {
@@ -401,6 +325,25 @@ class PermissionAnalyticsService {
       return 0;
     }
   }
+}
+
+function applyConfigValue(config: AnalyticsConfig, dbKey: string, value: unknown): void {
+  const key = CONFIG_KEY_BY_DB_KEY[dbKey];
+  if (!key) return;
+
+  if (key === 'enabled') {
+    config.enabled = value === true || value === 'true';
+    return;
+  }
+
+  const numericValue = toFiniteNumber(value);
+  if (numericValue === null) return;
+  config[key] = numericValue;
+}
+
+function toFiniteNumber(value: unknown): number | null {
+  const numericValue = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(numericValue) ? numericValue : null;
 }
 
 // Singleton instance

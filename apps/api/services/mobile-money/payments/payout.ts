@@ -3,7 +3,7 @@ import { type PaymentIntent, transactionsCompte, operationsCaisse, paymentIntent
 import { executeWithLedger, updateCompteSolde } from "../../ledger";
 import { getOrCreateDigitalCaisse, updateDigitalCaisseSolde } from "../mm-caisse-service";
 import { MethodePaiement, TypeOperationCaisse } from "@shared/enum/status-constants";
-import type { TypePaiementTerrainDz, TypeOperationCaisseDz, DisbursementStatusDz, StatutCreditDz } from "@shared/enum/enums";
+import type { TypePaiementTerrainDz, TypeOperationCaisseDz } from "@shared/enum/enums";
 import { createLogger } from "../../../lib/logger";
 import { findActiveSession, resolveOperator } from "./helpers";
 import { operatorToCorrespondent } from "../providers/pawapay/pawapay-config";
@@ -15,6 +15,7 @@ import { normalizePhone } from "@shared/utils/phone";
 import type { InitiatePayoutParams } from "../types";
 import { MobileMoneyError } from "../types";
 import { canMemberWithdraw } from "../../tontine-logic";
+import { runSuccessfulPayoutPostProcessing, type SuccessfulPayoutType } from "./payout-post-processing";
 
 const logger = createLogger("PaymentService:Payout");
 
@@ -165,8 +166,8 @@ export async function processSuccessfulPayout(
   providerTxnId?: string
 ): Promise<void> {
   const metadata = intent.metadata as Record<string, unknown> | null;
-  const operator = (intent as any).operator || intent.provider;
-  const typePaiement = intent.creditId
+  const operator = intent.operator || intent.provider;
+  const typePaiement: SuccessfulPayoutType = intent.creditId
     ? "CREDIT_DISBURSEMENT"
     : metadata?.useCase === "CLOSURE_PAYOUT"
       ? "CLOSURE_PAYOUT"
@@ -195,7 +196,7 @@ export async function processSuccessfulPayout(
       metadata: {
         provider: operator, // Les règles GL correspondent à l'opérateur (MTN/AIRTEL)
         gateway: "PAWAPAY",
-        correspondent: (intent as any).correspondent,
+        correspondent: intent.correspondent,
         phone: intent.phone,
         externalRef: intent.externalRef,
         feeOption: intent.feeOption || undefined,
@@ -261,7 +262,7 @@ export async function processSuccessfulPayout(
                 metadata: {
                   gateway: "PAWAPAY",
                   operator,
-                  correspondent: (intent as any).correspondent,
+                  correspondent: intent.correspondent,
                   providerTxnId,
                   phone: intent.phone,
                 },
@@ -297,93 +298,12 @@ export async function processSuccessfulPayout(
 
   logger.info({ intentId: intent.id, mouvementId: mouvement.id }, 'Payout processed');
 
-  // Hook post-payout: finaliser la fermeture si c'était un paiement de clôture
-  if (metadata?.useCase === "CLOSURE_PAYOUT" && metadata?.closureRequestId) {
-    try {
-      const { handleClosurePayoutSuccess } = await import("../../compte-closure");
-      await handleClosurePayoutSuccess(
-        metadata.closureRequestId as string,
-        mouvement.id
-      );
-      logger.info({ intentId: intent.id, closureRequestId: metadata.closureRequestId }, 'Closure payout finalized');
-    } catch (error) {
-      logger.error({ intentId: intent.id, err: error }, 'Failed to finalize closure after payout');
-    }
-  }
-
-  // Hook post-payout: finaliser le paiement de commission
-  if (metadata?.useCase === "COMMISSION_PAYOUT" && metadata?.commissionId) {
-    try {
-      const { finalizeCommissionMobileMoney } = await import("../../commission-payment-service");
-      await finalizeCommissionMobileMoney(
-        metadata.commissionId as string,
-        mouvement.id
-      );
-      logger.info({ intentId: intent.id, commissionId: metadata.commissionId }, 'Commission payout finalized');
-    } catch (error) {
-      logger.error({ intentId: intent.id, err: error }, 'Failed to finalize commission after payout');
-    }
-  }
-
-  // Hook post-payout: activer le crédit après décaissement réussi par Mobile Money
-  if (intent.creditId && typePaiement === "CREDIT_DISBURSEMENT") {
-    try {
-      const { updateCredit, generateCreditSchedule } = await import("../../../storage/finance");
-      const { StatutCredit } = await import("@shared/enum/status-constants");
-
-      await updateCredit(intent.creditId, {
-        statut: StatutCredit.ACTIVE as StatutCreditDz,
-        disbursementStatus: 'COMPLETED' as DisbursementStatusDz,
-        disbursedAt: new Date(),
-        disbursedBy: intent.createdBy,
-      });
-
-      // Générer l'échéancier (obligatoire, même pattern que le canal ACCOUNT)
-      try {
-        await generateCreditSchedule(intent.creditId);
-      } catch (scheduleErr) {
-        logger.error({ err: scheduleErr, creditId: intent.creditId }, 'Échec génération échéancier après décaissement MM — crédit rétrogradé');
-        await updateCredit(intent.creditId, {
-          statut: 'PENDING' as StatutCreditDz,
-          disbursementStatus: 'FAILED' as DisbursementStatusDz,
-        });
-      }
-
-      // Diffuser la notification WebSocket
-      try {
-        const { getWsInstance } = await import("../../../ws-server");
-        const wsInstance = getWsInstance();
-        if (wsInstance) {
-          wsInstance.broadcast({
-            type: "CAISSE_UPDATE" as any,
-            payload: {
-              subtype: 'LOAN_DISBURSEMENT_CONFIRMED',
-              creditId: intent.creditId,
-              channel: 'MOBILE_MONEY',
-              provider: (intent as any).operator || intent.provider,
-              amount: parseFloat(intent.amount),
-              timestamp: new Date().toISOString(),
-            }
-          });
-        }
-      } catch (_wsErr) { /* non critique */ }
-
-      logger.info({ intentId: intent.id, creditId: intent.creditId }, 'Credit activated after Mobile Money disbursement');
-    } catch (error) {
-      logger.error({ intentId: intent.id, creditId: intent.creditId, err: error }, 'Failed to activate credit after payout');
-    }
-  }
-
-  // Hook post-payout: finaliser le paiement de salaire après succès
-  if (metadata?.useCase === "SALARY_PAYOUT" && metadata?.jobId) {
-    try {
-      const { handlePayoutSuccess } = await import("../../salary-payment-service");
-      await handlePayoutSuccess(metadata.jobId as string, mouvement.id);
-      logger.info({ intentId: intent.id, jobId: metadata.jobId }, 'Salary payout finalized');
-    } catch (error) {
-      logger.error({ intentId: intent.id, jobId: metadata.jobId, err: error }, 'Failed to finalize salary payout');
-    }
-  }
+  await runSuccessfulPayoutPostProcessing({
+    intent,
+    metadata,
+    mouvementId: mouvement.id,
+    typePaiement,
+  });
 }
 
 /**

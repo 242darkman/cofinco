@@ -33,16 +33,9 @@ import {
   TontineTurnAuditActionType,
   TontineFrequency,
 } from "@shared/schema/tontines";
-import {
-  users,
-} from "@shared/schema/auth";
-import {
-  clients,
-} from "@shared/schema/clients";
-import {
-  mouvementsFinanciers,
-  comptes,
-} from "@shared/schema/finance";
+import { users } from "@shared/schema/auth";
+import { clients } from "@shared/schema/clients";
+import { mouvementsFinanciers, comptes } from "@shared/schema/finance";
 import { coffresForts } from "@shared/schema/coffres-forts";
 import { dispatchDomainEvent } from "./notifications/domain-events/event-registry";
 import { eq, and, sql, desc, asc, gte, lte, or, isNull, ne } from "drizzle-orm";
