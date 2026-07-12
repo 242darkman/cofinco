@@ -649,21 +649,21 @@ describe("Decimal precision — money.ts utility functions", () => {
     // Sum must equal exactly 1000 (no floating-point loss)
     const sum = parts.reduce((acc, p) => acc.plus(p), D(0));
     expect(sum.toNumber()).toBe(1000);
-    // First two parts = 333.33, last = 333.34
+    // Les deux premières parts valent 333.33, la dernière vaut 333.34.
     expect(parts[0].toNumber()).toBe(333.33);
     expect(parts[1].toNumber()).toBe(333.33);
     expect(parts[2].toNumber()).toBe(333.34);
   });
 
   it("Decimal division then multiplication should not lose precision (unlike float)", () => {
-    // Classic float failure: 0.1 + 0.2 !== 0.3 with Number
+    // Échec classique des flottants : 0.1 + 0.2 !== 0.3 avec Number.
     const floatResult = 0.1 + 0.2;
-    expect(floatResult).not.toBe(0.3); // float fails (gives 0.30000000000000004)
+    expect(floatResult).not.toBe(0.3); // Le flottant donne 0.30000000000000004.
 
-    // Decimal should preserve precision through splitEvenly
+    // Decimal conserve la précision avec splitEvenly.
     const parts = splitEvenly(D("1000"), 3);
     const decimalSum = parts.reduce((acc, p) => acc.plus(p), D(0));
-    expect(decimalSum.eq(1000)).toBe(true); // Decimal succeeds
+    expect(decimalSum.eq(1000)).toBe(true); // Decimal conserve le total.
   });
 });
 
@@ -676,7 +676,7 @@ describe("Decimal precision — critical files use Decimal imports", () => {
     "storage/finance.ts",
     "routes/finance/credit-plans.ts",
     "routes/finance/sessions-caisse-request-opening.ts",
-    "routes/config.ts",
+    "routes/config-credit-durations.ts",
   ];
 
   it("all critical financial files should import from money.ts", () => {
@@ -691,7 +691,7 @@ describe("Decimal precision — critical files use Decimal imports", () => {
     // storage/finance.ts et les sous-modules d'échéancier doivent utiliser roundMoney/splitEvenly
     for (const relPath of ["storage/finance.ts", "routes/finance/credit-plans.ts", "routes/finance/sessions-caisse-request-opening.ts"]) {
       const content = readFileSync(join(ROOT, relPath), "utf-8");
-      // Should not have the old pattern: capitalPerInstallment.toFixed(2)
+      // Ne doit pas réintroduire l'ancien arrondi direct par toFixed(2).
       expect(content).not.toMatch(/capitalPerInstallment\.toFixed/);
       expect(content).not.toMatch(/interestPerInstallment\.toFixed/);
       expect(content).not.toMatch(/installmentAmount\.toFixed/);

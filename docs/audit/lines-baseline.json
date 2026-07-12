@@ -7,7 +7,6 @@
   "apps/api/routes/caisse-agent.ts": 1506,
   "apps/api/routes/clients.ts": 2521,
   "apps/api/routes/coffre.ts": 1039,
-  "apps/api/routes/config.ts": 457,
   "apps/api/routes/conversations.ts": 1791,
   "apps/api/routes/dashboard.ts": 955,
   "apps/api/routes/employes.ts": 1085,
