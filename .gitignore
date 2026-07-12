@@ -11,8 +11,12 @@ vite.config.ts.*
 /logs
 .local
 .config
-/client/dev-dist
-/client/dev-dist/sw.js
+# PWA / SW
+apps/web/dev-dist/
+apps/web/public/sw.js
+apps/web/public/sw.js.map
+apps/web/public/workbox-*.js
+
 
 deploy_key
 deploy_key.pub
@@ -35,3 +39,7 @@ test-results
 tests/e2e/report
 .playwright
 coverage
+
+# Audit generated files
+docs/audit/GL_COVERAGE_MATRIX.generated.md
+docs/audit/gl_coverage.json
