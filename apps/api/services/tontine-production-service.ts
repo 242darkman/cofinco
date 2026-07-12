@@ -12,7 +12,7 @@
 
 import { db } from "../db";
 import { createLogger } from "../lib/logger";
-import { paymentService } from "./mobile-money/payment-service";
+import { initiatePayout } from "./mobile-money/payment-service";
 
 const logger = createLogger('TontineProduction');
 import {
@@ -1095,7 +1095,8 @@ export async function approveDistribution(params: {
       finalStatus = TontineDistributionRequestStatus.PENDING_PROVIDER;
 
       try {
-        const paymentResult = await paymentService.initiatePayout({
+        logger.info({ provider: request.provider, targetMsisdn: request.targetMsisdn }, 'Initiating Mobile Money payout via pawaPay');
+        const paymentResult = await initiatePayout({
           provider: request.provider as 'MTN' | 'AIRTEL',
           amount: netAmount,
           phone: request.targetMsisdn!,

@@ -8,7 +8,7 @@ import { createLogger } from "../lib/logger";
 
 const logger = createLogger('Routes:PaymentsTest');
 import * as storage from "../storage/mobile-money";
-import { paymentService } from "../services/mobile-money/payment-service";
+import { handleWebhook } from "../services/mobile-money/payment-service";
 import { operatorToCorrespondent, resolveOperatorFromPhone } from "../services/mobile-money/providers/pawapay/pawapay-config";
 import { currencyCode } from "@shared/config/currency";
 
@@ -86,7 +86,7 @@ paymentsTestRouter.post("/simulate-webhook", async (req, res) => {
         };
 
     // Traiter comme un vrai webhook pawaPay (sans vérification de signature en sandbox)
-    await paymentService.handleWebhook(
+    await handleWebhook(
       webhookPayload,
       JSON.stringify(webhookPayload),
       "simulated-signature",

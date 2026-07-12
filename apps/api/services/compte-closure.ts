@@ -749,7 +749,7 @@ export async function createClosureMoMoPayout(
   }
 
   // Lazy import to avoid circular dependency
-  const { paymentService } = await import("./mobile-money/payment-service");
+  const { initiatePayout } = await import("./mobile-money/payment-service");
 
   const [compte] = await db
     .select({
@@ -768,7 +768,7 @@ export async function createClosureMoMoPayout(
   const payoutEventType = getClosurePayoutEventType(compte.typeCompte);
 
   try {
-    const intent = await paymentService.initiatePayout(
+    const intent = await initiatePayout(
       {
         provider,
         amount: payoutAmount,

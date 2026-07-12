@@ -29,7 +29,7 @@ import { generateCreditReminderSchedule } from "../../services/notifications/cre
 import { db } from "../../db";
 import { getWsInstance } from "../../ws-server";
 import { eq, desc, and, sql, count, inArray } from "drizzle-orm";
-import { paymentService } from "../../services/mobile-money/payment-service";
+import { initiatePayout } from "../../services/mobile-money/payment-service";
 import { currencySymbol } from "@shared/config/currency";
 import { generateCreditSchedule } from "../../storage/finance";
 import { logger } from "./shared";
@@ -217,7 +217,7 @@ export function registerCreditsDecaissementRoutes(app: Express) {
           }
 
           try {
-            const payoutIntent = await paymentService.initiatePayout({
+            const payoutIntent = await initiatePayout({
               provider,
               amount: montantDecaissement,
               phone: mobilePhone,

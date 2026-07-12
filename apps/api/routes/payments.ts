@@ -13,7 +13,7 @@ import { createLogger } from "../lib/logger";
 
 const logger = createLogger('Routes:Payments');
 import { z } from "zod";
-import { paymentService } from "../services/mobile-money/payment-service";
+import { handleWebhook, initiateCollection, initiatePayout, listPaymentIntents, getPaymentIntent, cancelPayment, initiateRefund, manualReconcile } from "../services/mobile-money/payment-service";
 import { initializeProviders, providerRegistry } from "../services/mobile-money/provider-registry";
 import {
   getReconciliationReports,
@@ -183,7 +183,7 @@ async function handlePawaPayWebhook(req: Request, res: Response) {
                       (req.headers["signature-input"] as string) || "";
     const headers = req.headers as Record<string, string>;
 
-    await paymentService.handleWebhook(req.body, bodyForSignature, signature, headers);
+    await handleWebhook(req.body, bodyForSignature, signature, headers);
 
     logger.info({ processingTimeMs: Date.now() - startTime }, 'pawaPay webhook processed');
 
@@ -220,7 +220,7 @@ paymentsRouter.post("/collect", requireAuth, attachAbility, requireAbility(Actio
       parsed.data.agenceId = req.session.user.agenceId;
     }
 
-    const intent = await paymentService.initiateCollection(
+    const intent = await initiateCollection(
       parsed.data,
       req.session!.user!.id
     );
@@ -253,7 +253,7 @@ paymentsRouter.post("/payout", requireAuth, attachAbility, requireAbility(Action
       parsed.data.agenceId = req.session.user.agenceId;
     }
 
-    const intent = await paymentService.initiatePayout(
+    const intent = await initiatePayout(
       parsed.data,
       req.session!.user!.id
     );
@@ -341,7 +341,7 @@ paymentsRouter.get("/", requireAuth, attachAbility, requireAbility(Actions.VIEW,
       to: parsed.data.to ? new Date(parsed.data.to) : undefined,
     };
 
-    const result = await paymentService.listPaymentIntents(filter as any);
+    const result = await listPaymentIntents(filter as any);
 
     res.json(result);
   } catch (error) {
@@ -564,7 +564,7 @@ paymentsRouter.get("/fee-estimate", requireAuth, async (req: Request, res: Respo
  */
 paymentsRouter.get("/:id", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE), async (req, res) => {
   try {
-    const intent = await paymentService.getPaymentIntent(req.params.id);
+    const intent = await getPaymentIntent(req.params.id);
 
     if (!intent) {
       return res.status(404).json({ error: "Paiement non trouvé" });
@@ -582,7 +582,7 @@ paymentsRouter.get("/:id", requireAuth, attachAbility, requireAbility(Actions.VI
  */
 paymentsRouter.post("/:id/cancel", requireAuth, attachAbility, requireAbility(Actions.CANCEL, Subjects.CAISSE), async (req, res) => {
   try {
-    const intent = await paymentService.cancelPayment(
+    const intent = await cancelPayment(
       req.params.id,
       req.session!.user!.id
     );
@@ -609,7 +609,7 @@ paymentsRouter.post("/:id/refund", requireAuth, attachAbility, requireAbility(Ac
       return res.status(400).json({ error: "Le montant doit être un nombre positif" });
     }
 
-    const intent = await paymentService.initiateRefund(
+    const intent = await initiateRefund(
       req.params.id,
       amount,
       req.session!.user!.id
@@ -635,7 +635,7 @@ paymentsRouter.post("/:id/refund", requireAuth, attachAbility, requireAbility(Ac
  */
 paymentsRouter.post("/:id/fail-enqueued", requireAuth, attachAbility, requireAbility(Actions.CANCEL, Subjects.CAISSE), async (req, res) => {
   try {
-    const intent = await paymentService.getPaymentIntent(req.params.id);
+    const intent = await getPaymentIntent(req.params.id);
 
     if (!intent) {
       return res.status(404).json({ error: "Paiement non trouvé" });
@@ -653,7 +653,7 @@ paymentsRouter.post("/:id/fail-enqueued", requireAuth, attachAbility, requireAbi
     await pawaPayProvider.failEnqueuedPayout(intent.externalRef);
 
     // Update intent status
-    const updated = await paymentService.cancelPayment(req.params.id, req.session!.user!.id);
+    const updated = await cancelPayment(req.params.id, req.session!.user!.id);
 
     res.json({
       success: true,
@@ -676,7 +676,7 @@ paymentsRouter.post("/:id/manual-reconcile", requireAuth, attachAbility, require
       return res.status(400).json({ error: "Données invalides", details: parsed.error.errors });
     }
 
-    const intent = await paymentService.manualReconcile(
+    const intent = await manualReconcile(
       req.params.id,
       parsed.data.decision,
       parsed.data.providerTxnId,

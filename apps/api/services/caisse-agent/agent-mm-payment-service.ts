@@ -31,7 +31,7 @@ import {
   type InsertAgentMmPayment,
 } from "@shared/schema";
 import { eq, and, desc, sql, gte, lte, isNull } from "drizzle-orm";
-import { paymentService } from "../mobile-money/payment-service";
+import { initiateCollection, cancelPayment } from "../mobile-money/payment-service";
 import { generateReference } from "../ledger";
 import type { InitiateCollectionParams } from "../mobile-money/types";
 import { createLogger } from "../../lib/logger";
@@ -96,7 +96,6 @@ export interface AgentMmPaymentFilter {
 // SERVICE
 // ============================================
 
-class AgentMmPaymentService {
   /**
    * Initie un paiement Mobile Money par un agent terrain
    *
@@ -108,7 +107,7 @@ class AgentMmPaymentService {
    *
    * Le webhook SUCCESS (via paymentService) fait le settlement automatiquement.
    */
-  async initiatePayment(params: InitiateAgentMmPaymentParams): Promise<AgentMmPaymentResult> {
+export async function initiatePayment(params: InitiateAgentMmPaymentParams): Promise<AgentMmPaymentResult> {
     const {
       agentId,
       clientId,
@@ -130,7 +129,7 @@ class AgentMmPaymentService {
 
     // 1. Vérifier l'idempotence
     if (idempotencyKey) {
-      const existing = await this.getByIdempotencyKey(idempotencyKey);
+      const existing = await getByIdempotencyKey(idempotencyKey);
       if (existing) {
         logger.info({ paymentId: existing.id }, 'Idempotent request, returning existing payment');
         return { success: true, payment: existing, paymentIntentId: existing.paymentIntentId || undefined };
@@ -163,7 +162,7 @@ class AgentMmPaymentService {
     }
 
     // 4. Valider le produit financier cible
-    const targetValidation = await this.validateFinancialTarget(typePaiement, { creditId, compteId, tontineId });
+    const targetValidation = await validateFinancialTarget(typePaiement, { creditId, compteId, tontineId });
     if (!targetValidation.valid) {
       return { success: false, error: targetValidation.error, errorCode: "INVALID_TARGET" };
     }
@@ -220,7 +219,7 @@ class AgentMmPaymentService {
         },
       };
 
-      const intent = await paymentService.initiateCollection(collectionParams, createdBy);
+      const intent = await initiateCollection(collectionParams, createdBy);
 
       // 8. Lier le payment intent à notre enregistrement
       const [updatedPayment] = await db
@@ -272,7 +271,7 @@ class AgentMmPaymentService {
    * Appelé par le webhook paymentService quand le paiement est SUCCESS
    * Met à jour l'enregistrement agent_mm_payments
    */
-  async handlePaymentSuccess(paymentIntentId: string, mouvementClientId: string): Promise<void> {
+export async function handlePaymentSuccess(paymentIntentId: string, mouvementClientId: string): Promise<void> {
     const [payment] = await db
       .select()
       .from(agentMmPayments)
@@ -299,7 +298,7 @@ class AgentMmPaymentService {
   /**
    * Appelé par le webhook paymentService quand le paiement FAILED
    */
-  async handlePaymentFailed(paymentIntentId: string, errorCode: string, errorMessage: string): Promise<void> {
+export async function handlePaymentFailed(paymentIntentId: string, errorCode: string, errorMessage: string): Promise<void> {
     const [payment] = await db
       .select()
       .from(agentMmPayments)
@@ -326,7 +325,7 @@ class AgentMmPaymentService {
   /**
    * Récupère un paiement par ID
    */
-  async getById(id: string): Promise<AgentMmPayment | undefined> {
+export async function getById(id: string): Promise<AgentMmPayment | undefined> {
     const [payment] = await db
       .select()
       .from(agentMmPayments)
@@ -338,7 +337,7 @@ class AgentMmPaymentService {
   /**
    * Récupère un paiement par clé d'idempotence
    */
-  async getByIdempotencyKey(key: string): Promise<AgentMmPayment | undefined> {
+export async function getByIdempotencyKey(key: string): Promise<AgentMmPayment | undefined> {
     const [payment] = await db
       .select()
       .from(agentMmPayments)
@@ -350,7 +349,7 @@ class AgentMmPaymentService {
   /**
    * Liste les paiements avec filtres
    */
-  async list(filter: AgentMmPaymentFilter): Promise<{ data: AgentMmPayment[]; total: number }> {
+export async function list(filter: AgentMmPaymentFilter): Promise<{ data: AgentMmPayment[]; total: number }> {
     const conditions = [];
 
     if (filter.agentId) {
@@ -407,7 +406,7 @@ class AgentMmPaymentService {
   /**
    * Récupère les statistiques d'un agent
    */
-  async getAgentStats(agentId: string, from?: Date, to?: Date): Promise<{
+export async function getAgentStats(agentId: string, from?: Date, to?: Date): Promise<{
     totalPayments: number;
     successCount: number;
     failedCount: number;
@@ -447,8 +446,8 @@ class AgentMmPaymentService {
   /**
    * Annule un paiement en attente
    */
-  async cancelPayment(paymentId: string, userId: string): Promise<AgentMmPaymentResult> {
-    const payment = await this.getById(paymentId);
+export async function cancelPaymentAgent(paymentId: string, userId: string): Promise<AgentMmPaymentResult> {
+    const payment = await getById(paymentId);
 
     if (!payment) {
       return { success: false, error: "Paiement non trouvé", errorCode: "NOT_FOUND" };
@@ -461,7 +460,7 @@ class AgentMmPaymentService {
     // Si un payment intent existe, l'annuler aussi
     if (payment.paymentIntentId) {
       try {
-        await paymentService.cancelPayment(payment.paymentIntentId, userId);
+        await cancelPayment(payment.paymentIntentId, userId);
       } catch (error) {
         logger.warn({ err: error }, 'Could not cancel payment intent');
       }
@@ -483,7 +482,7 @@ class AgentMmPaymentService {
   /**
    * Valide que le produit financier cible existe
    */
-  private async validateFinancialTarget(
+async function validateFinancialTarget(
     typePaiement: string,
     targets: { creditId?: string; compteId?: string; tontineId?: string }
   ): Promise<{ valid: boolean; error?: string }> {
@@ -518,8 +517,3 @@ class AgentMmPaymentService {
 
     return { valid: true };
   }
-}
-
-// Singleton export
-export const agentMmPaymentService = new AgentMmPaymentService();
-export default agentMmPaymentService;

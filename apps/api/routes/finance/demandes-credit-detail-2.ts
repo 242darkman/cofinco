@@ -18,7 +18,7 @@ import { normalizeKeysDeep, coerceValueToSchema } from "../utils";
 import { db } from "../../db";
 import { getWsInstance } from "../../ws-server";
 import { eq, desc, and, sql, count, inArray } from "drizzle-orm";
-import { paymentService } from "../../services/mobile-money/payment-service";
+import { initiateCollection } from "../../services/mobile-money/payment-service";
 import { MethodePaiement } from "@shared/enum/status-constants";
 import { currencySymbol } from "@shared/config/currency";
 import { logger } from "./shared";
@@ -199,7 +199,7 @@ export function registerDemandesCreditDetail2Routes(app: Express) {
               }
 
               // Initier la collection Mobile Money
-              const paymentIntent = await paymentService.initiateCollection({
+              const paymentIntent = await initiateCollection({
                   provider,
                   amount: parseFloat(data.montant),
                   phone,

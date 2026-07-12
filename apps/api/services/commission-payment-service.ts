@@ -341,10 +341,10 @@ export async function initiateCommissionMobileMoney(
   if (montantNet <= 0) throw new Error("Montant net de la commission invalide");
 
   // Import mobile money service dynamically to avoid circular deps
-  const { paymentService: mobileMoneyPaymentService } = await import("./mobile-money/payment-service");
+  const { initiatePayout } = await import("./mobile-money/payment-service");
 
   // Initiate payout via pawaPay
-  const intent = await mobileMoneyPaymentService.initiatePayout(
+  const intent = await initiatePayout(
     {
       provider: provider as 'MTN' | 'AIRTEL',
       amount: montantNet,

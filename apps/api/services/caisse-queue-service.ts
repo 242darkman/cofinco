@@ -414,8 +414,8 @@ async function processFeeRefund(
           throw new Error("Numéro de téléphone Mobile Money invalide");
         }
 
-        const { paymentService } = await import("./mobile-money/payment-service");
-        await paymentService.initiatePayout({
+        const { initiatePayout } = await import("./mobile-money/payment-service");
+        await initiatePayout({
           provider: momoProvider as "MTN" | "AIRTEL",
           amount,
           phone: momoPhone,

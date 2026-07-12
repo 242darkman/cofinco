@@ -230,7 +230,7 @@ async function processCashJob(job: SalaryPaymentJob): Promise<void> {
  * Le webhook pawaPay appellera handlePayoutSuccess/handlePayoutFailure.
  */
 async function processMobileMoneyJob(job: SalaryPaymentJob): Promise<void> {
-  const { paymentService } = await import("./mobile-money/payment-service");
+  const { initiatePayout } = await import("./mobile-money/payment-service");
   const { resolveOperatorFromPhone, operatorToCorrespondent } = await import("./mobile-money/providers/pawapay/pawapay-config");
 
   const amount = Number(job.amount);
@@ -300,7 +300,7 @@ async function processMobileMoneyJob(job: SalaryPaymentJob): Promise<void> {
     .where(eq(salaryPaymentJobs.id, job.id));
 
   try {
-    const intent = await paymentService.initiatePayout({
+    const intent = await initiatePayout({
       provider: operator,
       amount,
       phone,
