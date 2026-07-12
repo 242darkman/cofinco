@@ -31,7 +31,6 @@
   "apps/api/services/coffre/transfert-service.ts": 603,
   "apps/api/services/commission-payment-service.ts": 410,
   "apps/api/services/compte-closure.ts": 898,
-  "apps/api/services/comptes.ts": 2459,
   "apps/api/services/credit-allocation-service.ts": 413,
   "apps/api/services/dsf-service.ts": 472,
   "apps/api/services/exercice-cloture-service.ts": 674,
