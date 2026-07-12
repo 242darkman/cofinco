@@ -1,6 +1,12 @@
 import type { Express } from "express";
 import { createLogger } from "./lib/logger";
-import { registerAuthRoutes } from "./routes/auth";
+import { registerAuthCoreRoutes } from "./routes/auth/core";
+import { registerAuthProfileRoutes } from "./routes/auth/profile";
+import { registerUsersRoutes } from "./routes/users";
+import { registerUsersPermissionsRoutes } from "./routes/users-permissions";
+import { registerSessionsRoutes } from "./routes/sessions";
+import { registerAuditLogsRoutes } from "./routes/audit-logs";
+import { registerAdminDashboardRoutes } from "./routes/admin-dashboard";
 import { registerClientRoutes } from "./routes/clients";
 import { registerFinanceRoutes } from "./routes/finance";
 import { registerTontineRoutes } from "./routes/tontines";
@@ -113,7 +119,13 @@ export function registerRoutes(app: Express): Server {
   app.use("/api/balances", balancesRouter);
 
   // Register modular routes
-  registerAuthRoutes(app);
+  registerAuthCoreRoutes(app);
+  registerAuthProfileRoutes(app);
+  registerUsersRoutes(app);
+  registerUsersPermissionsRoutes(app);
+  registerSessionsRoutes(app);
+  registerAuditLogsRoutes(app);
+  registerAdminDashboardRoutes(app);
   registerClientRoutes(app);
   registerFinanceRoutes(app);
   registerComptesRoutes(app); // Comptes microfinance (dépôt, retrait, blocage, transfert)

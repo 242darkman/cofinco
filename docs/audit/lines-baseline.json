@@ -1,7 +1,6 @@
 {
   "apps/api/routes/accounting.ts": 1930,
   "apps/api/routes/agent-modules.ts": 1693,
-  "apps/api/routes/auth.ts": 2838,
   "apps/api/routes/caisse-admin.ts": 2205,
   "apps/api/routes/caisse-agent.ts": 1506,
   "apps/api/routes/clients.ts": 2521,
