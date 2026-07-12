@@ -1,10 +1,8 @@
 import { Router } from "express";
-import { z } from "zod";
 import { createLogger } from "../lib/logger";
 import { requireAuth } from "../auth";
 import { attachAbility, requireAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
-import { currencyCode } from "@shared/config/currency";
 
 import { listEvacuations, getEvacuationDetails, getAuditLogs, getStatistics } from "../services/evacuation-coffre/queries";
 import { createEvacuation } from "../services/evacuation-coffre/creation";
@@ -19,6 +17,15 @@ import {
   cancelEvacuation
 } from "../services/evacuation-coffre/workflow";
 import { getConfig, updateConfig } from "../services/evacuation-coffre/config";
+import {
+  createEvacuationSchema,
+  rejectEvacuationSchema,
+  prepareEvacuationSchema,
+  dispatchEvacuationSchema,
+  depositEvacuationSchema,
+  reconcileEvacuationSchema,
+  cancelEvacuationSchema
+} from "./evacuation-coffre.schemas";
 
 const logger = createLogger("Routes:EvacuationCoffre");
 
@@ -36,8 +43,8 @@ evacuationCoffreRouter.get("/", async (req, res) => {
     const { page, limit, statut, coffreSourceId, typeDestination, agenceId, dateDebut, dateFin, search, sortBy, sortOrder } = req.query;
 
     const result = await listEvacuations({
-      page: page ? parseInt(page as string) : undefined,
-      limit: limit ? parseInt(limit as string) : undefined,
+      page: page ? Number.parseInt(page as string) : undefined,
+      limit: limit ? Number.parseInt(limit as string) : undefined,
       statut: statut as string,
       coffreSourceId: coffreSourceId as string,
       typeDestination: typeDestination as string,
@@ -66,25 +73,7 @@ evacuationCoffreRouter.post("/", attachAbility, requireAbility(Actions.CREATE, S
       return res.status(401).json({ success: false, error: "Non authentifié" });
     }
 
-    const schema = z.object({
-      coffreSourceId: z.string().uuid(),
-      agenceId: z.string().uuid(),
-      typeDestination: z.enum(["BANQUE", "COFFRE_CENTRAL", "TRANSPORTEUR"]),
-      banqueNom: z.string().optional(),
-      banqueCompte: z.string().optional(),
-      banqueNumeroComptable: z.string().optional(),
-      coffreDestinationId: z.string().uuid().optional(),
-      transporteurNom: z.string().optional(),
-      transporteurContact: z.string().optional(),
-      transporteurReference: z.string().optional(),
-      montant: z.number().positive(),
-      devise: z.string().default(currencyCode()),
-      motifEvacuation: z.enum(["EXCEDENT_ENCAISSE", "FIN_EXERCICE", "SECURITE", "FERMETURE_AGENCE", "APPROVISIONNEMENT_SIEGE", "TRANSFERT_BANCAIRE", "AUTRE"]),
-      motifDetail: z.string().min(10),
-      idempotencyKey: z.string().optional(),
-    });
-
-    const data = schema.parse(req.body);
+    const data = createEvacuationSchema.parse(req.body);
 
     const result = await createEvacuation({
       ...data,
@@ -224,8 +213,7 @@ evacuationCoffreRouter.post("/:id/reject", attachAbility, requireAbility(Actions
     const userRole = req.user?.role ?? '';
     if (!userId) return res.status(401).json({ success: false, error: "Non authentifié" });
 
-    const schema = z.object({ reason: z.string().min(10) });
-    const { reason } = schema.parse(req.body);
+    const { reason } = rejectEvacuationSchema.parse(req.body);
 
     const result = await rejectEvacuation({
       evacuationId: req.params.id,
@@ -251,15 +239,7 @@ evacuationCoffreRouter.post("/:id/prepare", attachAbility, requireAbility(Action
     const userRole = req.user?.role ?? '';
     if (!userId) return res.status(401).json({ success: false, error: "Non authentifié" });
 
-    const schema = z.object({
-      typeConditionnement: z.enum(["Sac scellé", "Mallette", "Enveloppe", "Autre"]).optional(),
-      numeroScelle: z.string().optional(),
-      billetage: z.record(z.number()).optional(),
-      montantCompte: z.number().positive().optional(),
-      commentairePreparation: z.string().optional(),
-    });
-
-    const data = schema.parse(req.body);
+    const data = prepareEvacuationSchema.parse(req.body);
 
     const result = await prepareEvacuation({
       evacuationId: req.params.id,
@@ -285,17 +265,7 @@ evacuationCoffreRouter.post("/:id/dispatch", attachAbility, requireAbility(Actio
     const userRole = req.user?.role ?? '';
     if (!userId) return res.status(401).json({ success: false, error: "Non authentifié" });
 
-    const schema = z.object({
-      agentsTransport: z.array(z.object({
-        userId: z.string().uuid().optional(),
-        nom: z.string().min(2),
-        contact: z.string().min(5),
-        fonction: z.string().optional(),
-      })).optional(),
-      heureDepart: z.string().optional(),
-    });
-
-    const data = schema.parse(req.body);
+    const data = dispatchEvacuationSchema.parse(req.body);
 
     const result = await dispatchEvacuation({
       evacuationId: req.params.id,
@@ -321,15 +291,7 @@ evacuationCoffreRouter.post("/:id/deposit", attachAbility, requireAbility(Action
     const userRole = req.user?.role ?? '';
     if (!userId) return res.status(401).json({ success: false, error: "Non authentifié" });
 
-    const schema = z.object({
-      montantDepose: z.number().positive(),
-      referenceBordereau: z.string().optional(),
-      referenceRecuTransporteur: z.string().optional(),
-      heureDepot: z.string().optional(),
-      commentaireDepot: z.string().optional(),
-    });
-
-    const data = schema.parse(req.body);
+    const data = depositEvacuationSchema.parse(req.body);
 
     const result = await depositEvacuation({
       evacuationId: req.params.id,
@@ -355,13 +317,7 @@ evacuationCoffreRouter.post("/:id/reconcile", attachAbility, requireAbility(Acti
     const userRole = req.user?.role ?? '';
     if (!userId) return res.status(401).json({ success: false, error: "Non authentifié" });
 
-    const schema = z.object({
-      montantConfirme: z.number().min(0),
-      conforme: z.boolean(),
-      motifEcart: z.string().optional(),
-    });
-
-    const data = schema.parse(req.body);
+    const data = reconcileEvacuationSchema.parse(req.body);
 
     const result = await reconcileEvacuation({
       evacuationId: req.params.id,
@@ -387,8 +343,7 @@ evacuationCoffreRouter.post("/:id/cancel", async (req, res) => {
     const userRole = req.user?.role ?? '';
     if (!userId) return res.status(401).json({ success: false, error: "Non authentifié" });
 
-    const schema = z.object({ reason: z.string().min(10) });
-    const { reason } = schema.parse(req.body);
+    const { reason } = cancelEvacuationSchema.parse(req.body);
 
     const result = await cancelEvacuation({
       evacuationId: req.params.id,

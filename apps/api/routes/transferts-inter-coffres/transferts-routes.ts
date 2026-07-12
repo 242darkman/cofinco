@@ -6,15 +6,18 @@ const logger = createLogger('Routes:TransfertsInterCoffres');
 import { requireAuth } from "../../auth";
 import { attachAbility, requireAbility } from "../../authorization";
 import { Actions, Subjects } from "@shared/ability";
+import { TYPE_CONDITIONNEMENT_VALUES } from "@shared/enum/status-constants";
 import * as coffresQueries from "../../services/transfert-inter-coffres/coffres-queries";
 import * as coffresOperations from "../../services/transfert-inter-coffres/coffres-operations";
 import * as coffresConfig from "../../services/transfert-inter-coffres/coffres-config";
 import {
-  createTransfert,
+  createTransfert
+} from "../../services/transfert-inter-coffres/transfert-creation";
+import {
   submitTransfert,
   approveTransfert,
   cancelTransfert
-} from "../../services/transfert-inter-coffres/transfert-creation";
+} from "../../services/transfert-inter-coffres/transfert-validation";
 import {
   dispatchTransfert,
   receiveTransfert
@@ -118,7 +121,7 @@ transfertsRouter.post("/transferts", async (req, res) => {
       montant: z.number().positive(),
       devise: z.string().default(currencyCode()),
       motif: z.string().min(10),
-      typeConditionnement: z.enum(["Sac scellé", "Mallette", "Enveloppe", "Autre"]),
+      typeConditionnement: z.enum(TYPE_CONDITIONNEMENT_VALUES),
       numeroScelle: z.string().optional(),
       agentsTransport: z.array(z.object({
         userId: z.string().uuid().optional(),

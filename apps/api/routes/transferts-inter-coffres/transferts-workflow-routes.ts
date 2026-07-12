@@ -10,7 +10,7 @@ import {
   submitTransfert,
   approveTransfert,
   cancelTransfert
-} from "../../services/transfert-inter-coffres/transfert-creation";
+} from "../../services/transfert-inter-coffres/transfert-validation";
 import {
   dispatchTransfert,
   receiveTransfert

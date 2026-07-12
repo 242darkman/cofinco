@@ -626,6 +626,42 @@ export const MOTIF_EVACUATION_LABELS: Record<MotifEvacuationType, string> = {
   [MotifEvacuation.AUTRE]: "Autre motif",
 };
 
+// ============================================
+// TYPE CONDITIONNEMENT (Transferts inter-coffres & évacuations)
+// ============================================
+
+export const TypeConditionnement = {
+  SAC_SCELLE: "SAC_SCELLE",
+  MALLETTE: "MALLETTE",
+  ENVELOPPE: "ENVELOPPE",
+  AUTRE: "AUTRE",
+} as const;
+
+export type TypeConditionnementType = (typeof TypeConditionnement)[keyof typeof TypeConditionnement];
+
+/** Tuple des valeurs (source unique pour les schémas zod) */
+export const TYPE_CONDITIONNEMENT_VALUES = [
+  TypeConditionnement.SAC_SCELLE,
+  TypeConditionnement.MALLETTE,
+  TypeConditionnement.ENVELOPPE,
+  TypeConditionnement.AUTRE,
+] as const;
+
+/** Labels FR pour l'UI des types de conditionnement */
+export const TYPE_CONDITIONNEMENT_LABELS: Record<TypeConditionnementType, string> = {
+  [TypeConditionnement.SAC_SCELLE]: "Sac scellé",
+  [TypeConditionnement.MALLETTE]: "Mallette",
+  [TypeConditionnement.ENVELOPPE]: "Enveloppe",
+  [TypeConditionnement.AUTRE]: "Autre",
+};
+
+/** Options (value EN / label FR) pour les selects de l'UI */
+export const TYPE_CONDITIONNEMENT_OPTIONS: { value: TypeConditionnementType; label: string }[] =
+  (Object.keys(TYPE_CONDITIONNEMENT_LABELS) as TypeConditionnementType[]).map((value) => ({
+    value,
+    label: TYPE_CONDITIONNEMENT_LABELS[value],
+  }));
+
 /** Labels FR pour l'UI des types de mouvement coffre */
 export const TYPE_MOUVEMENT_COFFRE_LABELS: Record<string, string> = {
   [TypeMouvementCoffre.SORTIE_COFFRE]: "Sortie Coffre",
