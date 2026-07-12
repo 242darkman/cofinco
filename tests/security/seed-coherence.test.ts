@@ -64,7 +64,7 @@ describe("cohérence GL : seeds ↔ code", () => {
   });
 
   it("les événements GL de la synchro offline pointent vers des règles seedées", () => {
-    const syncSource = read("apps/api/routes/sync-journal.ts");
+    const syncSource = read("apps/api/services/sync-journal/business-execution.ts");
     const bases = [...syncSource.matchAll(/glEventType: '([A-Z_0-9]+)'/g)].map((m) => m[1]);
     expect(bases.length).toBeGreaterThanOrEqual(7);
 

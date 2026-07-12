@@ -20,7 +20,7 @@ const read = (relPath: string) => readFileSync(join(ROOT, relPath), "utf-8");
 
 const migrationService = read("apps/api/services/agency-migration.ts");
 const settingsRoute = read("apps/api/routes/settings.ts");
-const agencesRoute = read("apps/api/routes/agences.ts");
+const agencesRoute = read("apps/api/routes/agences/agences-migrations.ts");
 const wsServer = read("apps/api/ws-server.ts");
 const migrationSchema = read("packages/shared/schema/agency_migration.ts");
 

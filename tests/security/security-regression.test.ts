@@ -301,7 +301,7 @@ describe("Authentication — All reevaluation endpoints require auth", () => {
 describe("Open redirect — Storage route rejects external URLs", () => {
 
   it("storage file route should not redirect to external URLs", () => {
-    const content = readFileSync(join(ROOT, "routes/storage.ts"), "utf-8");
+    const content = readFileSync(join(ROOT, "routes/storage/public.ts"), "utf-8");
     // Should NOT contain res.redirect(key) for user-supplied keys
     expect(content).not.toMatch(/res\.redirect\(key\)/);
     expect(content).not.toMatch(/res\.redirect\(rawKey\)/);
@@ -315,7 +315,7 @@ describe("Open redirect — Storage route rejects external URLs", () => {
 describe("Debug logging — No console.log in webhook handlers", () => {
 
   it("payments.ts should not contain console.log", () => {
-    const content = readFileSync(join(ROOT, "routes/payments.ts"), "utf-8");
+    const content = readFileSync(join(ROOT, "routes/payments/webhooks.ts"), "utf-8");
     expect(content).not.toMatch(/console\.log/);
   });
 });
@@ -474,7 +474,7 @@ describe("CSRF — Origin/Referer validation middleware", () => {
 describe("File upload — Ownership verification", () => {
 
   it("storage entity upload should check user authorization", () => {
-    const content = readFileSync(join(ROOT, "routes/storage.ts"), "utf-8");
+    const content = readFileSync(join(ROOT, "routes/storage/entities.ts"), "utf-8");
     const uploadSection = content.substring(content.indexOf("entity/upload"));
     expect(uploadSection).toContain("isPrivileged");
     expect(uploadSection).toContain("ability");
@@ -495,14 +495,14 @@ describe("Math.random() elimination — Server-side references and IDs", () => {
     "routes/accounting.ts",
     "services/coffre/transfert-service.ts",
     "services/coffre/transfer-executor.ts",
-    "services/caisse/session-opening-service.ts",
+    "services/caisse/session-opening-direct.ts",
     "services/ledger.ts",
     "services/prospection-prime-service.ts",
     "services/hr-accounting-service.ts",
     "services/financial-monitoring-service.ts",
     "services/agency-migration.ts",
     "services/caisse-agent/operation-service.ts",
-    "services/transfert-inter-coffres/transfert-service.ts",
+    "services/transfert-inter-coffres/transfert-creation.ts",
     "services/hr-import-service.ts",
     "storage/operations.ts",
     "storage/tontines.ts",
