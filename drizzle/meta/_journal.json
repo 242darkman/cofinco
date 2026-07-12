@@ -36,6 +36,13 @@
       "when": 1783538662060,
       "tag": "0004_defaut-nom-application",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1783881736705,
+      "tag": "0005_conditionnement-enum-en",
+      "breakpoints": true
     }
   ]
 }

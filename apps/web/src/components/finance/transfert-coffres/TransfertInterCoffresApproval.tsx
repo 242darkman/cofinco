@@ -21,6 +21,7 @@ import { Button } from '@/components/ui';
 import { toast } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
 import { transfertInterCoffresApi as api } from './TransfertInterCoffresModule';
+import { getTypeConditionnementLabel } from '@shared/enum/status-constants';
 
 interface CoffreFort {
   id: string;
@@ -348,7 +349,7 @@ export default function TransfertInterCoffresApproval({
                 </div>
                 <div>
                   <p className="text-xs text-content-muted uppercase tracking-wide mb-1">Conditionnement</p>
-                  <p className="text-base text-content-primary font-medium">{currentTransfert.typeConditionnement}</p>
+                  <p className="text-base text-content-primary font-medium">{getTypeConditionnementLabel(currentTransfert.typeConditionnement)}</p>
                 </div>
               </div>
 

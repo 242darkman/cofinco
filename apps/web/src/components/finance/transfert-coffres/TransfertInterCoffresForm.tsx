@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { StatutCoffre, TypeConditionnement, type TypeConditionnementType, TYPE_CONDITIONNEMENT_OPTIONS } from '@shared/enum/status-constants';
+import { StatutCoffre, TypeConditionnement, type TypeConditionnementType, TYPE_CONDITIONNEMENT_OPTIONS, getTypeConditionnementLabel } from '@shared/enum/status-constants';
 import {
   X,
   Vault,
@@ -537,7 +537,7 @@ export default function TransfertInterCoffresForm({
               </div>
               <div className="text-2xl font-bold text-content-primary">{formatMoney(parseFloat(montant))}</div>
               <div className="text-xs text-content-muted">
-                Conditionnement: {typeConditionnement}
+                Conditionnement: {getTypeConditionnementLabel(typeConditionnement)}
                 {numeroScelle && ` - Scellé: ${numeroScelle}`}
               </div>
             </section>

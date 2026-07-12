@@ -662,6 +662,12 @@ export const TYPE_CONDITIONNEMENT_OPTIONS: { value: TypeConditionnementType; lab
     label: TYPE_CONDITIONNEMENT_LABELS[value],
   }));
 
+/** Obtient le label FR pour un type de conditionnement (tolère null/valeur inconnue) */
+export function getTypeConditionnementLabel(value: string | null | undefined): string {
+  if (!value) return "—";
+  return TYPE_CONDITIONNEMENT_LABELS[value as TypeConditionnementType] ?? value;
+}
+
 /** Labels FR pour l'UI des types de mouvement coffre */
 export const TYPE_MOUVEMENT_COFFRE_LABELS: Record<string, string> = {
   [TypeMouvementCoffre.SORTIE_COFFRE]: "Sortie Coffre",

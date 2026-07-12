@@ -1,6 +1,7 @@
 import React from 'react';
 import { useBranding } from '@/contexts/BrandingContext';
 import { currencySymbol } from '@shared/config/currency';
+import { getTypeConditionnementLabel } from '@shared/enum/status-constants';
 
 export type BonType = 'TRANSFERT' | 'SORTIE' | 'ENTREE';
 
@@ -146,7 +147,7 @@ export const TransfertCoffreBonTemplate = React.forwardRef<HTMLDivElement, Props
               <td className="bon-border px-3 py-1.5 font-semibold bon-bg-header">Type de transfert</td>
               <td className="bon-border px-3 py-1.5">{data.typeTransfert.replace(/_/g, ' → ')}</td>
               <td className="bon-border px-3 py-1.5 font-semibold bon-bg-header">Conditionnement</td>
-              <td className="bon-border px-3 py-1.5">{data.typeConditionnement || '—'}</td>
+              <td className="bon-border px-3 py-1.5">{getTypeConditionnementLabel(data.typeConditionnement)}</td>
             </tr>
             {data.numeroScelle && (
               <tr>

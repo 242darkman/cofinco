@@ -22,6 +22,7 @@ import { Button, Badge, Modal } from '@/components/ui';
 import { toast } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
 import { transfertInterCoffresApi as api } from './TransfertInterCoffresModule';
+import { getTypeConditionnementLabel } from '@shared/enum/status-constants';
 
 interface CoffreFort {
   id: string;
@@ -238,7 +239,7 @@ export default function TransfertInterCoffresReception({
             <div className="grid grid-cols-2 gap-4 mt-4">
               <div className="bg-surface-base/30 p-3 rounded-lg">
                 <p className="text-xs text-content-muted mb-1">Conditionnement</p>
-                <p className="text-sm text-content-primary">{currentTransfert.typeConditionnement}</p>
+                <p className="text-sm text-content-primary">{getTypeConditionnementLabel(currentTransfert.typeConditionnement)}</p>
               </div>
               {currentTransfert.numeroScelle && (
                 <div className="bg-surface-base/30 p-3 rounded-lg">

@@ -23,7 +23,7 @@ import {
 import { Button, Badge } from '@/components/ui';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
-import { StatutEvacuationCoffre, TypeDestinationEvacuation, MOTIF_EVACUATION_LABELS, TypeConditionnement, type TypeConditionnementType, TYPE_CONDITIONNEMENT_OPTIONS } from '@shared/enum/status-constants';
+import { StatutEvacuationCoffre, TypeDestinationEvacuation, MOTIF_EVACUATION_LABELS, TypeConditionnement, type TypeConditionnementType, TYPE_CONDITIONNEMENT_OPTIONS, getTypeConditionnementLabel } from '@shared/enum/status-constants';
 
 interface EvacuationDetailProps {
   evacuation: any;
@@ -333,7 +333,7 @@ export default function EvacuationDetail({
                 <div className="space-y-2">
                   <InfoRow label="Montant compté" value={formatMoney(evacuation.montantCompte)} bold />
                   <InfoRow label="Écart préparation" value={formatMoney(evacuation.ecartPreparation || 0)} />
-                  <InfoRow label="Conditionnement" value={evacuation.typeConditionnement || '—'} />
+                  <InfoRow label="Conditionnement" value={getTypeConditionnementLabel(evacuation.typeConditionnement)} />
                   <InfoRow label="N° scellé" value={evacuation.numeroScelle || '—'} />
                   {evacuation.agentsTransport && (
                     <div>
