@@ -13,7 +13,6 @@
   "apps/api/routes/rbac.ts": 3241,
   "apps/api/routes/reevaluations.ts": 868,
   "apps/api/routes/settings.ts": 1679,
-  "apps/api/routes/tontines.ts": 1961,
   "apps/api/services/accounting-posting-service.ts": 1397,
   "apps/api/services/agency-migration.ts": 2371,
   "apps/api/services/audit-trail-service.ts": 702,
