@@ -1,6 +1,5 @@
 {
   "apps/api/routes/accounting.ts": 1930,
-  "apps/api/routes/agences.ts": 1485,
   "apps/api/routes/agent-modules.ts": 1693,
   "apps/api/routes/auth.ts": 2838,
   "apps/api/routes/caisse-admin.ts": 2205,
@@ -10,7 +9,6 @@
   "apps/api/routes/dashboard.ts": 955,
   "apps/api/routes/employes.ts": 1085,
   "apps/api/routes/operations.ts": 1068,
-  "apps/api/routes/rbac.ts": 3241,
   "apps/api/routes/reevaluations.ts": 868,
   "apps/api/routes/settings.ts": 1679,
   "apps/api/services/accounting-posting-service.ts": 1397,
