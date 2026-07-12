@@ -37,13 +37,18 @@ import { maintenanceRouter } from "./routes/maintenance";
 import { checkMaintenanceMode } from "./middleware/maintenance";
 import { transfertsInterCoffresRouter } from "./routes/transferts-inter-coffres";
 import { evacuationCoffreRouter } from "./routes/evacuation-coffre";
-import storageRouter from "./routes/storage";
+import { registerStoragePublicRoutes } from "./routes/storage/public";
+import { registerStorageDocumentsRoutes } from "./routes/storage/documents";
+import { registerStorageEntitiesRoutes } from "./routes/storage/entities";
 import { regularisationRouter } from "./routes/regularisation";
 import { paymentsRouter, webhooksRouter } from "./routes/payments";
 import { paymentsTestRouter } from "./routes/payments-test";
 import balancesRouter from "./routes/balances";
 import permissionAnalyticsRouter from "./routes/permission-analytics";
-import { registerMonitoringRoutes } from "./routes/monitoring";
+import { registerMonitoringDashboardRoutes } from "./routes/monitoring/dashboard";
+import { registerMonitoringAlertsRoutes } from "./routes/monitoring/alerts";
+import { registerMonitoringReconciliationRoutes } from "./routes/monitoring/reconciliation";
+import { registerMonitoringSystemRoutes } from "./routes/monitoring/system";
 import { registerKpiRoutes } from "./routes/kpi";
 import { registerSyncHeartbeatRoutes } from "./routes/sync/heartbeat";
 import { registerSyncPushRoutes } from "./routes/sync/push";
@@ -82,8 +87,10 @@ export function registerRoutes(app: Express): Server {
   app.use("/api/webhooks", webhooksRouter); // Webhooks pawaPay (router dédié, sans auth)
   app.use("/api/payments-test", paymentsTestRouter); // Test endpoints (dev only)
 
-  // Storage routes (unified)
-  app.use("/api/storage", storageRouter);
+  // Storage API
+  registerStoragePublicRoutes(app);
+  registerStorageDocumentsRoutes(app);
+  registerStorageEntitiesRoutes(app);
 
   // Balances routes (unified source of truth)
   app.use("/api/balances", balancesRouter);
@@ -154,7 +161,10 @@ export function registerRoutes(app: Express): Server {
   registerReevaluationRoutes(app);
 
   // Financial Monitoring Module (alerts, reconciliation, real-time monitoring)
-  registerMonitoringRoutes(app);
+  registerMonitoringDashboardRoutes(app);
+  registerMonitoringAlertsRoutes(app);
+  registerMonitoringReconciliationRoutes(app);
+  registerMonitoringSystemRoutes(app);
 
   // KPI Module (Indicateurs clés de performance et pilotage)
   registerKpiRoutes(app);
