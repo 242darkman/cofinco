@@ -10,7 +10,6 @@
   "apps/api/routes/reevaluations.ts": 868,
   "apps/api/routes/settings.ts": 1679,
   "apps/api/services/accounting-posting-service.ts": 1397,
-  "apps/api/services/agency-migration.ts": 2371,
   "apps/api/services/audit-trail-service.ts": 702,
   "apps/api/services/balance-service.ts": 881,
   "apps/api/services/caisse-agent/agent-mm-payment-service.ts": 520,
