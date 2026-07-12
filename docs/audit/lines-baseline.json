@@ -47,7 +47,6 @@
   "apps/api/services/offline-event-reactor.ts": 481,
   "apps/api/services/payroll-engine.ts": 1161,
   "apps/api/services/rapprochement-bancaire-service.ts": 488,
-  "apps/api/services/rbac-audit-service.ts": 628,
   "apps/api/services/reevaluation-service.ts": 781,
   "apps/api/services/repayment-allocation-service.ts": 603,
   "apps/api/services/salary-payment-service.ts": 983,

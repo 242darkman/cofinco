@@ -36,7 +36,7 @@ export async function getRolePermissionsList(role: string) {
     .from(rolePermissions)
     .leftJoin(permissions, eq(rolePermissions.permissionId, permissions.id))
     .leftJoin(modules, eq(permissions.moduleId, modules.id))
-    .where(eq(rolePermissions.role, normalizedRole));
+    .where(eq(rolePermissions.role, normalizedRole as SystemRole));
 
   const { getInheritedRoles } = await import("../../authorization/ability");
   const inheritedRoleNames = await getInheritedRoles(normalizedRole);
@@ -101,7 +101,7 @@ export async function createRolePermission(data: { role: string; permission_id?:
   const [existing] = await db.select()
     .from(rolePermissions)
     .where(and(
-      eq(rolePermissions.role, normalizedRole),
+      eq(rolePermissions.role, normalizedRole as SystemRole),
       eq(rolePermissions.permissionId, permId)
     ));
 
@@ -117,7 +117,7 @@ export async function createRolePermission(data: { role: string; permission_id?:
 
   const [created] = await db.insert(rolePermissions)
     .values({
-      role: normalizedRole,
+      role: normalizedRole as SystemRole,
       permissionId: permId,
       granted,
     })
