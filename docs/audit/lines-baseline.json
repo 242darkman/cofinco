@@ -21,7 +21,6 @@
   "apps/api/routes/settings.ts": 1679,
   "apps/api/routes/storage.ts": 484,
   "apps/api/routes/sync-journal.ts": 822,
-  "apps/api/routes/sync.ts": 556,
   "apps/api/routes/tontines.ts": 1961,
   "apps/api/routes/transferts-inter-coffres.ts": 1055,
   "apps/api/services/accounting-posting-service.ts": 1397,

@@ -45,7 +45,9 @@ import balancesRouter from "./routes/balances";
 import permissionAnalyticsRouter from "./routes/permission-analytics";
 import { registerMonitoringRoutes } from "./routes/monitoring";
 import { registerKpiRoutes } from "./routes/kpi";
-import syncRouter from "./routes/sync";
+import { registerSyncHeartbeatRoutes } from "./routes/sync/heartbeat";
+import { registerSyncPushRoutes } from "./routes/sync/push";
+import { registerSyncPullRoutes } from "./routes/sync/pull";
 import { syncJournalRouter } from "./routes/sync-journal";
 import { registerArrondissementsRoutes } from "./routes/zones/arrondissements";
 import { registerMarchesRoutes } from "./routes/zones/marches";
@@ -158,7 +160,9 @@ export function registerRoutes(app: Express): Server {
   registerKpiRoutes(app);
 
   // Sync Heartbeat Module (real-time connection status)
-  app.use("/api/sync", syncRouter);
+  registerSyncHeartbeatRoutes(app);
+  registerSyncPushRoutes(app);
+  registerSyncPullRoutes(app);
 
   // Offline-Native Sync Journal (ECDSA-signed journal entries, device keys, COBAC audit)
   app.use("/api/sync", syncJournalRouter);
