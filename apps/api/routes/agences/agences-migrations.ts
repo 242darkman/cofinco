@@ -336,7 +336,7 @@ export function registerAgencesMigrationsRoutes(app: Express) {
       await agencyMigrationService.submitMigration(migration.id, userId);
 
       // Lancer l'exécution
-      agencyMigrationService.processMigration(migration.id, { userId }).catch(err => {
+      agencyMigrationService.processMigration(migration.id, { userId }).catch((err: any) => {
         logger.error({ err }, 'Background Migration Failed');
       });
 
