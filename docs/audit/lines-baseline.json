@@ -29,7 +29,6 @@
   "apps/api/services/caisse/agency-closure-service.ts": 422,
   "apps/api/services/caisse/ecart-approval-service.ts": 409,
   "apps/api/services/caisse/reconciliation-service.ts": 469,
-  "apps/api/services/caisse/security-code-rotation-service.ts": 732,
   "apps/api/services/caisse/session-closing-service.ts": 1502,
   "apps/api/services/caisse/session-opening-service.ts": 1600,
   "apps/api/services/caisse/session-service.ts": 1202,

@@ -1559,7 +1559,7 @@ caisseAdminRouter.post(
 
       const userId = req.session.user!.id;
       const userAgenceId = req.session.user!.agenceId;
-      const { securityCodeRotationService } = await import("../services/caisse/security-code-rotation-service");
+      const { securityCodeGenerator } = await import("../services/caisse/security-code-generator");
 
       // Déterminer l'agenceId cible
       let targetAgenceId = validation.data.agenceId || userAgenceId;
@@ -1581,7 +1581,7 @@ caisseAdminRouter.post(
         }
       }
 
-      const result = await securityCodeRotationService.generateCode({
+      const result = await securityCodeGenerator.generateCode({
         ...validation.data,
         agenceId: targetAgenceId,
         createdBy: userId,
@@ -1622,9 +1622,9 @@ caisseAdminRouter.post(
       }
 
       const userId = req.session.user!.id;
-      const { securityCodeRotationService } = await import("../services/caisse/security-code-rotation-service");
+      const { securityCodeValidator } = await import("../services/caisse/security-code-validator");
 
-      const result = await securityCodeRotationService.validateCode({
+      const result = await securityCodeValidator.validateCode({
         ...validation.data,
         userId,
         ipAddress: req.ip,
@@ -1663,9 +1663,9 @@ caisseAdminRouter.delete(
       const { reason } = req.body;
       const userId = req.session.user!.id;
 
-      const { securityCodeRotationService } = await import("../services/caisse/security-code-rotation-service");
+      const { securityCodeValidator } = await import("../services/caisse/security-code-validator");
 
-      const success = await securityCodeRotationService.revokeCode(id, userId, reason);
+      const success = await securityCodeValidator.revokeCode(id, userId, reason);
 
       if (!success) {
         return res.status(400).json({ error: 'Impossible de révoquer le code' });
@@ -1690,9 +1690,9 @@ caisseAdminRouter.get(
     try {
       const agenceId = req.query.agenceId as string || req.session.user?.agenceId;
 
-      const { securityCodeRotationService } = await import("../services/caisse/security-code-rotation-service");
+      const { securityCodeStats } = await import("../services/caisse/security-code-stats");
 
-      const statistics = await securityCodeRotationService.getStatistics(agenceId);
+      const statistics = await securityCodeStats.getStatistics(agenceId);
 
       res.json(statistics);
     } catch (error: any) {
@@ -1713,9 +1713,9 @@ caisseAdminRouter.get(
     try {
       const agenceId = req.query.agenceId as string || req.session.user?.agenceId;
 
-      const { securityCodeRotationService } = await import("../services/caisse/security-code-rotation-service");
+      const { securityCodePolicy } = await import("../services/caisse/security-code-policy");
 
-      const policy = await securityCodeRotationService.getRotationPolicy(agenceId);
+      const policy = await securityCodePolicy.getRotationPolicy(agenceId);
 
       res.json(policy || {
         rotationFrequencyDays: 30,
@@ -1748,9 +1748,9 @@ caisseAdminRouter.put(
       }
 
       const userId = req.session.user!.id;
-      const { securityCodeRotationService } = await import("../services/caisse/security-code-rotation-service");
+      const { securityCodePolicy } = await import("../services/caisse/security-code-policy");
 
-      const policy = await securityCodeRotationService.upsertRotationPolicy({
+      const policy = await securityCodePolicy.upsertRotationPolicy({
         ...validation.data,
         updatedBy: userId,
       });
@@ -1775,9 +1775,9 @@ caisseAdminRouter.post(
   attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE),
   async (req, res) => {
     try {
-      const { securityCodeRotationService } = await import("../services/caisse/security-code-rotation-service");
+      const { securityCodePolicy } = await import("../services/caisse/security-code-policy");
 
-      const result = await securityCodeRotationService.checkAndApplyRotation();
+      const result = await securityCodePolicy.checkAndApplyRotation();
 
       res.json({
         ...result,
