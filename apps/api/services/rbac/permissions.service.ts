@@ -1,5 +1,5 @@
 import { eq, and, desc, count, inArray } from "drizzle-orm";
-import { db } from "../../../db";
+import { db } from "../../db";
 import {
   modules,
   permissions,
@@ -8,14 +8,14 @@ import {
   permissionRequests,
   userRoles
 } from "@shared/schema";
-import { SystemRole, asSystemRole } from "@shared/types/roles";
+import { SystemRole,  } from "@shared/types/roles";
 import { getRbacVersion, buildRbacUpdatePayload, getUserIdsWithRole, incrementRbacVersion } from "../rbac-service";
-import { logAudit } from "../../../audit";
+import { logAudit } from "../../audit";
 import { auditTrailService } from "../audit-trail-service";
-import { getWsInstance } from "../../../ws-server";
+import { getWsInstance } from "../../ws-server";
 import { logRbacChange, type AuditLogContext } from "../rbac-audit-service";
 import { getPermissionsForUserV2 } from "../permissions-service";
-import { createLogger } from "../../../lib/logger";
+import { createLogger } from "../../lib/logger";
 
 const logger = createLogger('Service:RBAC:Permissions');
 
@@ -102,7 +102,7 @@ export async function bulkAssignPermissions(assignments: any[], req: any, ctx: A
 
   const byRole = new Map<string, Array<{ permissionId: string; granted: boolean }>>();
   for (const assignment of assignments) {
-    const normalizedRole = asSystemRole(assignment.role);
+    const normalizedRole = (assignment.role);
     if (!normalizedRole) {
       results.push({ role: assignment.role, permissionId: assignment.permissionId, success: false, error: 'Rôle invalide' });
       continue;
@@ -113,7 +113,7 @@ export async function bulkAssignPermissions(assignments: any[], req: any, ctx: A
     byRole.get(normalizedRole)!.push({ permissionId: assignment.permissionId, granted: assignment.granted });
   }
 
-  await db.transaction(async (tx) => {
+  await db.transaction(async (tx: any) => {
     for (const [role, roleAssignments] of byRole) {
       for (const { permissionId, granted } of roleAssignments) {
         try {
@@ -204,7 +204,7 @@ export async function getRequestablePermissions(userId: string, agenceIdActive?:
   const pendingRequests = await db.select({ permissionId: permissionRequests.permissionId })
     .from(permissionRequests)
     .where(and(eq(permissionRequests.requesterId, userId), eq(permissionRequests.status, 'PENDING')));
-  const pendingPermIds = new Set(pendingRequests.map(r => r.permissionId));
+  const pendingPermIds = new Set(pendingRequests.map((r: any) => r.permissionId));
 
   const allPermissions = await db.select({
     id: permissions.id,
@@ -219,7 +219,7 @@ export async function getRequestablePermissions(userId: string, agenceIdActive?:
     .leftJoin(modules, eq(permissions.moduleId, modules.id))
     .orderBy(modules.orderIndex, permissions.code);
 
-  const missing = allPermissions.filter(p => {
+  const missing = allPermissions.filter((p: any) => {
     if (pendingPermIds.has(p.id)) return false;
     const normalizedCode = p.code.replace(/[.:]/g, '.').toLowerCase();
     return !effectiveCodes.has(p.code) && !effectiveCodes.has(normalizedCode);
@@ -237,7 +237,7 @@ export async function getRequestablePermissions(userId: string, agenceIdActive?:
   }
 
   return {
-    permissions: missing.map(p => ({
+    permissions: missing.map((p: any) => ({
       id: p.id, code: p.code, name: p.name, description: p.description,
       moduleName: p.moduleName, moduleCategory: p.moduleCategory,
     })),

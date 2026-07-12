@@ -1,16 +1,16 @@
 import { eq, and, inArray } from "drizzle-orm";
-import { db } from "../../../db";
+import { db } from "../../db";
 import {
   modules,
   permissions,
   rolePermissions,
 } from "@shared/schema";
-import { SystemRole, asSystemRole } from "@shared/types/roles";
-import { getWsInstance } from "../../../ws-server";
-import { logAudit } from "../../../audit";
+import { SystemRole,  } from "@shared/types/roles";
+import { getWsInstance } from "../../ws-server";
+import { logAudit } from "../../audit";
 import { auditTrailService } from "../audit-trail-service";
 import { type AuditLogContext } from "../rbac-audit-service";
-import { createLogger } from "../../../lib/logger";
+import { createLogger } from "../../lib/logger";
 
 const logger = createLogger('Service:RBAC:Roles');
 
@@ -18,7 +18,7 @@ const logger = createLogger('Service:RBAC:Roles');
  * Récupère les permissions d'un rôle (directes et héritées)
  */
 export async function getRolePermissionsList(role: string) {
-  const normalizedRole = asSystemRole(role);
+  const normalizedRole = (role);
   if (!normalizedRole) {
     throw new Error("Rôle invalide");
   }
@@ -42,7 +42,7 @@ export async function getRolePermissionsList(role: string) {
   const inheritedRoleNames = await getInheritedRoles(normalizedRole);
 
   if (inheritedRoleNames.length > 0) {
-    const directPermIds = new Set(rolePerms.map(p => p.permissionId));
+    const directPermIds = new Set(rolePerms.map((p: any) => p.permissionId));
 
     const inheritedPerms = await db.select({
       id: rolePermissions.id,
@@ -82,7 +82,7 @@ export async function getRolePermissionsList(role: string) {
  * Crée ou met à jour une permission pour un rôle
  */
 export async function createRolePermission(data: { role: string; permission_id?: string; permission_code?: string; granted?: boolean }, req: any, ctx: AuditLogContext) {
-  const normalizedRole = asSystemRole(data.role);
+  const normalizedRole = (data.role);
   if (!normalizedRole) {
     throw new Error("Rôle invalide");
   }

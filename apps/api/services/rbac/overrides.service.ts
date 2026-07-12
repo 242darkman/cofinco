@@ -1,12 +1,12 @@
 import { eq, and } from "drizzle-orm";
-import { db } from "../../../db";
+import { db } from "../../db";
 import { permissions, userPermissions, userRoles } from "@shared/schema";
-import { getWsInstance } from "../../../ws-server";
-import { logAudit } from "../../../audit";
+import { getWsInstance } from "../../ws-server";
+import { logAudit } from "../../audit";
 import { auditTrailService } from "../audit-trail-service";
 import { logRbacChange, logBulkRbacChange, type AuditLogContext, validateReasonForCritical, isReasonRequiredForCritical } from "../rbac-audit-service";
 import { getRbacVersion, buildRbacUpdatePayload, toggleUserPermissionOverride as rbacToggleUserPermissionOverride, resetUserPermissionOverrides as rbacResetUserPermissionOverrides } from "../rbac-service";
-import { createLogger } from "../../../lib/logger";
+import { createLogger } from "../../lib/logger";
 
 const logger = createLogger('Service:RBAC:Overrides');
 
@@ -140,7 +140,7 @@ export async function bulkUpdateOverrides(
   const allPerms = permIds.length > 0 ? await db.select({ id: permissions.id, code: permissions.code }).from(permissions) : [];
   const permCodeMap = new Map(allPerms.map(p => [p.id, p.code]));
 
-  await db.transaction(async (tx) => {
+  await db.transaction(async (tx: any) => {
     for (const update of updates) {
       const { permissionId, granted } = update;
       if (!permissionId) {

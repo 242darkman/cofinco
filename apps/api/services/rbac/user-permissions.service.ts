@@ -1,5 +1,5 @@
 import { eq, and } from "drizzle-orm";
-import { db } from "../../../db";
+import { db } from "../../db";
 import {
   modules,
   permissions,
@@ -8,11 +8,11 @@ import {
   userRoles
 } from "@shared/schema";
 import { SystemRole } from "@shared/types/roles";
-import { logAudit } from "../../../audit";
+import { logAudit } from "../../audit";
 import { auditTrailService } from "../audit-trail-service";
-import { getWsInstance } from "../../../ws-server";
+import { getWsInstance } from "../../ws-server";
 import { type AuditLogContext } from "../rbac-audit-service";
-import { createLogger } from "../../../lib/logger";
+import { createLogger } from "../../lib/logger";
 
 const logger = createLogger('Service:RBAC:UserPermissions');
 
@@ -46,7 +46,7 @@ export async function getUserPermissions(userId: string) {
     .from(rolePermissions)
     .where(eq(rolePermissions.role, userRole));
 
-  const rolePermIds = new Set(rolePerms.filter(rp => rp.granted).map(rp => rp.permissionId));
+  const rolePermIds = new Set(rolePerms.filter((rp: any) => rp.granted).map((rp: any) => rp.permissionId));
 
   const customPerms = await db.select({
     permissionId: userPermissions.permissionId,
@@ -55,9 +55,9 @@ export async function getUserPermissions(userId: string) {
     .from(userPermissions)
     .where(eq(userPermissions.userId, userId));
 
-  const customPermMap = new Map(customPerms.map(cp => [cp.permissionId, cp]));
+  const customPermMap = new Map(customPerms.map((cp: any) => [cp.permissionId, cp]));
 
-  return allPerms.map(p => {
+  return allPerms.map((p: any) => {
     const hasRolePerm = rolePermIds.has(p.id);
     const customPerm = customPermMap.get(p.id);
 
@@ -167,7 +167,7 @@ export async function resetUserPermissions(userId: string, req: any, ctx: AuditL
   );
 
   if (existingOverrides.length > 0) {
-    const auditEntries = existingOverrides.map(override => ({
+    const auditEntries = existingOverrides.map((override: any) => ({
       entityType: 'user' as const,
       entityId: userId,
       permissionId: override.permissionId,
