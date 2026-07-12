@@ -47,8 +47,10 @@ import { registerMonitoringRoutes } from "./routes/monitoring";
 import { registerKpiRoutes } from "./routes/kpi";
 import syncRouter from "./routes/sync";
 import { syncJournalRouter } from "./routes/sync-journal";
-import { registerZoneManagementRoutes } from "./routes/zone-management";
-import { registerProspectionPrimesRoutes } from "./routes/prospection-primes";
+import { registerArrondissementsRoutes } from "./routes/zones/arrondissements";
+import { registerMarchesRoutes } from "./routes/zones/marches";
+import { registerProspectionPrimesRoutes } from "./routes/prospections/primes";
+import { registerProspectionPrimeConfigRoutes } from "./routes/prospections/prime-config";
 import { registerVilleRoutes } from "./routes/villes";
 import { registerCatalogRoutes } from "./routes/catalog";
 import { scoringAdminRouter } from "./routes/scoring-admin";
@@ -92,8 +94,10 @@ export function registerRoutes(app: Express): Server {
   registerTontineRoutes(app);
   registerOperationsRoutes(app); // Agents, prospection
   registerTrackingRoutes(app); // GPS tracking batch sync + sessions
-  registerZoneManagementRoutes(app); // Arrondissements & Marchés CRUD
+  registerArrondissementsRoutes(app); // Arrondissements CRUD
+  registerMarchesRoutes(app); // Marchés CRUD
   registerProspectionPrimesRoutes(app); // Prospection primes management
+  registerProspectionPrimeConfigRoutes(app); // Prospection primes config
   registerVilleRoutes(app); // Départements & Villes reference data
   registerCatalogRoutes(app); // Catalog Module (sectors, professions, activity types)
   registerAgentModulesRoutes(app); // Agent sub-modules (commissions, planning, objectifs, etc.)
