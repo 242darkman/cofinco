@@ -1094,9 +1094,9 @@ caisseAdminRouter.get(
       const agenceId = req.query.agenceId as string || req.session.user?.agenceId;
       const caisseId = req.query.caisseId as string | undefined;
 
-      const { predictiveBilletageService } = await import("../services/caisse/predictive-billetage-service");
+      const { denominationTemplateService } = await import("../services/caisse/denomination-template-service");
 
-      const templates = await predictiveBilletageService.getFrequentTemplates(agenceId, caisseId);
+      const templates = await denominationTemplateService.getFrequentTemplates(agenceId, caisseId);
 
       res.json(templates);
     } catch (error: any) {
@@ -1124,9 +1124,9 @@ caisseAdminRouter.post(
       }
 
       const userId = req.session.user!.id;
-      const { predictiveBilletageService } = await import("../services/caisse/predictive-billetage-service");
+      const { denominationTemplateService } = await import("../services/caisse/denomination-template-service");
 
-      const template = await predictiveBilletageService.saveTemplate({
+      const template = await denominationTemplateService.saveTemplate({
         ...validation.data,
         createdBy: userId,
       });
@@ -1188,9 +1188,9 @@ caisseAdminRouter.post(
       }
 
       const fromCaissierId = req.session.user!.id;
-      const { handoverService } = await import("../services/caisse/handover-service");
+      const { handoverWorkflow } = await import("../services/caisse/handover-workflow");
 
-      const result = await handoverService.initiateHandover({
+      const result = await handoverWorkflow.initiateHandover({
         ...validation.data,
         fromCaissierId,
         ipAddress: req.ip,
@@ -1225,9 +1225,9 @@ caisseAdminRouter.get(
   async (req, res) => {
     try {
       const userId = req.session.user!.id;
-      const { handoverService } = await import("../services/caisse/handover-service");
+      const { handoverQueries } = await import("../services/caisse/handover-queries");
 
-      const handovers = await handoverService.getPendingHandovers(userId);
+      const handovers = await handoverQueries.getPendingHandovers(userId);
 
       res.json(handovers);
     } catch (error: any) {
@@ -1246,10 +1246,9 @@ caisseAdminRouter.get(
   attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE),
   async (req, res) => {
     try {
-      const { id } = req.params;
-      const { handoverService } = await import("../services/caisse/handover-service");
+      const { handoverQueries } = await import("../services/caisse/handover-queries");
 
-      const handover = await handoverService.getHandoverById(id);
+      const handover = await handoverQueries.getHandoverById(req.params.handoverId);
 
       if (!handover) {
         return res.status(404).json({ error: 'Transfert non trouvé' });
@@ -1274,9 +1273,9 @@ caisseAdminRouter.post(
     try {
       const { id } = req.params;
       const toCaissierId = req.session.user!.id;
-      const { handoverService } = await import("../services/caisse/handover-service");
+      const { handoverWorkflow } = await import("../services/caisse/handover-workflow");
 
-      const result = await handoverService.startCounting(id, toCaissierId, req.ip);
+      const result = await handoverWorkflow.startCounting(id, toCaissierId, req.ip);
 
       if (!result.success) {
         return res.status(400).json({ error: result.error });
@@ -1310,9 +1309,9 @@ caisseAdminRouter.post(
       }
 
       const toCaissierId = req.session.user!.id;
-      const { handoverService } = await import("../services/caisse/handover-service");
+      const { handoverWorkflow } = await import("../services/caisse/handover-workflow");
 
-      const result = await handoverService.confirmHandover({
+      const result = await handoverWorkflow.confirmHandover({
         handoverId: id,
         toCaissierId,
         ...validation.data,
@@ -1361,9 +1360,9 @@ caisseAdminRouter.post(
       }
 
       const approvedBy = req.session.user!.id;
-      const { handoverService } = await import("../services/caisse/handover-service");
+      const { handoverWorkflow } = await import("../services/caisse/handover-workflow");
 
-      const result = await handoverService.approveDisputed(
+      const result = await handoverWorkflow.approveDisputed(
         id,
         approvedBy,
         validation.data.comment,
@@ -1405,9 +1404,9 @@ caisseAdminRouter.post(
       }
 
       const cancelledBy = req.session.user!.id;
-      const { handoverService } = await import("../services/caisse/handover-service");
+      const { handoverWorkflow } = await import("../services/caisse/handover-workflow");
 
-      const result = await handoverService.cancelHandover({
+      const result = await handoverWorkflow.cancelHandover({
         handoverId: id,
         cancelledBy,
         reason: validation.data.reason,
@@ -1439,11 +1438,11 @@ caisseAdminRouter.get(
   async (req, res) => {
     try {
       const { sessionId } = req.params;
-      const { handoverService } = await import("../services/caisse/handover-service");
+      const { handoverQueries } = await import("../services/caisse/handover-queries");
 
-      const history = await handoverService.getHandoverHistory(sessionId);
+      const handovers = await handoverQueries.getHandoverHistory(sessionId);
 
-      res.json(history);
+      res.json(handovers);
     } catch (error: any) {
       logger.error({ err: error }, 'Erreur récupération historique handovers');
       res.status(500).json({ error: error.message || "Erreur interne" });

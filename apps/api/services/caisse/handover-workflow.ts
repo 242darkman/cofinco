@@ -1,105 +1,26 @@
-/**
- * Service de Transfert de Garde (Handover) pour Sessions de Caisse
- *
- * Permet le changement de caissier en cours de journée sans clôturer la session:
- * - Le caissier sortant déclare le solde et le billetage
- * - Le caissier entrant vérifie et confirme
- * - En cas d'écart, une approbation peut être requise
- * - L'historique complet est conservé pour audit
- */
-
 import { db } from "../../db";
 import {
   caisseHandovers,
   caisseHandoverAuditLogs,
   sessionsCaisse,
-  caisses,
   users,
   userRoles,
-  type CaisseHandover,
 } from "@shared/schema";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { createLogger } from "../../lib/logger";
-import { DENOMINATION_VALUES } from "@shared/config/denomination-weights";
+import {
+  InitiateHandoverParams,
+  InitiateHandoverResult,
+  ConfirmHandoverParams,
+  ConfirmHandoverResult,
+  CancelHandoverParams,
+  CancelHandoverResult,
+  ECART_APPROVAL_THRESHOLD
+} from "./handover-types";
 
-const logger = createLogger('HandoverService');
+const logger = createLogger('HandoverWorkflow');
 
-// ============================================================================
-// TYPES
-// ============================================================================
-
-export interface InitiateHandoverParams {
-  sessionId: string;
-  fromCaissierId: string;
-  toCaissierId: string;
-  montantCompte: number;
-  billetage?: Record<string, number>;
-  motif?: string;
-  observations?: string;
-  ipAddress?: string;
-  userAgent?: string;
-}
-
-export interface InitiateHandoverResult {
-  success: boolean;
-  handover?: CaisseHandover;
-  error?: string;
-  errorCode?: string;
-}
-
-export interface ConfirmHandoverParams {
-  handoverId: string;
-  toCaissierId: string;
-  montantVerifie: number;
-  billetage?: Record<string, number>;
-  observations?: string;
-  ecartJustification?: string;
-  ipAddress?: string;
-  userAgent?: string;
-}
-
-export interface ConfirmHandoverResult {
-  success: boolean;
-  handover?: CaisseHandover;
-  requiresApproval?: boolean;
-  error?: string;
-  errorCode?: string;
-}
-
-export interface CancelHandoverParams {
-  handoverId: string;
-  cancelledBy: string;
-  reason: string;
-  ipAddress?: string;
-}
-
-export interface CancelHandoverResult {
-  success: boolean;
-  handover?: CaisseHandover;
-  error?: string;
-}
-
-export interface PendingHandover {
-  id: string;
-  sessionId: string;
-  caisseId: string;
-  caisseNom: string;
-  fromCaissierNom: string;
-  toCaissierNom: string;
-  montantTheorique: number;
-  statut: string;
-  initiatedAt: Date;
-}
-
-// Seuil d'écart nécessitant une approbation (en XOF)
-const ECART_APPROVAL_THRESHOLD = 5000;
-
-// ============================================================================
-// SERVICE
-// ============================================================================
-
-export class HandoverService {
-
+export class HandoverWorkflow {
   /**
    * Initie un transfert de garde
    */
@@ -493,6 +414,7 @@ export class HandoverService {
         statutApres: 'CANCELLED',
         details: { reason },
         ipAddress,
+        userAgent: undefined, // Add if needed
       });
 
       logger.info({ handoverId, cancelledBy, reason }, 'Transfert annulé');
@@ -506,80 +428,6 @@ export class HandoverService {
       return { success: false, error: (error as Error).message };
     }
   }
-
-  /**
-   * Récupère les transferts en attente pour un utilisateur
-   */
-  async getPendingHandovers(userId: string): Promise<PendingHandover[]> {
-    const handovers = await db.select({
-      id: caisseHandovers.id,
-      sessionId: caisseHandovers.sessionId,
-      caisseId: caisseHandovers.caisseId,
-      caisseNom: caisses.nom,
-      fromCaissierId: caisseHandovers.fromCaissierId,
-      toCaissierId: caisseHandovers.toCaissierId,
-      montantTheorique: caisseHandovers.montantTheorique,
-      statut: caisseHandovers.statut,
-      initiatedAt: caisseHandovers.initiatedAt,
-    })
-    .from(caisseHandovers)
-    .innerJoin(caisses, eq(caisseHandovers.caisseId, caisses.id))
-    .where(and(
-      sql`${caisseHandovers.statut} IN ('PENDING', 'COUNTING', 'DISPUTED')`,
-      sql`(${caisseHandovers.fromCaissierId} = ${userId} OR ${caisseHandovers.toCaissierId} = ${userId})`
-    ))
-    .orderBy(desc(caisseHandovers.initiatedAt));
-
-    // Récupérer les noms des caissiers
-    const result: PendingHandover[] = [];
-    for (const h of handovers) {
-      const [fromUser] = await db.select({ nom: users.nom, prenom: users.prenom })
-        .from(users).where(eq(users.id, h.fromCaissierId));
-      const [toUser] = await db.select({ nom: users.nom, prenom: users.prenom })
-        .from(users).where(eq(users.id, h.toCaissierId));
-
-      result.push({
-        id: h.id,
-        sessionId: h.sessionId,
-        caisseId: h.caisseId,
-        caisseNom: h.caisseNom,
-        fromCaissierNom: `${fromUser?.prenom || ''} ${fromUser?.nom || ''}`.trim(),
-        toCaissierNom: `${toUser?.prenom || ''} ${toUser?.nom || ''}`.trim(),
-        montantTheorique: Number(h.montantTheorique),
-        statut: h.statut,
-        initiatedAt: h.initiatedAt,
-      });
-    }
-
-    return result;
-  }
-
-  /**
-   * Récupère l'historique des transferts pour une session
-   */
-  async getHandoverHistory(sessionId: string): Promise<CaisseHandover[]> {
-    const handovers = await db.select()
-      .from(caisseHandovers)
-      .where(eq(caisseHandovers.sessionId, sessionId))
-      .orderBy(desc(caisseHandovers.initiatedAt));
-
-    return handovers;
-  }
-
-  /**
-   * Récupère un handover par ID
-   */
-  async getHandoverById(handoverId: string): Promise<CaisseHandover | null> {
-    const [handover] = await db.select()
-      .from(caisseHandovers)
-      .where(eq(caisseHandovers.id, handoverId));
-
-    return handover || null;
-  }
-
-  // ============================================================================
-  // MÉTHODES PRIVÉES
-  // ============================================================================
 
   /**
    * Transfère la propriété de la session au nouveau caissier
@@ -619,5 +467,4 @@ export class HandoverService {
   }
 }
 
-// Export singleton
-export const handoverService = new HandoverService();
+export const handoverWorkflow = new HandoverWorkflow();
