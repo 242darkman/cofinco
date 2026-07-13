@@ -59,7 +59,6 @@
   "apps/api/services/treasury/gl-balance-reader.ts": 629,
   "apps/api/storage/employes.ts": 982,
   "apps/api/storage/finance-enhanced.ts": 514,
-  "apps/api/storage/hr.ts": 2033,
   "apps/api/storage/index.ts": 598,
   "apps/api/storage/operations.ts": 1114,
   "apps/api/storage/tontines.ts": 869,
