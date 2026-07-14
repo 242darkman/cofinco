@@ -3,13 +3,20 @@ import { z } from "zod";
 import { db } from "../../db";
 import { createLogger } from "../../lib/logger";
 import { deviceKeys, offlineJournalEntries } from "@shared/schema/device-keys";
-import { eq } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 import { SyncConflictResolver } from "../../services/sync-conflict-resolver";
 import { OfflineAnomalyDetector } from "../../services/offline-anomaly-detector";
 import { OfflineReconciliationService } from "../../services/offline-reconciliation-service";
 import { processConfirmedBatch, type ConfirmedEntry } from "../../services/offline-event-reactor";
 import { computeEntryHash, verifyEcdsaSignature } from "../../services/sync-journal/crypto-utils";
 import { executeJournalBusinessOperation } from "../../services/sync-journal/business-execution";
+import {
+  extractEntryAmount,
+  validateEntryAgainstLimits,
+  FINANCIAL_OPERATION_TYPES,
+  type AgentDailyStats,
+} from "../../services/sync-journal/offline-limits";
+import { D } from "../../lib/money";
 import { requireAuth } from "../../auth";
 
 const logger = createLogger('Routes:SyncJournal:Upload');
@@ -47,6 +54,36 @@ const uploadBatchSchema = z.object({
   entries: z.array(journalEntrySchema).min(1).max(10),
 });
 
+/**
+ * Statistiques financières confirmées d'un agent pour une session (jour)
+ * offline donnée — base du contrôle serveur des plafonds quotidiens.
+ */
+async function getConfirmedDailyStats(
+  agentId: string,
+  offlineSessionDate: string,
+): Promise<AgentDailyStats> {
+  const financialTypes = [...FINANCIAL_OPERATION_TYPES];
+  const result = await db
+    .select({
+      count: sql<string>`COUNT(*)`,
+      volume: sql<string>`COALESCE(SUM(CAST(payload->>'amount' AS DECIMAL)), 0)`,
+    })
+    .from(offlineJournalEntries)
+    .where(and(
+      eq(offlineJournalEntries.agentId, agentId),
+      eq(offlineJournalEntries.offlineSessionDate, offlineSessionDate),
+      eq(offlineJournalEntries.status, 'confirmed'),
+      inArray(offlineJournalEntries.eventType, financialTypes),
+      sql`payload->>'amount' IS NOT NULL`,
+    ));
+
+  const row = result[0];
+  return {
+    operationCount: Number(row?.count ?? 0),
+    totalVolume: Number(row?.volume ?? 0),
+  };
+}
+
 journalUploadRouter.post('/journal', requireAuth, async (req, res) => {
   try {
     const { entries } = uploadBatchSchema.parse(req.body);
@@ -56,6 +93,10 @@ journalUploadRouter.post('/journal', requireAuth, async (req, res) => {
     const rejected: Array<{ uuid: string; reason: string }> = [];
     const conflicts: Array<{ uuid: string; conflictWith: string; reason: string }> = [];
     const confirmedEntries: ConfirmedEntry[] = [];
+
+    // Stats quotidiennes par session offline, cumulées au fil du batch
+    // (une entrée acceptée compte pour les suivantes du même jour)
+    const dailyStatsCache = new Map<string, AgentDailyStats>();
 
     for (const entry of entries) {
       try {
@@ -137,6 +178,33 @@ journalUploadRouter.post('/journal', requireAuth, async (req, res) => {
             rejected.push({ uuid: entry.uuid, reason: conflictResult.reason });
           }
           continue;
+        }
+
+        // Application SERVEUR des plafonds offline. Les limites côté client
+        // ne sont qu'un garde-fou UX : c'est ici que la contrainte est réelle
+        // (§8 AGENTS.md — ne jamais faire confiance au client).
+        let dailyStats = dailyStatsCache.get(entry.sessionId);
+        if (!dailyStats) {
+          dailyStats = await getConfirmedDailyStats(agentId, entry.sessionId);
+          dailyStatsCache.set(entry.sessionId, dailyStats);
+        }
+        const entryAmount = extractEntryAmount(entry.payload);
+        const limitCheck = validateEntryAgainstLimits({
+          type: entry.type,
+          amount: entryAmount,
+          dailyStats,
+        });
+        if (!limitCheck.allowed) {
+          rejected.push({ uuid: entry.uuid, reason: limitCheck.reason });
+          logger.warn(
+            { uuid: entry.uuid, agentId, reason: limitCheck.reason, details: limitCheck.details },
+            'Rejet au rejeu : plafond offline dépassé',
+          );
+          continue;
+        }
+        if (FINANCIAL_OPERATION_TYPES.has(entry.type) && entryAmount !== null) {
+          dailyStats.operationCount += 1;
+          dailyStats.totalVolume = D(dailyStats.totalVolume).plus(D(entryAmount)).toNumber();
         }
 
         await db.insert(offlineJournalEntries).values({

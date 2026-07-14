@@ -5,6 +5,7 @@ import { createLogger } from "../../lib/logger";
 import { deviceKeys, offlineJournalEntries } from "@shared/schema/device-keys";
 import { eq, and, desc } from "drizzle-orm";
 import { signLimits } from "../../services/sync-journal/crypto-utils";
+import { OFFLINE_LIMITS } from "../../services/sync-journal/offline-limits";
 import { requireAuth } from "../../auth";
 
 const logger = createLogger('Routes:SyncJournal:Handshake');
@@ -63,24 +64,16 @@ handshakeRouter.post('/handshake', requireAuth, async (req, res) => {
         eq(deviceKeys.status, 'revoked')
       ));
 
-    // Generate signed offline limits
+    // Limites offline — source de vérité : services/sync-journal/offline-limits
+    // (les mêmes valeurs sont appliquées côté serveur au rejeu du journal)
     const offlineLimits = {
-      maxCaisseBalance: 5_000_000,   // 5M XAF
-      maxSingleOperation: 1_000_000, // 1M XAF
-      maxDailyOperations: 50,
-      maxDailyVolume: 10_000_000,    // 10M XAF
-      maxOfflineDays: 7,
-      maxPendingSync: 200,
-      allowedOperationTypes: [
-        'DEPOSIT', 'WITHDRAWAL', 'LOAN_REPAYMENT',
-        'TONTINE_CONTRIBUTION', 'CLIENT_CREATE', 'CLIENT_UPDATE',
-        'CAISSE_OPEN', 'CAISSE_CLOSE', 'CAISSE_RECONCILE',
-        'REMISE_CREATE', 'SETTLEMENT'
-      ],
+      ...OFFLINE_LIMITS,
+      allowedOperationTypes: [...OFFLINE_LIMITS.allowedOperationTypes],
       lastUpdated: Date.now(),
     };
 
-    // Sign the limits with server HMAC key
+    // Signature HMAC serveur : opaque pour le client (qui n'a pas le secret),
+    // elle permet au serveur de reconnaître ses propres limites en audit.
     const limitsSignature = signLimits(offlineLimits);
 
     res.json({

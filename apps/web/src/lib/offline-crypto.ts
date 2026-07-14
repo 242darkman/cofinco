@@ -295,40 +295,12 @@ export async function verifySignature(
   }
 }
 
-// ========== HMAC VERIFICATION (Server-signed limits) ==========
-
-/**
- * Verify HMAC-SHA256 signature on server-provided data (e.g., offline limits).
- * The HMAC key is derived from a server-provided secret during sync handshake.
- */
-let hmacVerifyKey: CryptoKey | null = null;
-
-export async function initHmacKey(serverSecret: string): Promise<void> {
-  const keyMaterial = new TextEncoder().encode(serverSecret);
-  hmacVerifyKey = await crypto.subtle.importKey(
-    'raw',
-    keyMaterial,
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['verify']
-  );
-}
-
-export async function verifyHmac(data: string, signatureBase64: string): Promise<boolean> {
-  if (!hmacVerifyKey) return false;
-
-  try {
-    const encoded = new TextEncoder().encode(data);
-    const signature = base64ToArrayBuffer(signatureBase64);
-    return await crypto.subtle.verify('HMAC', hmacVerifyKey, signature, encoded);
-  } catch {
-    return false;
-  }
-}
-
-export function clearHmacKey(): void {
-  hmacVerifyKey = null;
-}
+// NOTE : l'ancienne vérification HMAC des limites offline a été supprimée.
+// Un secret HMAC partagé ne peut pas être embarqué dans un bundle public
+// (forgeable), et la clé n'était de toute façon jamais initialisée : toutes
+// les mises à jour de limites étaient rejetées. L'application réelle des
+// plafonds est désormais faite côté serveur au rejeu du journal
+// (apps/api/routes/sync-journal/journal.ts).
 
 // ========== HASHING UTILITIES ==========
 
