@@ -84,6 +84,36 @@ export function KpiLoadingSkeleton() {
 }
 
 // ---------------------------------------------------------------------------
+// Bannière d'écart de cohérence (admin) — consolidé ≠ somme des agences
+// ---------------------------------------------------------------------------
+
+interface CoherenceWarningsProps {
+  warnings: string[];
+}
+
+export function KpiCoherenceWarningsBanner({ warnings }: CoherenceWarningsProps) {
+  if (warnings.length === 0) return null;
+  return (
+    <div role="alert" className="rounded-lg border border-edge bg-status-warning-bg px-4 py-3">
+      <div className="flex items-center gap-2 text-status-warning text-sm font-semibold">
+        <AlertTriangle size={16} className="shrink-0" />
+        Ecart de coherence detecte ({warnings.length})
+      </div>
+      <ul className="mt-2 space-y-1 text-xs text-content-secondary list-disc pl-5">
+        {warnings.map((warning) => (
+          <li key={warning}>{warning}</li>
+        ))}
+      </ul>
+      <p className="mt-2 text-xs text-content-muted">
+        La vue consolidee ne correspond pas a la somme des agences sur ces
+        indicateurs. Verifier les operations hors perimetre agence avant de
+        publier ces chiffres.
+      </p>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // État vide — aucun snapshot pour la période
 // ---------------------------------------------------------------------------
 

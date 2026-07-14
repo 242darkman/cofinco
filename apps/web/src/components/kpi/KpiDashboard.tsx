@@ -18,6 +18,7 @@ import { exportKpiToExcel } from './kpi-export';
 import KpiDashboardHeader from './KpiDashboardHeader';
 import {
   KpiAccessDeniedCard,
+  KpiCoherenceWarningsBanner,
   KpiEmptyPeriodState,
   KpiErrorCard,
   KpiLoadingSkeleton,
@@ -145,6 +146,12 @@ function KpiDashboard() {
   const payload = snapshot?.payload ?? snapshot ?? null;
   const deltas = snapshot?.payload?.deltas ?? snapshot?.deltas ?? null;
 
+  // Écarts consolidé/somme des agences (metadata du snapshot consolidé) —
+  // visibles uniquement pour les admins, qui peuvent agir dessus
+  const coherenceWarnings: string[] = canManage
+    ? (snapshot?.metadata?.warnings ?? [])
+    : [];
+
   // ---- Period options ----
   const periodOptions = periodType === 'monthly' ? MONTH_OPTIONS : YEAR_OPTIONS;
 
@@ -239,6 +246,8 @@ function KpiDashboard() {
         snapshotVersion={snapshot?.version ?? null}
         snapshotSource={snapshot?.metadata?.source ?? null}
       />
+
+      <KpiCoherenceWarningsBanner warnings={coherenceWarnings} />
 
       <TabGroup
         tabs={KPI_TABS.map((t) => ({ key: t.key, label: t.label, icon: t.icon }))}
