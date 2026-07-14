@@ -84,6 +84,8 @@ export interface KpiDashboardHeaderProps {
   generatedAt?: string | null;
   snapshotVersion?: number | null;
   snapshotSource?: string | null;
+  /** Connexion WebSocket active : les snapshots se rafraîchissent seuls */
+  isLive?: boolean;
 }
 
 export default function KpiDashboardHeader(props: KpiDashboardHeaderProps) {
@@ -92,7 +94,7 @@ export default function KpiDashboardHeader(props: KpiDashboardHeaderProps) {
     canManage, agencyOptions, selectedAgencyId, onAgencyChange,
     exportDisabled, onExport,
     recalculatePending, recalculateSuccess, recalculateError, onRecalculate,
-    generatedAt, snapshotVersion, snapshotSource,
+    generatedAt, snapshotVersion, snapshotSource, isLive,
   } = props;
 
   const toggleClass = (active: boolean, borderLeft = false) => `
@@ -107,13 +109,31 @@ export default function KpiDashboardHeader(props: KpiDashboardHeaderProps) {
   return (
     <Card padding="sm" className="space-y-3 sm:space-y-0">
       <div className="flex flex-wrap items-center gap-3">
-        {/* Title + freshness */}
+        {/* Title + live + freshness */}
         <div className="flex items-center gap-2 mr-auto">
           <BarChart3 size={22} className="text-accent shrink-0" />
           <div className="flex flex-col">
-            <h1 className="text-lg sm:text-xl font-bold text-content-primary whitespace-nowrap">
-              KPI & Pilotage
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg sm:text-xl font-bold text-content-primary whitespace-nowrap">
+                KPI & Pilotage
+              </h1>
+              {isLive !== undefined && (
+                <span
+                  role="status"
+                  className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-full ${
+                    isLive
+                      ? 'bg-status-success-bg text-status-success'
+                      : 'bg-surface-elevated text-content-muted'
+                  }`}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`w-1.5 h-1.5 rounded-full ${isLive ? 'bg-status-success' : 'bg-content-muted'}`}
+                  />
+                  {isLive ? 'Temps réel' : 'Hors ligne'}
+                </span>
+              )}
+            </div>
             {generatedAt && (
               <KpiFreshnessBadge
                 generatedAt={generatedAt}

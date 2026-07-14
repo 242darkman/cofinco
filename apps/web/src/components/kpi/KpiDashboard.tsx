@@ -7,9 +7,11 @@ import {
   TrendingUp,
   Wallet,
   Users,
+  Landmark,
 } from 'lucide-react';
 import TabGroup from '@/components/ui/TabGroup';
 import { useKpiSnapshot, useKpiRecalculate, useKpiRealtimeRefresh } from '@/hooks/use-kpi';
+import { useWebSocket } from '@/hooks/useWebSocket';
 import { useAbilityContext } from '@/contexts/AbilityContext';
 import { Actions, Subjects } from '@/lib/casl';
 import { useAgence } from '@/contexts/AgenceContext';
@@ -30,6 +32,7 @@ import KpiTontinesTab from './tabs/KpiTontinesTab';
 import KpiRentabiliteTab from './tabs/KpiRentabiliteTab';
 import KpiTresorerieTab from './tabs/KpiTresorerieTab';
 import KpiRhTab from './tabs/KpiRhTab';
+import KpiCobacTab from './tabs/KpiCobacTab';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -111,6 +114,12 @@ function KpiDashboard() {
   const { ability, isAdmin, roles } = useAbilityContext();
   const canView = isAdmin || ability.can(Actions.VIEW, Subjects.KPI);
   const canManage = isAdmin || ability.can(Actions.MANAGE, Subjects.KPI);
+  // L'onglet COBAC est masqué sans permission comptable — l'API applique
+  // la même règle côté serveur (VIEW COMPTABILITE)
+  const canViewCobac = isAdmin || ability.can(Actions.VIEW, Subjects.COMPTABILITE);
+
+  // ---- Connexion temps réel ----
+  const { isConnected: isLive } = useWebSocket();
 
   // ---- Agency context (admin can pick an agency) ----
   const { agences, selectedAgence } = useAgence();
@@ -217,6 +226,12 @@ function KpiDashboard() {
     return <KpiErrorCard />;
   }
 
+  // ---- Tabs (COBAC conditionné par la permission comptable) ----
+  const visibleTabs = [
+    ...KPI_TABS.map((t) => ({ key: t.key, label: t.label, icon: t.icon })),
+    ...(canViewCobac ? [{ key: 'cobac', label: 'Ratios COBAC', icon: Landmark }] : []),
+  ];
+
   // ---- Active tab component ----
   const ActiveTabComponent = TAB_COMPONENTS[activeTab] ?? KpiOverviewTab;
 
@@ -245,19 +260,23 @@ function KpiDashboard() {
         generatedAt={snapshot?.generatedAt ?? null}
         snapshotVersion={snapshot?.version ?? null}
         snapshotSource={snapshot?.metadata?.source ?? null}
+        isLive={isLive}
       />
 
       <KpiCoherenceWarningsBanner warnings={coherenceWarnings} />
 
       <TabGroup
-        tabs={KPI_TABS.map((t) => ({ key: t.key, label: t.label, icon: t.icon }))}
+        tabs={visibleTabs}
         activeTab={activeTab}
         onTabChange={setActiveTab}
         variant="pills"
         size="sm"
       />
 
-      {!payload ? (
+      {activeTab === 'cobac' ? (
+        // Onglet autonome : source comptabilité, indépendante des snapshots KPI
+        <KpiCobacTab agencyId={scope} isAdmin={canManage} />
+      ) : !payload ? (
         <KpiEmptyPeriodState
           periodLabel={periodOptions.find((o) => o.value === periodKey)?.label ?? periodKey}
           canManage={canManage}
