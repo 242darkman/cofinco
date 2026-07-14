@@ -6,9 +6,10 @@ import { requireAuth } from "../auth";
 import { attachAbility, requireAbility, hasAbility, Actions, Subjects } from "../authorization";
 import { requireAgenceIdAccess } from "../middleware";
 import { createLogger } from "../lib/logger";
-import { getSnapshot, listSnapshotPeriods } from "../services/kpi/kpi-store";
+import { getSnapshot, listSnapshotPeriods, listSnapshotSeries } from "../services/kpi/kpi-store";
+import { buildSeriesPoints } from "../services/kpi/kpi-series";
 import { refreshAgencyScope, refreshAllScopes } from "../services/kpi/kpi-refresh-service";
-import type { KpiPeriodType, KpiScopeType } from "@shared/schema/kpi";
+import type { KpiPayload, KpiPeriodType, KpiScopeType } from "@shared/schema/kpi";
 
 const logger = createLogger('Routes:KPI');
 
@@ -81,6 +82,59 @@ export function registerKpiRoutes(app: Express) {
       } catch (error) {
         logger.error({ err: error }, 'Error fetching KPI snapshot');
         res.status(500).json({ message: "Erreur lors de la récupération des KPI" });
+      }
+    }
+  );
+
+  // ============================================
+  // GET /api/kpi/series — Séries temporelles compactes (sparklines)
+  // ============================================
+  app.get("/api/kpi/series",
+    requireAuth,
+    attachAbility,
+    requireAbility(Actions.VIEW, Subjects.KPI),
+    requireAgenceIdAccess(),
+    async (req, res) => {
+      try {
+        const periodType = (req.query.periodType as string || 'MONTH') as KpiPeriodType;
+        if (periodType !== 'MONTH' && periodType !== 'YEAR') {
+          return res.status(400).json({ message: "periodType invalide. Attendu: MONTH ou YEAR" });
+        }
+
+        // Nombre de périodes borné : 12 par défaut, 24 maximum
+        const requestedLimit = Number.parseInt(req.query.limit as string, 10);
+        const limit = Number.isFinite(requestedLimit)
+          ? Math.min(24, Math.max(2, requestedLimit))
+          : 12;
+
+        // Résolution de scope identique à GET /api/kpi
+        const isAdmin = req.agenceFilter === null;
+        const agencyId = req.selectedAgenceId;
+
+        let scopeType: KpiScopeType;
+        let scopeAgencyId: string | null;
+        if (isAdmin && agencyId) {
+          scopeType = 'AGENCY';
+          scopeAgencyId = agencyId;
+        } else if (!isAdmin && req.agenceFilter?.agenceId) {
+          scopeType = 'AGENCY';
+          scopeAgencyId = req.agenceFilter.agenceId;
+        } else if (isAdmin) {
+          scopeType = 'CONSOLIDATED';
+          scopeAgencyId = null;
+        } else {
+          return res.status(400).json({ message: "Impossible de déterminer l'agence" });
+        }
+
+        const rows = await listSnapshotSeries(periodType, scopeType, scopeAgencyId, limit);
+        const points = buildSeriesPoints(
+          rows.map((r) => ({ periodKey: r.periodKey, generatedAt: r.generatedAt, payload: r.payload as KpiPayload })),
+        );
+
+        res.json({ data: points });
+      } catch (error) {
+        logger.error({ err: error }, 'Error fetching KPI series');
+        res.status(500).json({ message: "Erreur lors de la récupération des séries KPI" });
       }
     }
   );

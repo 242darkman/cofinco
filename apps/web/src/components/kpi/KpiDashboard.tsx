@@ -18,6 +18,7 @@ import { useAgence } from '@/contexts/AgenceContext';
 import { exportKpiToExcel } from './kpi-export';
 
 import KpiDashboardHeader from './KpiDashboardHeader';
+import KpiTrendsStrip from './KpiTrendsStrip';
 import {
   KpiAccessDeniedCard,
   KpiCoherenceWarningsBanner,
@@ -264,6 +265,8 @@ function KpiDashboard() {
       />
 
       <KpiCoherenceWarningsBanner warnings={coherenceWarnings} />
+
+      {payload && <KpiTrendsStrip periodType={periodType} scope={scope} />}
 
       <TabGroup
         tabs={visibleTabs}

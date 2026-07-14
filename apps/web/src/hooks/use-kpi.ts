@@ -38,6 +38,32 @@ export function useKpiSnapshot(periodType: string, periodKey: string, scope?: st
   });
 }
 
+export interface KpiSeriesPoint {
+  periodKey: string;
+  generatedAt: string;
+  metrics: Record<string, number>;
+}
+
+/**
+ * Séries temporelles compactes (12 dernières périodes) pour les sparklines.
+ * L'agence est résolue côté serveur (header X-Agence-Id / agence de
+ * l'utilisateur), comme pour le snapshot ; `scope` ne sert qu'à la clé de
+ * cache. Invalidée par le rafraîchissement temps réel (préfixe ['kpi']).
+ */
+export function useKpiSeries(periodType: string, scope?: string) {
+  const apiPeriodType = toApiPeriodType(periodType);
+  return useQuery<{ data: KpiSeriesPoint[] }>({
+    queryKey: ['kpi', 'series', apiPeriodType, scope],
+    queryFn: async () => {
+      const params = new URLSearchParams({ periodType: apiPeriodType });
+      const res = await fetch(`/api/kpi/series?${params}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Erreur chargement séries KPI');
+      return res.json();
+    },
+    staleTime: KPI_STALE_TIME,
+  });
+}
+
 export function useKpiPeriods() {
   return useQuery<{ data: Array<{ periodType: string; periodKey: string; generatedAt: string; version: number }> }>({
     queryKey: ['kpi', 'periods'],

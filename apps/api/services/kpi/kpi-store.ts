@@ -118,6 +118,40 @@ export async function getSnapshot(
 }
 
 /**
+ * Liste les derniers snapshots d'un scope avec leur payload complet,
+ * du plus récent au plus ancien (pour les séries temporelles).
+ * Le tri lexicographique sur period_key est correct pour 'YYYY-MM' et 'YYYY'.
+ */
+export async function listSnapshotSeries(
+  periodType: KpiPeriodType,
+  scopeType: KpiScopeType,
+  agencyId: string | null,
+  limit = 12,
+) {
+  const conditions = [
+    eq(kpiSnapshots.periodType, periodType),
+    eq(kpiSnapshots.scopeType, scopeType),
+  ];
+
+  if (scopeType === 'AGENCY' && agencyId) {
+    conditions.push(eq(kpiSnapshots.agencyId, agencyId));
+  } else {
+    conditions.push(isNull(kpiSnapshots.agencyId));
+  }
+
+  return db
+    .select({
+      periodKey: kpiSnapshots.periodKey,
+      generatedAt: kpiSnapshots.generatedAt,
+      payload: kpiSnapshots.payload,
+    })
+    .from(kpiSnapshots)
+    .where(and(...conditions))
+    .orderBy(desc(kpiSnapshots.periodKey))
+    .limit(limit);
+}
+
+/**
  * List available snapshot periods for a given scope.
  */
 export async function listSnapshotPeriods(
