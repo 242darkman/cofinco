@@ -1,28 +1,41 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import {
   parsePeriodRange,
   getPreviousPeriodKey,
   computeDelta,
   currentPeriodKeys,
+  resolveBusinessTimeZone,
 } from '../../apps/api/services/kpi/kpi-periods';
 
-describe('KPI Periods — parsePeriodRange', () => {
-  it('parse une période mensuelle [début, début mois suivant)', () => {
-    const { start, end } = parsePeriodRange('MONTH', '2026-07');
-    expect(start).toEqual(new Date(2026, 6, 1));
-    expect(end).toEqual(new Date(2026, 7, 1));
+describe('KPI Periods — parsePeriodRange (timezone métier)', () => {
+  it('borne le mois à minuit Africa/Brazzaville (UTC+1)', () => {
+    const { start, end } = parsePeriodRange('MONTH', '2026-07', 'Africa/Brazzaville');
+    // Minuit du 01/07 à Brazzaville = 30/06 23:00 UTC
+    expect(start.toISOString()).toBe('2026-06-30T23:00:00.000Z');
+    expect(end.toISOString()).toBe('2026-07-31T23:00:00.000Z');
+  });
+
+  it('borne le mois à minuit UTC quand la timezone est UTC', () => {
+    const { start, end } = parsePeriodRange('MONTH', '2026-07', 'UTC');
+    expect(start.toISOString()).toBe('2026-07-01T00:00:00.000Z');
+    expect(end.toISOString()).toBe('2026-08-01T00:00:00.000Z');
   });
 
   it('gère le passage décembre → janvier', () => {
-    const { start, end } = parsePeriodRange('MONTH', '2026-12');
-    expect(start).toEqual(new Date(2026, 11, 1));
-    expect(end).toEqual(new Date(2027, 0, 1));
+    const { end } = parsePeriodRange('MONTH', '2026-12', 'UTC');
+    expect(end.toISOString()).toBe('2027-01-01T00:00:00.000Z');
   });
 
-  it('parse une période annuelle', () => {
-    const { start, end } = parsePeriodRange('YEAR', '2026');
-    expect(start).toEqual(new Date(2026, 0, 1));
-    expect(end).toEqual(new Date(2027, 0, 1));
+  it('borne l\'année en timezone métier', () => {
+    const { start, end } = parsePeriodRange('YEAR', '2026', 'Africa/Brazzaville');
+    expect(start.toISOString()).toBe('2025-12-31T23:00:00.000Z');
+    expect(end.toISOString()).toBe('2026-12-31T23:00:00.000Z');
+  });
+
+  it('les périodes consécutives sont jointives (fin N = début N+1)', () => {
+    const juin = parsePeriodRange('MONTH', '2026-06', 'Africa/Brazzaville');
+    const juillet = parsePeriodRange('MONTH', '2026-07', 'Africa/Brazzaville');
+    expect(juin.end.getTime()).toBe(juillet.start.getTime());
   });
 });
 
@@ -37,6 +50,54 @@ describe('KPI Periods — getPreviousPeriodKey', () => {
 
   it('année précédente', () => {
     expect(getPreviousPeriodKey('YEAR', '2026')).toBe('2025');
+  });
+});
+
+describe('KPI Periods — currentPeriodKeys (timezone métier)', () => {
+  it('le 30/06 23h30 UTC est déjà juillet à Brazzaville', () => {
+    const keys = currentPeriodKeys(new Date('2026-06-30T23:30:00Z'), 'Africa/Brazzaville');
+    expect(keys.monthKey).toBe('2026-07');
+    expect(keys.yearKey).toBe('2026');
+  });
+
+  it('le même instant reste juin en UTC', () => {
+    const keys = currentPeriodKeys(new Date('2026-06-30T23:30:00Z'), 'UTC');
+    expect(keys.monthKey).toBe('2026-06');
+  });
+
+  it('le 31/12 23h30 UTC bascule d\'année à Brazzaville', () => {
+    const keys = currentPeriodKeys(new Date('2026-12-31T23:30:00Z'), 'Africa/Brazzaville');
+    expect(keys.monthKey).toBe('2027-01');
+    expect(keys.yearKey).toBe('2027');
+  });
+
+  it('pad le mois sur deux chiffres', () => {
+    const keys = currentPeriodKeys(new Date('2026-01-15T12:00:00Z'), 'UTC');
+    expect(keys.monthKey).toBe('2026-01');
+  });
+});
+
+describe('KPI Periods — resolveBusinessTimeZone', () => {
+  const original = process.env.KPI_TIMEZONE;
+
+  afterEach(() => {
+    if (original === undefined) delete process.env.KPI_TIMEZONE;
+    else process.env.KPI_TIMEZONE = original;
+  });
+
+  it('défaut sûr : Africa/Brazzaville sans variable', () => {
+    delete process.env.KPI_TIMEZONE;
+    expect(resolveBusinessTimeZone()).toBe('Africa/Brazzaville');
+  });
+
+  it('respecte une timezone valide', () => {
+    process.env.KPI_TIMEZONE = 'Africa/Douala';
+    expect(resolveBusinessTimeZone()).toBe('Africa/Douala');
+  });
+
+  it('repli sur le défaut si la timezone est invalide', () => {
+    process.env.KPI_TIMEZONE = 'Invalid/Zone';
+    expect(resolveBusinessTimeZone()).toBe('Africa/Brazzaville');
   });
 });
 
@@ -72,18 +133,5 @@ describe('KPI Periods — computeDelta (Decimal, valeurs métier)', () => {
     const delta = computeDelta(800, 1000);
     expect(delta.value).toBe(-200);
     expect(delta.percent).toBe(-20);
-  });
-});
-
-describe('KPI Periods — currentPeriodKeys', () => {
-  it('retourne les clés mois et année de la date fournie', () => {
-    const keys = currentPeriodKeys(new Date(2026, 6, 9));
-    expect(keys.monthKey).toBe('2026-07');
-    expect(keys.yearKey).toBe('2026');
-  });
-
-  it('pad le mois sur deux chiffres', () => {
-    const keys = currentPeriodKeys(new Date(2026, 0, 15));
-    expect(keys.monthKey).toBe('2026-01');
   });
 });

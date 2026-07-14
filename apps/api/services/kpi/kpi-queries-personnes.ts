@@ -7,6 +7,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "../../db";
 import { agencyFilter, safeDiv, toNum, type KpiDb } from "./kpi-query-helpers";
+import { currentPeriodKeys } from "./kpi-periods";
 
 interface TotalRow { total: string }
 interface TauxRow { taux: string }
@@ -194,10 +195,10 @@ export async function queryRhProductiviteKpis(
   const topAgents = (topQuery.rows as unknown as AgentRow[]).map(mapAgentRow);
   const bottomAgents = (bottomQuery.rows as unknown as AgentRow[]).map(mapAgentRow);
 
-  // Masse salariale
-  const moisKey = periodStart
-    ? `${periodStart.getFullYear()}-${String(periodStart.getMonth() + 1).padStart(2, '0')}`
-    : '';
+  // Masse salariale — mois dérivé en timezone MÉTIER (periodStart est un
+  // instant UTC de minuit métier ; getMonth() serveur donnerait le mois
+  // précédent sur un serveur en UTC)
+  const moisKey = periodStart ? currentPeriodKeys(periodStart).monthKey : '';
   const salaires = await dbx.execute(sql`
     SELECT ROUND(COALESCE(SUM(CAST(bp.salaire_net AS DECIMAL)), 0), 2) AS total
     FROM bulletins_paie bp
