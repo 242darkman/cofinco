@@ -4,6 +4,7 @@ import { registerAuthCoreRoutes } from "./routes/auth/core";
 import { registerAuthProfileRoutes } from "./routes/auth/profile";
 import { registerUsersRoutes } from "./routes/users";
 import { registerUsersPermissionsRoutes } from "./routes/users-permissions";
+import { registerUsersRolesRoutes } from "./routes/users-roles";
 import { registerSessionsRoutes } from "./routes/sessions";
 import { registerAuditLogsRoutes } from "./routes/audit-logs";
 import { registerAdminDashboardRoutes } from "./routes/admin-dashboard";
@@ -123,6 +124,7 @@ export function registerRoutes(app: Express): Server {
   registerAuthProfileRoutes(app);
   registerUsersRoutes(app);
   registerUsersPermissionsRoutes(app);
+  registerUsersRolesRoutes(app);
   registerSessionsRoutes(app);
   registerAuditLogsRoutes(app);
   registerAdminDashboardRoutes(app);
