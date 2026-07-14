@@ -125,11 +125,21 @@ export default function KpiDashboardHeader(props: KpiDashboardHeaderProps) {
         </div>
 
         {/* Period type toggle */}
-        <div className="flex rounded-lg border border-edge overflow-hidden shrink-0">
-          <button type="button" onClick={() => onPeriodTypeChange('monthly')} className={toggleClass(periodType === 'monthly')}>
+        <div className="flex rounded-lg border border-edge overflow-hidden shrink-0" role="group" aria-label="Type de periode">
+          <button
+            type="button"
+            onClick={() => onPeriodTypeChange('monthly')}
+            aria-pressed={periodType === 'monthly'}
+            className={toggleClass(periodType === 'monthly')}
+          >
             Mensuel
           </button>
-          <button type="button" onClick={() => onPeriodTypeChange('yearly')} className={toggleClass(periodType === 'yearly', true)}>
+          <button
+            type="button"
+            onClick={() => onPeriodTypeChange('yearly')}
+            aria-pressed={periodType === 'yearly'}
+            className={toggleClass(periodType === 'yearly', true)}
+          >
             Annuel
           </button>
         </div>
@@ -143,6 +153,7 @@ export default function KpiDashboardHeader(props: KpiDashboardHeaderProps) {
           <select
             value={periodKey}
             onChange={(e) => onPeriodKeyChange(e.target.value)}
+            aria-label="Choisir la periode"
             className="
               appearance-none pl-8 pr-8 py-1.5
               text-xs sm:text-sm font-medium
@@ -170,6 +181,7 @@ export default function KpiDashboardHeader(props: KpiDashboardHeaderProps) {
             <select
               value={selectedAgencyId ?? 'all'}
               onChange={(e) => onAgencyChange(e.target.value === 'all' ? undefined : e.target.value)}
+              aria-label="Choisir l'agence"
               className="
                 appearance-none pl-8 pr-8 py-1.5
                 text-xs sm:text-sm font-medium
@@ -195,6 +207,7 @@ export default function KpiDashboardHeader(props: KpiDashboardHeaderProps) {
           type="button"
           onClick={onExport}
           disabled={exportDisabled}
+          aria-label="Exporter les KPI en Excel"
           className="
             inline-flex items-center gap-1.5
             px-3 py-1.5
@@ -216,6 +229,7 @@ export default function KpiDashboardHeader(props: KpiDashboardHeaderProps) {
             type="button"
             onClick={onRecalculate}
             disabled={recalculatePending}
+            aria-label="Recalculer les KPI"
             className="
               inline-flex items-center gap-1.5
               px-3 py-1.5
@@ -236,12 +250,12 @@ export default function KpiDashboardHeader(props: KpiDashboardHeaderProps) {
 
       {/* Recalculate feedback */}
       {recalculateSuccess && (
-        <div className="mt-2 px-3 py-1.5 rounded-lg bg-status-success-bg text-status-success text-xs font-medium">
+        <div role="status" className="mt-2 px-3 py-1.5 rounded-lg bg-status-success-bg text-status-success text-xs font-medium">
           Recalcul termine avec succes.
         </div>
       )}
       {recalculateError && (
-        <div className="mt-2 px-3 py-1.5 rounded-lg bg-status-danger-bg text-status-danger text-xs font-medium">
+        <div role="alert" className="mt-2 px-3 py-1.5 rounded-lg bg-status-danger-bg text-status-danger text-xs font-medium">
           Erreur lors du recalcul : {recalculateError}
         </div>
       )}
