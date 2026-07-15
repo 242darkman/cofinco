@@ -34,6 +34,7 @@ import {
   TypeCompte as TypeCompteEnum
 } from "@shared/enum/status-constants";
 import { allocateOpeningPayment, clientHasCompteOfType, generateNumeroCompte, recomputeAccountStatus } from "./helpers";
+import { createCompteWithInitialDeposit } from "./creation-avec-depot";
 import { CompteError, MotifBlocage, TypeCompte, type CreateCompteData, type OpeningSnapshot } from "./types";
 
 /**
