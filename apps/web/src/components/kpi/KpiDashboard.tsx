@@ -16,6 +16,7 @@ import { useAbilityContext } from '@/contexts/AbilityContext';
 import { Actions, Subjects } from '@/lib/casl';
 import { useAgence } from '@/contexts/AgenceContext';
 import { exportKpiToExcel } from './kpi-export';
+import { formatPeriodLabel } from './kpi-period-utils';
 
 import KpiDashboardHeader from './KpiDashboardHeader';
 import KpiTrendsStrip from './KpiTrendsStrip';
@@ -50,28 +51,6 @@ interface TabComponentProps {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Generate the last 24 month options as { value, label } */
-function buildMonthOptions(): { value: string; label: string }[] {
-  const options: { value: string; label: string }[] = [];
-  const now = new Date();
-  for (let i = 0; i < 24; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    const label = d.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
-    options.push({ value, label: label.charAt(0).toUpperCase() + label.slice(1) });
-  }
-  return options;
-}
-
-/** Generate the last 5 year options */
-function buildYearOptions(): { value: string; label: string }[] {
-  const currentYear = new Date().getFullYear();
-  return Array.from({ length: 5 }, (_, i) => {
-    const year = currentYear - i;
-    return { value: String(year), label: String(year) };
-  });
-}
-
 /** Return the current period key depending on type */
 function currentPeriodKey(type: PeriodType): string {
   const now = new Date();
@@ -82,9 +61,6 @@ function currentPeriodKey(type: PeriodType): string {
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-
-const MONTH_OPTIONS = buildMonthOptions();
-const YEAR_OPTIONS = buildYearOptions();
 
 const KPI_TABS = [
   { key: 'overview', label: "Vue d'ensemble", icon: Eye },
@@ -163,7 +139,6 @@ function KpiDashboard() {
     : [];
 
   // ---- Period options ----
-  const periodOptions = periodType === 'monthly' ? MONTH_OPTIONS : YEAR_OPTIONS;
 
   // ---- Agency options for admin selector ----
   const agencyOptions = useMemo(() => {
@@ -241,7 +216,6 @@ function KpiDashboard() {
       <KpiDashboardHeader
         periodType={periodType}
         periodKey={periodKey}
-        periodOptions={periodOptions}
         onPeriodTypeChange={handlePeriodTypeChange}
         onPeriodKeyChange={setPeriodKey}
         canManage={canManage}
@@ -281,7 +255,7 @@ function KpiDashboard() {
         <KpiCobacTab agencyId={scope} isAdmin={canManage} />
       ) : !payload ? (
         <KpiEmptyPeriodState
-          periodLabel={periodOptions.find((o) => o.value === periodKey)?.label ?? periodKey}
+          periodLabel={formatPeriodLabel(periodType, periodKey)}
           canManage={canManage}
           isPending={recalculate.isPending}
           onRecalculate={handleRecalculate}

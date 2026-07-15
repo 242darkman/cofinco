@@ -4,8 +4,9 @@
  * Extrait de KpiDashboard.tsx pour respecter la limite de 400 lignes.
  */
 import { useEffect, useState } from 'react';
-import { BarChart3, Building2, Calendar, Clock, Download, RefreshCw } from 'lucide-react';
+import { BarChart3, Building2, Clock, Download, RefreshCw } from 'lucide-react';
 import Card from '@/components/ui/Card';
+import KpiPeriodPicker from './KpiPeriodPicker';
 
 type PeriodType = 'monthly' | 'yearly';
 
@@ -68,7 +69,6 @@ export function KpiFreshnessBadge({ generatedAt, version, source }: FreshnessBad
 export interface KpiDashboardHeaderProps {
   periodType: PeriodType;
   periodKey: string;
-  periodOptions: Option[];
   onPeriodTypeChange: (type: PeriodType) => void;
   onPeriodKeyChange: (key: string) => void;
   canManage: boolean;
@@ -90,7 +90,7 @@ export interface KpiDashboardHeaderProps {
 
 export default function KpiDashboardHeader(props: KpiDashboardHeaderProps) {
   const {
-    periodType, periodKey, periodOptions, onPeriodTypeChange, onPeriodKeyChange,
+    periodType, periodKey, onPeriodTypeChange, onPeriodKeyChange,
     canManage, agencyOptions, selectedAgencyId, onAgencyChange,
     exportDisabled, onExport,
     recalculatePending, recalculateSuccess, recalculateError, onRecalculate,
@@ -165,30 +165,12 @@ export default function KpiDashboardHeader(props: KpiDashboardHeaderProps) {
         </div>
 
         {/* Period picker */}
-        <div className="relative shrink-0">
-          <Calendar
-            size={14}
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-content-muted pointer-events-none"
-          />
-          <select
+        <div className="shrink-0">
+          <KpiPeriodPicker
+            periodType={periodType}
             value={periodKey}
-            onChange={(e) => onPeriodKeyChange(e.target.value)}
-            aria-label="Choisir la periode"
-            className="
-              appearance-none pl-8 pr-8 py-1.5
-              text-xs sm:text-sm font-medium
-              bg-input border border-input-border rounded-lg
-              text-content-primary
-              focus:outline-none focus:border-input-focus
-              transition-colors cursor-pointer
-            "
-          >
-            {periodOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+            onChange={onPeriodKeyChange}
+          />
         </div>
 
         {/* Agency selector (admin only) */}
