@@ -3,7 +3,7 @@
   "name": "MicroFlex",
   "theme": {
     "primaryColor": "hsl(210, 100%, 45%)",
-    "logoUrl": "/microflex-logo.png"
+    "logoUrl": "/brand/microflex/logo.png"
   },
   "features": {
     "enableSms": true,

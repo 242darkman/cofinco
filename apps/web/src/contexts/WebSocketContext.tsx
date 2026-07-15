@@ -106,7 +106,7 @@ type MessageType =
   // =============================================
   // CONFIGURATION & BRANDING
   // =============================================
-  | "BRANDING_CHANGED" | "PRESETS_CHANGED" | "CURRENCY_CHANGED"
+  | "PRESETS_CHANGED" | "CURRENCY_CHANGED"
 
   // =============================================
   // TRANSFERTS INTER-COFFRES

@@ -5,10 +5,10 @@ import ComplianceReportCard from './compliance/ComplianceReportCard';
 import ComplianceStatusStats from './compliance/ComplianceStatusStats';
 import SelectField from '../ui/SelectField';
 import Card from '../ui/Card';
-import { useBranding } from '../../contexts/BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 
 export default function ComplianceReports() {
-  const { branding } = useBranding();
+  const branding = useDocumentBranding();
   const {
     loading,
     selectedPeriod,

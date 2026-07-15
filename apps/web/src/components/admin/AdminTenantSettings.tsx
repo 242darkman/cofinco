@@ -1,19 +1,10 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import {
-  Loader2,
-  MessageSquare,
-  Users,
-  Smartphone,
-  MapPin,
-  RotateCcw,
-  Paintbrush,
-  ToggleRight,
-  AlertTriangle,
-} from 'lucide-react';
-import Switch from '../ui/Switch';
+import { Loader2, RotateCcw, Paintbrush, AlertTriangle } from 'lucide-react';
 import type { TenantBrandingKey, TenantFeatureKey } from '@shared/tenant-config';
+import { FEATURE_LABELS, BRANDING_LABELS } from './tenantSettingsLabels';
+import { TenantModulesPanel, type FeatureState } from './TenantModulesPanel';
 
 /**
  * Administration du tenant courant : feature flags et branding dynamiques.
@@ -24,34 +15,12 @@ import type { TenantBrandingKey, TenantFeatureKey } from '@shared/tenant-config'
  * statique du livrable (fichier client).
  */
 
-interface FeatureState {
-  feature: TenantFeatureKey;
-  effective: boolean;
-  static: boolean;
-  overridden: boolean;
-}
-
 interface BrandingState {
   key: TenantBrandingKey;
   effective: string | undefined;
   static: string | undefined;
   overridden: boolean;
 }
-
-const FEATURE_LABELS: Record<TenantFeatureKey, { label: string; description: string; icon: React.ElementType }> = {
-  enableSms: { label: 'SMS', description: 'Notifications et validations par SMS', icon: MessageSquare },
-  enableTontine: { label: 'Tontines', description: 'Module tontines et contributions', icon: Users },
-  enableMobileMoney: { label: 'Mobile Money', description: 'Paiements MTN MoMo / Airtel (pawaPay)', icon: Smartphone },
-  enableFieldAgents: { label: 'Agents terrain', description: 'Prospection, tracking et paiements terrain', icon: MapPin },
-};
-
-const BRANDING_LABELS: Record<TenantBrandingKey, { label: string; placeholder: string }> = {
-  name: { label: "Nom de l'application", placeholder: 'MicroFlex' },
-  primaryColor: { label: 'Couleur principale', placeholder: 'hsl(210, 100%, 45%)' },
-  secondaryColor: { label: 'Couleur secondaire', placeholder: 'hsl(30, 90%, 50%)' },
-  logoUrl: { label: 'URL du logo', placeholder: '/microflex-logo.png' },
-  faviconUrl: { label: 'URL du favicon', placeholder: '/favicon.ico' },
-};
 
 function ProvenanceBadge({ overridden }: { overridden: boolean }) {
   return overridden ? (
@@ -203,62 +172,13 @@ export default function AdminTenantSettings() {
 
   return (
     <div className="space-y-6 max-w-3xl">
-      {/* Modules (feature flags) */}
-      <div className="bg-surface/50 border border-edge rounded-lg p-4 space-y-4">
-        <div className="flex items-center gap-2">
-          <ToggleRight size={16} className="text-accent" />
-          <h3 className="text-sm font-semibold text-content-primary">Modules du tenant</h3>
-        </div>
-        <p className="text-xs text-content-muted -mt-2">
-          L'exposition des modules est aussi bloquée côté serveur : désactiver un module
-          coupe ses routes API. Chaque changement est motivé et audité.
-        </p>
-
-        {features.length === 0 ? (
-          <p className="text-sm text-content-muted py-4 text-center">Aucun module configurable.</p>
-        ) : (
-          <div className="divide-y divide-edge-subtle">
-            {features.map(({ feature, effective, static: staticValue, overridden }) => {
-              const meta = FEATURE_LABELS[feature];
-              const Icon = meta?.icon ?? ToggleRight;
-              return (
-                <div key={feature} className="flex items-center gap-3 py-3">
-                  <Icon size={18} className="text-content-muted shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-content-primary">{meta?.label ?? feature}</span>
-                      <ProvenanceBadge overridden={overridden} />
-                    </div>
-                    <p className="text-xs text-content-muted truncate">{meta?.description}</p>
-                    {overridden && (
-                      <p className="text-[10px] text-content-muted">
-                        Valeur statique : {staticValue ? 'activé' : 'désactivé'}
-                      </p>
-                    )}
-                  </div>
-                  {overridden && (
-                    <button
-                      type="button"
-                      onClick={() => featureResetMutation.mutate(feature)}
-                      disabled={featureResetMutation.isPending}
-                      title="Revenir à la configuration statique"
-                      className="p-1.5 text-content-muted hover:text-content-secondary transition-colors"
-                    >
-                      <RotateCcw size={14} />
-                    </button>
-                  )}
-                  <Switch
-                    checked={effective}
-                    onChange={() => setPendingFeature({ feature, enabled: !effective })}
-                    ariaLabel={`Basculer ${meta?.label ?? feature}`}
-                    data-testid={`switch-tenant-${feature}`}
-                  />
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      {/* Modules provisionnés & intégrations (feature flags) */}
+      <TenantModulesPanel
+        features={features}
+        onToggle={(feature, enabled) => setPendingFeature({ feature, enabled })}
+        onReset={(feature) => featureResetMutation.mutate(feature)}
+        resetPending={featureResetMutation.isPending}
+      />
 
       {/* Branding */}
       <div className="bg-surface/50 border border-edge rounded-lg p-4 space-y-4">

@@ -1,5 +1,5 @@
 import React from 'react';
-import { useBranding } from '@/contexts/BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 import { LOGO_BASE64 } from '@/lib/pdf-logo';
 import { currencySymbol } from '@shared/config/currency';
 import { formatPhoneNumber } from '@/lib/format';
@@ -145,7 +145,7 @@ interface PayslipTemplateProps {
 
 export const PayslipTemplate = React.forwardRef<HTMLDivElement, PayslipTemplateProps>(
   ({ data }, ref) => {
-    const { branding } = useBranding();
+    const branding = useDocumentBranding();
     const { bulletin, lines, employe, company, agence, leaves, heuresTravaillees, paymentFee } = data;
     const companyName = company?.appName || branding.appName;
     const employeeName = employe ? `${employe.nom} ${employe.prenom || ''}`.trim() : 'N/A';

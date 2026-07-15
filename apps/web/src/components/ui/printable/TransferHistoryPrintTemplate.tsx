@@ -1,5 +1,5 @@
 import React from 'react';
-import { useBranding } from '@/contexts/BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Building2, Phone, Mail, MapPin } from 'lucide-react';
@@ -55,7 +55,7 @@ const DEFAULT_COMPANY_INFO = {
 
 export const TransferHistoryPrintTemplate = React.forwardRef<HTMLDivElement, TransferHistoryPrintTemplateProps>(
   ({ data, companyInfo: companyInfoProp = DEFAULT_COMPANY_INFO }, ref) => {
-    const { branding } = useBranding();
+    const branding = useDocumentBranding();
     const companyInfo = { ...companyInfoProp, nom: companyInfoProp === DEFAULT_COMPANY_INFO ? branding.appName : companyInfoProp.nom };
 
     const formattedDate = new Date(data.date).toLocaleDateString('fr-FR', {

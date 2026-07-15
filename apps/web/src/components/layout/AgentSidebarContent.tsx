@@ -3,7 +3,7 @@ import { TenantLogo } from '@/components/branding/TenantLogo';
 import { Menu, X, LogOut, ArrowDownCircle, ArrowUpCircle, CreditCard, Banknote } from 'lucide-react';
 import IconButton from '../ui/IconButton';
 import Button from '../ui/Button';
-import { useBranding } from '../../contexts/BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 
 interface AgentSidebarContentProps {
   sidebarOpen: boolean;
@@ -29,7 +29,7 @@ export default function AgentSidebarContent({
   onLogout,
   agent
 }: AgentSidebarContentProps) {
-  const { branding } = useBranding();
+  const branding = useDocumentBranding();
 
   const getTabLabel = (tab: 'versement' | 'retrait' | 'remboursement' | 'epargne') => {
     switch (tab) {

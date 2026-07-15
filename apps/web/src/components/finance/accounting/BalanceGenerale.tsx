@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { Download, Printer, BarChart3, RefreshCw } from 'lucide-react';
-import { useBranding } from '../../../contexts/BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 import { useBalanceGenerale, useAccountingWebSocket } from '../../../hooks/accounting/useAccounting';
 // Interface moved to exports file, or keep it. Let's keep it but just import the export functions.
 import { exportBalanceGeneraleExcel, exportBalanceGeneralePDF, BalanceCompteExport } from './exports/balanceGeneraleExports';
@@ -8,7 +8,7 @@ import { exportBalanceGeneraleExcel, exportBalanceGeneralePDF, BalanceCompteExpo
 interface BalanceCompte extends BalanceCompteExport {}
 
 export default function BalanceGenerale() {
-  const { branding } = useBranding();
+  const branding = useDocumentBranding();
   const [dateDebut, setDateDebut] = useState(new Date().getFullYear() + '-01-01');
   const [dateFin, setDateFin] = useState(new Date().toISOString().split('T')[0]);
   const [filtreClasse, setFiltreClasse] = useState<string>('all');

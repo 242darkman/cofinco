@@ -14,7 +14,7 @@ import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import { UniversalPaymentSuccessModal } from './shared/UniversalPaymentSuccessModal';
 import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
 import { currencySymbol } from '@shared/config/currency';
-import { useBranding } from '@/contexts/BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 import { useEnabledPaymentMethods } from '../../../contexts/FeatureFlagsContext';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -70,7 +70,7 @@ export default function CaissePaiementModal({
 }: CaissePaiementModalProps) {
   // RBAC permissions
   const { hasPermission } = usePermissions();
-  const { branding } = useBranding();
+  const branding = useDocumentBranding();
   const enabledPayments = useEnabledPaymentMethods();
   const canCreatePayments = hasPermission('caisse', 'create') || hasPermission('paiements', 'create');
 

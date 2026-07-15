@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { addPdfLogoHeader, addPdfLogoFooter } from '@/lib/pdf-logo';
-import { useBranding } from '@/contexts/BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 import { formatMoney as formatCurrency } from '@shared/config/currency';
 // P4.1: Lazy-load heavy export libraries
 import { loadPDFLibraries } from '@/lib/lazy-export';
@@ -165,7 +165,7 @@ const MIGRATION_PHASES = [
 
 export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess }: MigrationWizardProps) {
   const queryClient = useQueryClient();
-  const { branding } = useBranding();
+  const branding = useDocumentBranding();
 
   // State
   const [currentStep, setCurrentStep] = useState(0);

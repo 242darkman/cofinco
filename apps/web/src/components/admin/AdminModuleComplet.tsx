@@ -7,11 +7,12 @@ import {
 } from 'lucide-react';
 
 // Constants
-import { ADMIN_TABS, AdminTabId } from '../../constants/admin-constants';
+import { ADMIN_TABS, ADMIN_TAB_TENANT_FEATURE, AdminTabId } from '../../constants/admin-constants';
 import { useAbility } from '../../contexts/AbilityContext';
 import { Actions, Subjects } from '@/lib/casl';
 import { getPermissionMapping } from '@shared/ability/mappings';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
+import { useTenant } from '@/contexts/TenantContext';
 
 // Sub-components
 import AdminGestionProfils from './AdminGestionProfils';
@@ -34,7 +35,7 @@ import AdminClientCredentials from './AdminClientCredentials';
 import AdminProductRates from './AdminProductRates';
 import ZoneManagement from './ZoneManagement';
 import AdminCurrencySettings from './AdminCurrencySettings';
-import AdminBrandingSettings from './AdminBrandingSettings';
+import AdminCompanyInfoSettings from './AdminCompanyInfoSettings';
 import AdminTenantSettings from './AdminTenantSettings';
 import AdminAgencyReset from './AdminAgencyReset';
 import AdminScoring from './AdminScoring';
@@ -49,15 +50,21 @@ interface AdminModuleCompletProps {
 export default function AdminModuleComplet({ activeView }: AdminModuleCompletProps) {
   const ability = useAbility();
   const { currentSubModule, navigateToModule } = useAppNavigation();
+  const { config: tenantConfig } = useTenant();
+  const tenantFeatures = tenantConfig.features;
 
   // Dérive l'onglet actif depuis l'URL (source de vérité)
   const VALID_TAB_IDS = ADMIN_TABS.map(t => t.id) as string[];
   const activeTab = useMemo<AdminTabId>(() => {
     if (currentSubModule && VALID_TAB_IDS.includes(currentSubModule)) {
-      return currentSubModule as AdminTabId;
+      const tabId = currentSubModule as AdminTabId;
+      // Onglet lié à une feature désactivée : inaccessible même en accès direct
+      const feature = ADMIN_TAB_TENANT_FEATURE[tabId];
+      if (feature && !tenantFeatures[feature]) return 'dashboard';
+      return tabId;
     }
     return 'dashboard';
-  }, [currentSubModule]);
+  }, [currentSubModule, tenantFeatures]);
 
   const setActiveTab = useCallback((tab: AdminTabId) => {
     navigateToModule('administrateur', tab);
@@ -176,6 +183,9 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
                 className="flex-1 flex items-center gap-1 overflow-x-auto no-scrollbar scroll-smooth px-2"
             >
                {ADMIN_TABS.filter(tab => {
+                  // Masqué si la feature tenant associée est désactivée
+                  const feature = ADMIN_TAB_TENANT_FEATURE[tab.id];
+                  if (feature && !tenantFeatures[feature]) return false;
                   if (!tab.permission) return true;
                   const parts = tab.permission.split('.');
                   const module = parts[0];
@@ -267,7 +277,7 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
                   {activeTab === 'zones-commerciales' && <ZoneManagement />}
                   {activeTab === 'payment-methods' && <AdminPaymentMethodToggles />}
                   {activeTab === 'currency' && <AdminCurrencySettings />}
-                  {activeTab === 'branding' && <AdminBrandingSettings />}
+                  {activeTab === 'company-info' && <AdminCompanyInfoSettings />}
                   {activeTab === 'tenant' && <AdminTenantSettings />}
                   {activeTab === 'reset-agence' && <AdminAgencyReset />}
                   {activeTab === 'scoring' && <AdminScoring />}

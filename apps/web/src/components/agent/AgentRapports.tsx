@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { requestListAll, caisseAgentApi } from '../../lib/api-client';
 import { FileText, Download, Users, DollarSign, Activity, BarChart3, Filter, ChevronLeft, ChevronRight, Eye, Loader2 } from 'lucide-react';
 import { addPdfLogoHeader } from '@/lib/pdf-logo';
-import { useBranding } from '@/contexts/BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { toast } from '../../lib/toast';
 import { loadPDFLibraries } from '@/lib/lazy-export';
@@ -30,7 +30,7 @@ interface Rapport {
 }
 
 export default function AgentRapports({ agentId }: { agentId?: string }) {
-  const { branding } = useBranding();
+  const branding = useDocumentBranding();
   const { fmt, label: currencyLabel } = useCurrency();
   const [rapports, setRapports] = useState<Rapport[]>([]);
   const [loading, setLoading] = useState(true);

@@ -39,13 +39,17 @@ export const useSettingsStore = create<SettingsState>((set) => ({
 
   loadBranding: async () => {
     try {
-      const data = await api.get<BrandingSettings>('/api/branding');
+      // Source unique de vérité : configuration tenant (nom, couleurs, logo).
+      const config = await api.get<{
+        name?: string;
+        theme?: { primaryColor?: string; logoUrl?: string | null };
+      }>('/api/tenant/config');
       set({
         branding: {
-          appName: data.appName || DEFAULT_BRANDING.appName,
-          primaryColor: data.primaryColor || DEFAULT_BRANDING.primaryColor,
-          logoUrl: data.logoUrl,
-          theme: data.theme || DEFAULT_BRANDING.theme,
+          appName: config.name || DEFAULT_BRANDING.appName,
+          primaryColor: config.theme?.primaryColor || DEFAULT_BRANDING.primaryColor,
+          logoUrl: config.theme?.logoUrl ?? null,
+          theme: DEFAULT_BRANDING.theme,
         },
       });
     } catch {

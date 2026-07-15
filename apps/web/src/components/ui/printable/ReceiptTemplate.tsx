@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useBranding } from '@/contexts/BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 import { LOGO_BASE64 } from '@/lib/pdf-logo';
 import { currencySymbol } from '@shared/config/currency';
 import { formatPhoneNumber } from '@/lib/format';
@@ -573,7 +573,7 @@ const ReceiptContent: React.FC<{
 
 export const ReceiptTemplate = React.forwardRef<HTMLDivElement, ReceiptTemplateProps>(
   ({ data, companyInfo, copyType = 'original', showQRCode = true }, ref) => {
-    const { branding } = useBranding();
+    const branding = useDocumentBranding();
     const normalized = normalizeReceiptData(data, companyInfo);
     // Override defaults with dynamic branding when no explicit companyInfo is passed
     const hasExplicitCompanyInfo = companyInfo || data.companyInfo;

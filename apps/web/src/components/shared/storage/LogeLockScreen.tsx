@@ -2,7 +2,7 @@ import React from 'react';
 import { Shield, Lock, Key, RefreshCw, AlertCircle } from 'lucide-react';
 import FormField from '@/components/ui/FormField';
 import Button from '@/components/ui/Button';
-import { useBranding } from '@/contexts/BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 
 interface LogeLockScreenProps {
   password: string;
@@ -15,7 +15,7 @@ interface LogeLockScreenProps {
 export default function LogeLockScreen({ 
   password, setPassword, handleUnlock, authError, isAuthenticating 
 }: LogeLockScreenProps) {
-  const { branding } = useBranding();
+  const branding = useDocumentBranding();
   return (
     <div className="min-h-screen bg-gradient-to-br from-surface-base via-blue-900 to-accent flex items-center justify-center p-6">
       <div className="w-full max-w-md">

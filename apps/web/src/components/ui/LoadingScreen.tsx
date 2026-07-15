@@ -1,6 +1,6 @@
 import React from 'react';
 import { TenantLogo } from '@/components/branding/TenantLogo';
-import { useBranding } from '../../contexts/BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 
 interface LoadingScreenProps {
   message?: string;
@@ -113,7 +113,7 @@ function SmallSpinner({ size = 48 }: { size?: number }) {
 }
 
 export default function LoadingScreen({ message = 'Chargement...', fullScreen = true, showLogo = false }: LoadingScreenProps) {
-  const { branding } = useBranding();
+  const branding = useDocumentBranding();
   if (fullScreen) {
     return (
       <div className="fixed inset-0 bg-gradient-to-br from-surface-base via-surface-base to-surface flex items-center justify-center z-50">

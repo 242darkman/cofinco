@@ -22,7 +22,7 @@ import { exportBilanExcel, exportBilanPDF } from './exports/bilanOHADAExports';
 import Card from '../../ui/Card';
 import Badge from '../../ui/Badge';
 import Button from '../../ui/Button';
-import { useBranding } from '../../../contexts/BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 import {
   ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, Tooltip, Cell,
@@ -140,7 +140,7 @@ interface ComptabiliteSageOHADAProps {
 }
 
 const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeView }) => {
-  const { branding } = useBranding();
+  const branding = useDocumentBranding();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabKey>('plan');
   const [expandedClasses, setExpandedClasses] = useState<number[]>([]);

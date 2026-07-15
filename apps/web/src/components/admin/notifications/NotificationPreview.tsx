@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import DOMPurify from 'isomorphic-dompurify';
 import { toast } from '../../../lib/toast';
+import { useTenantBranding } from '@/components/branding/TenantLogo';
 
 export interface NotificationTemplate {
   id: string;
@@ -61,6 +62,7 @@ export default function NotificationPreview({
     return init;
   });
   const [copied, setCopied] = useState(false);
+  const { logoUrl } = useTenantBranding();
 
   // Reset only when the template itself changes (by id)
   const [prevTemplateId, setPrevTemplateId] = useState(template.id);
@@ -78,7 +80,7 @@ export default function NotificationPreview({
       rendered = rendered.replace(new RegExp(`\\{\\{${placeholder}\\}\\}`, 'g'), value);
     });
     // Replace email CID references with actual public path for browser preview
-    rendered = rendered.replace(/src=["']cid:company-logo["']/g, 'src="/microflex-logo.png"');
+    rendered = rendered.replace(/src=["']cid:company-logo["']/g, `src="${logoUrl ?? '/brand/microflex/logo.png'}"`);
     return rendered;
   };
 

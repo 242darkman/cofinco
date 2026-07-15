@@ -5,7 +5,7 @@ import { useLanguage } from '../../../contexts/LanguageContext';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { addPdfLogoHeader } from '@/lib/pdf-logo';
-import { useBranding } from '@/contexts/BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 // P4.1: Lazy-load heavy export libraries
 import { loadPDFLibraries } from '@/lib/lazy-export';
 import { currencySymbol, currencyLabel } from '@shared/config/currency';
@@ -19,7 +19,7 @@ interface StatementExportModalProps {
 
 export default function StatementExportModal({ isOpen, onClose, compte, transactions }: StatementExportModalProps) {
   const { t } = useLanguage();
-  const { branding } = useBranding();
+  const branding = useDocumentBranding();
   const [startDate, setStartDate] = useState(
     new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
   );

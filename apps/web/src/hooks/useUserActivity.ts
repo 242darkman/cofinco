@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useBranding } from '../contexts/BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 import { addPdfLogoHeader } from '../lib/pdf-logo';
 // P4.1: Lazy-load heavy export libraries
 import { loadPDFLibraries } from '../lib/lazy-export';
@@ -21,7 +21,7 @@ export interface ActivityStats {
 }
 
 export function useUserActivity() {
-  const { branding } = useBranding();
+  const branding = useDocumentBranding();
   const [activities, setActivities] = useState<UserActivity[]>([]);
   const [loading, setLoading] = useState(false);
   const [dateDebut, setDateDebut] = useState('');

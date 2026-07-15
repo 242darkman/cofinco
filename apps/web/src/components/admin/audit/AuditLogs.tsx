@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Shield, Filter, Download, Search, AlertTriangle, CheckCircle, XCircle, Clock, FileSpreadsheet, FileText } from 'lucide-react';
 import { addPdfLogoHeader } from '@/lib/pdf-logo';
-import { useBranding } from '@/contexts/BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 import { auditApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { ALL_STATUS_LABELS } from '../../../lib/status-labels';
@@ -35,7 +35,7 @@ const formatLogDate = (log: any) => {
 };
 
 export default function AuditLogs() {
-  const { branding } = useBranding();
+  const branding = useDocumentBranding();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');

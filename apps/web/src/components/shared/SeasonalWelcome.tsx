@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { TenantLogo } from '@/components/branding/TenantLogo';
 import { Sparkles, PartyPopper, Snowflake, Gift, TreePine, Wine, Hand } from 'lucide-react';
-import { useBranding } from '../../contexts/BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 
 interface SeasonalWelcomeProps {
   userName?: string;
@@ -11,7 +11,7 @@ interface SeasonalWelcomeProps {
 type EventType = 'christmas' | 'newyear' | null;
 
 export default function SeasonalWelcome({ userName = 'Utilisateur', onComplete }: Readonly<SeasonalWelcomeProps>) {
-  const { branding } = useBranding();
+  const branding = useDocumentBranding();
   const [eventType, setEventType] = useState<EventType>(null);
   const [visible, setVisible] = useState(true);
   const [particles, setParticles] = useState<Array<{ id: number; left: number; delay: number; duration: number; color?: string }>>([]);

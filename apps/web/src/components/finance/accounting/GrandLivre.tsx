@@ -7,7 +7,7 @@ import Button from '../../ui/Button';
 import Card from '../../ui/Card';
 import { toast, handleApiError } from '../../../lib/toast';
 import { addPdfLogoHeader } from '../../../lib/pdf-logo';
-import { useBranding } from '../../../contexts/BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 import { useChartOfAccounts, useGrandLivre, useAccountingWebSocket } from '../../../hooks/accounting/useAccounting';
 // P4.1: Lazy-load heavy export libraries
 import { loadPDFLibraries } from '../../../lib/lazy-export';
@@ -24,7 +24,7 @@ interface GrandLivreEntry extends GrandLivreEntryExport {}
 interface GrandLivreData extends GrandLivreDataExport {}
 
 export default function GrandLivre() {
-  const { branding } = useBranding();
+  const branding = useDocumentBranding();
   const [compteSelectionne, setCompteSelectionne] = useState('');
   const [dateDebut, setDateDebut] = useState(new Date().getFullYear() + '-01-01');
   const [dateFin, setDateFin] = useState(new Date().toISOString().split('T')[0]);

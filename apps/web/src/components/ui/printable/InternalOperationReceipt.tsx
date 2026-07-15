@@ -1,5 +1,5 @@
 import React from 'react';
-import { useBranding } from '@/contexts/BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 import { InternalTransactionType, InternalTransactionInfo } from './ReceiptTemplate';
 import { currencySymbol } from '@shared/config/currency';
 import { formatPhoneNumber } from '../../../lib/format';
@@ -102,7 +102,7 @@ const formatAmount = (amount: number, currency: string = currencySymbol()) => {
 
 export const InternalOperationReceipt = React.forwardRef<HTMLDivElement, InternalOperationReceiptProps>(
   ({ data }, ref) => {
-    const { branding } = useBranding();
+    const branding = useDocumentBranding();
     const company = { ...DEFAULT_COMPANY, name: branding.appName, ...data.companyInfo };
     const currency = data.devise || currencySymbol();
     const typeLabel = INTERNAL_TYPE_LABELS[data.type] || data.type;

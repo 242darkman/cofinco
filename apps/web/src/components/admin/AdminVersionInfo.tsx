@@ -4,7 +4,7 @@ import {
   Cpu, HardDrive, Zap, ExternalLink, CheckCircle, Clock
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { useBranding } from '../../contexts/BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 
 const BUILD_VERSION = '1.0.0';
 const BUILD_ENV = import.meta.env.MODE || 'development';
@@ -30,7 +30,7 @@ const FEATURES = [
 ];
 
 export default function AdminVersionInfo() {
-  const { branding } = useBranding();
+  const branding = useDocumentBranding();
   const currentYear = new Date().getFullYear();
   const [versionData, setVersionData] = useState({
     version: BUILD_VERSION,

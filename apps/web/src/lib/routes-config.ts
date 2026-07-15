@@ -111,6 +111,7 @@ export const ROUTES: RouteConfig[] = [
     label: 'Crédits',
     labelKey: 'menuCredits',
     group: 'Services Clients',
+    tenantFeature: 'enableCredits',
     subRoutes: [
       { path: '/credits/synthese', subModule: 'dashboard', label: 'Synthèse' },
       { path: '/credits/portefeuille', subModule: 'credits', label: 'Portefeuille' },
@@ -132,6 +133,7 @@ export const ROUTES: RouteConfig[] = [
     label: 'Restitutions (Refus)',
     labelKey: 'menuRemboursements',
     group: 'Services Clients',
+    tenantFeature: 'enableCredits',
   },
   {
     key: 'comptes',
@@ -141,6 +143,7 @@ export const ROUTES: RouteConfig[] = [
     label: 'Comptes',
     labelKey: 'menuCompte',
     group: 'Services Clients',
+    tenantFeature: 'enableComptes',
     subRoutes: [
       { path: '/comptes/tous', subModule: 'comptes', label: 'Tous les comptes' },
     ],
@@ -165,6 +168,7 @@ export const ROUTES: RouteConfig[] = [
     label: 'Caisse',
     labelKey: 'menuCaisse',
     group: 'Opérations',
+    tenantFeature: 'enableCaisse',
     subRoutes: [
       { path: '/caisse/demandes', subModule: 'demandes', label: 'Demandes' },
       { path: '/caisse/operations', subModule: 'operations', label: 'Opérations' },
@@ -238,6 +242,7 @@ export const ROUTES: RouteConfig[] = [
     label: 'Transferts',
     labelKey: 'menuTransfert',
     group: 'Opérations',
+    tenantFeature: 'enableTransfert',
   },
   {
     key: 'coffre',
@@ -247,6 +252,7 @@ export const ROUTES: RouteConfig[] = [
     label: 'Coffre-Fort',
     labelKey: 'menuCoffre',
     group: 'Opérations',
+    tenantFeature: 'enableCoffreFort',
   },
   {
     key: 'tresorerie',
@@ -256,6 +262,7 @@ export const ROUTES: RouteConfig[] = [
     label: 'Trésorerie',
     labelKey: 'menuTresorerie',
     group: 'Opérations',
+    tenantFeature: 'enableTresorerie',
   },
   // {
   //   key: 'reconciliation',
@@ -274,6 +281,7 @@ export const ROUTES: RouteConfig[] = [
     label: 'Virements Programmés',
     labelKey: 'menuVirementsProgrammes',
     group: 'Opérations',
+    tenantFeature: 'enableVirementsProgrammes',
   },
 
   // --- Gestion ---
@@ -285,6 +293,7 @@ export const ROUTES: RouteConfig[] = [
     label: 'Comptabilité',
     labelKey: 'menuComptabilite',
     group: 'Gestion',
+    tenantFeature: 'enableComptabilite',
     subRoutes: [
       { path: '/comptabilite/journal', subModule: 'journal', label: 'Journal' },
       { path: '/comptabilite/grand-livre', subModule: 'grand-livre', label: 'Grand Livre' },
@@ -299,6 +308,7 @@ export const ROUTES: RouteConfig[] = [
     label: 'Rapports',
     labelKey: 'menuRapports',
     group: 'Gestion',
+    tenantFeature: 'enableRapports',
   },
   {
     key: 'kpi',
@@ -309,6 +319,7 @@ export const ROUTES: RouteConfig[] = [
     label: 'KPI & Pilotage',
     labelKey: 'menuKPI',
     group: 'Gestion',
+    tenantFeature: 'enableKpi',
   },
   {
     key: 'rh',
@@ -318,6 +329,7 @@ export const ROUTES: RouteConfig[] = [
     label: 'Personnel',
     labelKey: 'menuRH',
     group: 'Gestion',
+    tenantFeature: 'enableRH',
     subRoutes: [
       { path: '/ressources-humaines/tableau-de-bord', subModule: 'dashboard', label: 'Tableau de bord' },
       { path: '/ressources-humaines/employes', subModule: 'list', label: 'Employés' },
@@ -368,7 +380,7 @@ export const ROUTES: RouteConfig[] = [
       { path: '/administration/zones-commerciales', subModule: 'zones-commerciales', label: 'Arrondissements & Marchés' },
       { path: '/administration/paiements', subModule: 'payment-methods', label: 'Paiements' },
       { path: '/administration/devise', subModule: 'currency', label: 'Devise' },
-      { path: '/administration/branding', subModule: 'branding', label: 'Branding' },
+      { path: '/administration/societe', subModule: 'company-info', label: 'Société' },
       { path: '/administration/tenant', subModule: 'tenant', label: 'Tenant & Modules' },
       { path: '/administration/reset-agence', subModule: 'reset-agence', label: 'Reset Agence' },
       { path: '/administration/scoring', subModule: 'scoring', label: 'Scoring' },
@@ -390,6 +402,7 @@ export const ROUTES: RouteConfig[] = [
     label: 'Mon Espace',
     labelKey: 'menuMonEspace',
     group: 'Système',
+    tenantFeature: 'enableRH',
     subRoutes: [
       { path: '/mon-espace/dashboard', subModule: 'dashboard', label: 'Dashboard' },
       { path: '/mon-espace/coordonnees', subModule: 'coordonnees', label: 'Coordonnées' },

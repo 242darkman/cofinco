@@ -9,7 +9,7 @@ import { notificationApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
 import { ALL_STATUS_LABELS } from '../../lib/status-labels';
 import { addPdfLogoHeader } from '@/lib/pdf-logo';
-import { useBranding } from '@/contexts/BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 // P4.1: Lazy-load heavy export libraries
 import { loadPDFLibraries } from '@/lib/lazy-export';
 
@@ -28,7 +28,7 @@ interface SecurityAlert {
 }
 
 export default function SecurityAlertsPanel() {
-  const { branding } = useBranding();
+  const branding = useDocumentBranding();
   const [alerts, setAlerts] = useState<SecurityAlert[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedAlert, setSelectedAlert] = useState<SecurityAlert | null>(null);

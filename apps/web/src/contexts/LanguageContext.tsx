@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
-import { useBranding } from './BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 
 type Language = 'fr' | 'en';
 
@@ -58,7 +58,7 @@ const translations: Translations = {
   french: { fr: 'Français', en: 'French' },
   english: { fr: 'Anglais', en: 'English' },
 
-  // Default app name — overridden at runtime by BrandingContext via brandedOverrides below
+  // Default app name — overridden at runtime by the tenant config via brandedOverrides below
   microflexPlatform: { fr: 'MicroFlex', en: 'MicroFlex' },
   platformeMicrofinance: { fr: 'Plateforme Microfinance', en: 'Microfinance Platform' },
 
@@ -433,7 +433,7 @@ const translations: Translations = {
   premium: { fr: 'Premium', en: 'Premium' },
   
   // Welcome message
-  // Default welcome message — overridden at runtime by BrandingContext via brandedOverrides below
+  // Default welcome message — overridden at runtime by the tenant config via brandedOverrides below
   bienvenueMicroflex: { fr: 'Bienvenue sur MicroFlex', en: 'Welcome to MicroFlex' },
   gestionMicrofinance: { fr: 'Gestion complète de microfinance', en: 'Complete microfinance management' },
   
@@ -574,7 +574,7 @@ const translations: Translations = {
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const { branding } = useBranding();
+  const branding = useDocumentBranding();
   const [language, setLanguageState] = useState<Language>(() => {
     const saved = localStorage.getItem('language');
     return (saved as Language) || 'fr';

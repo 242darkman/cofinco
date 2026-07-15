@@ -21,7 +21,7 @@ import Button from '../ui/Button';
 import FormField from '../ui/FormField';
 import Card from '../ui/Card';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { useBranding } from '../../contexts/BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 import { useTenant } from '../../contexts/TenantContext';
 
 interface LoginPageProps {
@@ -31,7 +31,7 @@ interface LoginPageProps {
 
 export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: LoginPageProps) {
   const { t } = useLanguage();
-  const { branding } = useBranding();
+  const branding = useDocumentBranding();
   const { config: tenantConfig } = useTenant();
   const appName = tenantConfig?.name || branding.appName;
 

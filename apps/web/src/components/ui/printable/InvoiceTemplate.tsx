@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useBranding } from '@/contexts/BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 import { ReceiptData } from './ReceiptTemplate';
 import { LOGO_BASE64 } from '@/lib/pdf-logo';
 import { TYPE_OPERATION_TERRAIN_LABELS } from '@shared/enum/status-constants';
@@ -91,7 +91,7 @@ interface InvoiceTemplateProps {
 
 export const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
   ({ data, companyInfo: companyInfoProp = COMPANY, showQRCode = true }, ref) => {
-    const { branding } = useBranding();
+    const branding = useDocumentBranding();
     const companyInfo = { ...companyInfoProp, nom: companyInfoProp === COMPANY ? branding.appName : companyInfoProp.nom };
     const items = data.items ?? [];
     const total = data.total ?? 0;

@@ -2,7 +2,7 @@ import type { ClientWithIdentity } from '@shared/schema';
 import React, { useState } from 'react';
 import { Send, Mail, MessageSquare, Users, AlertCircle, CheckCircle, X, AlertTriangle } from 'lucide-react';
 import { usePermissions } from '../auth/ProtectedFeature';
-import { useBranding } from '../../contexts/BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 
 interface ClientBulkCommunicationProps {
   clients: ClientWithIdentity[];
@@ -13,7 +13,7 @@ interface ClientBulkCommunicationProps {
 export default function ClientBulkCommunication({ clients, onClose, onComplete }: ClientBulkCommunicationProps) {
   // RBAC permissions
   const { hasPermission } = usePermissions();
-  const { branding } = useBranding();
+  const branding = useDocumentBranding();
   const canSendCommunications = hasPermission('clients', 'communicate') || hasPermission('communications', 'send') || hasPermission('admin', 'manage');
 
   const [method, setMethod] = useState<'sms' | 'email'>('sms');

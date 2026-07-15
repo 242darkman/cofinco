@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { useBranding } from '../contexts/BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 import { exportToCSV, exportToPDF } from '../lib/exportUtils';
 
 export function useComplianceReports() {
-  const { branding } = useBranding();
+  const branding = useDocumentBranding();
   const [loading, setLoading] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState('current_month');
 

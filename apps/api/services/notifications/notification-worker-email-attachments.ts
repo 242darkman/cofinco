@@ -1,5 +1,5 @@
 import type { EmailAttachment } from "./providers/provider.interface";
-import { getLogoBuffer } from "../../lib/company-logo";
+import { getLogoBuffer, getLogoFilename, getLogoMime } from "../../lib/company-logo";
 import { createLogger } from "../../lib/logger";
 import { StorageService } from "../storage-service";
 
@@ -53,9 +53,9 @@ function buildInlineLogoAttachment(): EmailAttachment[] {
   }
 
   return [{
-    filename: "microflex-logo.png",
+    filename: getLogoFilename(),
     content: logoBuffer,
-    contentType: "image/png",
+    contentType: getLogoMime() ?? "image/png",
     cid: "company-logo",
   }];
 }

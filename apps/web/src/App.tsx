@@ -24,7 +24,7 @@ import NetworkOverlay from './components/shared/NetworkOverlay';
 import NetworkBanner from './components/shared/NetworkBanner';
 import SessionExpirationWarning from './components/shared/SessionExpirationWarning';
 import { useOfflineBus } from './hooks/useOfflineBus';
-import { useBranding } from './contexts/BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 import { OfflineProvider } from './contexts/OfflineContext';
 import { TenantProvider } from './contexts/TenantContext';
 
@@ -44,7 +44,7 @@ function App() {
   const [sessionExpiredMessage, setSessionExpiredMessage] = useState<string | null>(null);
   const { isServerReachable, isChecking, checkHealth } = useServerHealth();
   const { status: networkStatus, isOffline, isApiDown, forceRetry } = useNetwork();
-  const { branding } = useBranding();
+  const branding = useDocumentBranding();
   const [location, setLocation] = useLocation();
   const queryClient = useQueryClient();
 

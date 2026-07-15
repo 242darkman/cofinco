@@ -19,7 +19,7 @@ export default defineConfig({
     metaImagesPlugin(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'microflex-logo.png', 'icons/*.png'],
+      includeAssets: ['favicon.ico', 'brand/**/*', 'icons/*.png'],
       manifest: false, // Use external manifest.json
       workbox: {
         // Precache all static assets
