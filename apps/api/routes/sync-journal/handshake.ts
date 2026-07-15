@@ -6,6 +6,7 @@ import { deviceKeys, offlineJournalEntries } from "@shared/schema/device-keys";
 import { eq, and, desc } from "drizzle-orm";
 import { signLimits } from "../../services/sync-journal/crypto-utils";
 import { OFFLINE_LIMITS } from "../../services/sync-journal/offline-limits";
+import { recordDeviceSyncState } from "../../services/sync-journal/sync-state";
 import { requireAuth } from "../../auth";
 
 const logger = createLogger('Routes:SyncJournal:Handshake');
@@ -54,6 +55,16 @@ handshakeRouter.post('/handshake', requireAuth, async (req, res) => {
       ))
       .orderBy(desc(offlineJournalEntries.serverTimestamp))
       .limit(1);
+
+    // Compteur d'opérations en attente déclaré par l'appareil (best effort,
+    // alimente l'indicateur « données incomplètes » de l'écran KPI)
+    await recordDeviceSyncState({
+      deviceId: data.deviceId,
+      agentId,
+      agenceId: req.user?.agenceId ?? null,
+      pendingCount: data.pendingCount,
+      event: 'handshake',
+    });
 
     // Get all revoked keys for this agent (client needs to know)
     const revokedKeys = await db

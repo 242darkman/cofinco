@@ -114,6 +114,45 @@ export function KpiCoherenceWarningsBanner({ warnings }: CoherenceWarningsProps)
 }
 
 // ---------------------------------------------------------------------------
+// Bannière opérations offline en attente — indicateurs incomplets
+// ---------------------------------------------------------------------------
+
+interface OfflinePendingBannerProps {
+  totalPending: number;
+  deviceCount: number;
+  oldestReportAt: string | null;
+}
+
+function formatReportAge(oldestReportAt: string): string {
+  const elapsedMs = Date.now() - new Date(oldestReportAt).getTime();
+  if (!Number.isFinite(elapsedMs) || elapsedMs < 0) return '';
+  const minutes = Math.floor(elapsedMs / 60_000);
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} h`;
+  return `${Math.floor(hours / 24)} j`;
+}
+
+export function KpiOfflinePendingBanner({ totalPending, deviceCount, oldestReportAt }: OfflinePendingBannerProps) {
+  if (totalPending <= 0) return null;
+  const age = oldestReportAt ? formatReportAge(oldestReportAt) : '';
+  return (
+    <div role="status" className="rounded-lg border border-edge bg-status-warning-bg px-4 py-3">
+      <div className="flex items-center gap-2 text-status-warning text-sm font-semibold">
+        <AlertTriangle size={16} className="shrink-0" />
+        {totalPending} opération{totalPending > 1 ? 's' : ''} offline en attente de synchronisation
+      </div>
+      <p className="mt-1 text-xs text-content-secondary">
+        {deviceCount} appareil{deviceCount > 1 ? 's' : ''} n'{deviceCount > 1 ? 'ont' : 'a'} pas
+        termine sa synchronisation{age ? ` (plus ancien rapport : il y a ${age})` : ''}.
+        Les indicateurs affiches peuvent etre incomplets tant que ces operations ne sont pas
+        integrees.
+      </p>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // État vide — aucun snapshot pour la période
 // ---------------------------------------------------------------------------
 

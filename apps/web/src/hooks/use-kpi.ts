@@ -64,6 +64,27 @@ export function useKpiSeries(periodType: string, scope?: string) {
   });
 }
 
+import type { PendingSyncSummary } from '@shared/types/offline-sync';
+
+/**
+ * Opérations offline en attente de synchronisation (scope courant).
+ * Un total non nul signifie que les indicateurs affichés sont
+ * potentiellement incomplets. Rafraîchi périodiquement : les appareils
+ * hors ligne ne génèrent pas d'événement temps réel par définition.
+ */
+export function useOfflinePendingSummary(scope?: string) {
+  return useQuery<{ data: PendingSyncSummary }>({
+    queryKey: ['kpi', 'offline-pending', scope],
+    queryFn: async () => {
+      const res = await fetch('/api/kpi/offline-pending', { credentials: 'include' });
+      if (!res.ok) throw new Error('Erreur chargement opérations en attente');
+      return res.json();
+    },
+    staleTime: 60 * 1000,
+    refetchInterval: 2 * 60 * 1000,
+  });
+}
+
 export function useKpiPeriods() {
   return useQuery<{ data: Array<{ periodType: string; periodKey: string; generatedAt: string; version: number }> }>({
     queryKey: ['kpi', 'periods'],

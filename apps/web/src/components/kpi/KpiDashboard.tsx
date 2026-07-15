@@ -10,7 +10,7 @@ import {
   Landmark,
 } from 'lucide-react';
 import TabGroup from '@/components/ui/TabGroup';
-import { useKpiSnapshot, useKpiRecalculate, useKpiRealtimeRefresh } from '@/hooks/use-kpi';
+import { useKpiSnapshot, useKpiRecalculate, useKpiRealtimeRefresh, useOfflinePendingSummary } from '@/hooks/use-kpi';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useAbilityContext } from '@/contexts/AbilityContext';
 import { Actions, Subjects } from '@/lib/casl';
@@ -26,6 +26,7 @@ import {
   KpiEmptyPeriodState,
   KpiErrorCard,
   KpiLoadingSkeleton,
+  KpiOfflinePendingBanner,
 } from './KpiDashboardStates';
 import KpiOverviewTab from './tabs/KpiOverviewTab';
 import KpiCreditTab from './tabs/KpiCreditTab';
@@ -138,6 +139,10 @@ function KpiDashboard() {
     ? (snapshot?.metadata?.warnings ?? [])
     : [];
 
+  // Opérations offline en attente : les indicateurs peuvent être incomplets
+  const offlinePending = useOfflinePendingSummary(scope);
+  const pendingSummary = offlinePending.data?.data;
+
   // ---- Period options ----
 
   // ---- Agency options for admin selector ----
@@ -239,6 +244,14 @@ function KpiDashboard() {
       />
 
       <KpiCoherenceWarningsBanner warnings={coherenceWarnings} />
+
+      {pendingSummary && (
+        <KpiOfflinePendingBanner
+          totalPending={pendingSummary.totalPending}
+          deviceCount={pendingSummary.deviceCount}
+          oldestReportAt={pendingSummary.oldestReportAt}
+        />
+      )}
 
       {payload && <KpiTrendsStrip periodType={periodType} scope={scope} />}
 

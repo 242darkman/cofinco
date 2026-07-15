@@ -10,6 +10,7 @@ import { getSnapshot, listSnapshotPeriods, listSnapshotSeries } from "../service
 import { buildSeriesPoints } from "../services/kpi/kpi-series";
 import { refreshAgencyScope, refreshAllScopes } from "../services/kpi/kpi-refresh-service";
 import { broadcastKpiUpdated } from "../services/kpi/kpi-refresh-worker";
+import { getPendingSyncSummary } from "../services/sync-journal/sync-state";
 import type { KpiPayload, KpiPeriodType, KpiScopeType } from "@shared/schema/kpi";
 
 const logger = createLogger('Routes:KPI');
@@ -136,6 +137,40 @@ export function registerKpiRoutes(app: Express) {
       } catch (error) {
         logger.error({ err: error }, 'Error fetching KPI series');
         res.status(500).json({ message: "Erreur lors de la récupération des séries KPI" });
+      }
+    }
+  );
+
+  // ============================================
+  // GET /api/kpi/offline-pending — Opérations offline en attente de sync
+  // ============================================
+  app.get("/api/kpi/offline-pending",
+    requireAuth,
+    attachAbility,
+    requireAbility(Actions.VIEW, Subjects.KPI),
+    requireAgenceIdAccess(),
+    async (req, res) => {
+      try {
+        // Résolution de scope identique à GET /api/kpi/series
+        const isAdmin = req.agenceFilter === null;
+        const agencyId = req.selectedAgenceId;
+
+        let scopeAgencyId: string | null;
+        if (isAdmin && agencyId) {
+          scopeAgencyId = agencyId;
+        } else if (!isAdmin && req.agenceFilter?.agenceId) {
+          scopeAgencyId = req.agenceFilter.agenceId;
+        } else if (isAdmin) {
+          scopeAgencyId = null; // consolidé
+        } else {
+          return res.status(400).json({ message: "Impossible de déterminer l'agence" });
+        }
+
+        const summary = await getPendingSyncSummary(scopeAgencyId);
+        res.json({ data: summary });
+      } catch (error) {
+        logger.error({ err: error }, 'Error fetching offline pending summary');
+        res.status(500).json({ message: "Erreur lors de la récupération des opérations en attente" });
       }
     }
   );

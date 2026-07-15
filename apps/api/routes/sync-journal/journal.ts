@@ -17,6 +17,7 @@ import {
   type AgentDailyStats,
 } from "../../services/sync-journal/offline-limits";
 import { D } from "../../lib/money";
+import { recordDeviceSyncState } from "../../services/sync-journal/sync-state";
 import { requireAuth } from "../../auth";
 
 const logger = createLogger('Routes:SyncJournal:Upload');
@@ -52,6 +53,8 @@ export const journalEntrySchema = z.object({
 
 const uploadBatchSchema = z.object({
   entries: z.array(journalEntrySchema).min(1).max(10),
+  /** Opérations restant en file côté client APRÈS ce lot (compteur KPI) */
+  remainingPending: z.number().int().min(0).optional(),
 });
 
 /**
@@ -86,7 +89,7 @@ async function getConfirmedDailyStats(
 
 journalUploadRouter.post('/journal', requireAuth, async (req, res) => {
   try {
-    const { entries } = uploadBatchSchema.parse(req.body);
+    const { entries, remainingPending } = uploadBatchSchema.parse(req.body);
     const agentId = req.user!.id;
 
     const accepted: string[] = [];
@@ -266,6 +269,16 @@ journalUploadRouter.post('/journal', requireAuth, async (req, res) => {
         rejected.push({ uuid: entry.uuid, reason: 'processing_error' });
       }
     }
+
+    // État de sync de l'appareil : file restante déclarée après ce lot
+    // (best effort — n'impacte jamais le résultat de l'upload)
+    await recordDeviceSyncState({
+      deviceId: entries[0].deviceId,
+      agentId,
+      agenceId: entries[0].agenceId,
+      pendingCount: remainingPending,
+      event: 'upload',
+    });
 
     let anomalies: Awaited<ReturnType<typeof OfflineAnomalyDetector.analyzeBatch>> = [];
     try {
