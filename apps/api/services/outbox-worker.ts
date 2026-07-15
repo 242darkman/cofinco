@@ -3,7 +3,7 @@ import { evenementsOutbox } from "@shared/schema";
 import { eq, isNull, asc, sql } from "drizzle-orm";
 import { getWsInstance } from "../ws-server";
 import { createLogger } from "../lib/logger";
-import { markKpiDirty } from "./kpi/kpi-refresh-worker";
+import { markKpiDirtyForDates } from "./kpi/kpi-refresh-worker";
 import type pg from "pg";
 
 const logger = createLogger('Outbox');
@@ -44,6 +44,9 @@ async function processOutboxEvents(): Promise<number> {
 
     const wsInstance = getWsInstance();
     let publishedCount = 0;
+    // Dates d'opération des événements publiés : une opération antidatée
+    // (rejeu offline) invalide le snapshot KPI de SA période
+    const kpiDirtyDates: Array<Date | string | undefined> = [];
 
     for (const event of events) {
       try {
@@ -78,6 +81,12 @@ async function processOutboxEvents(): Promise<number> {
         }
 
         publishedCount++;
+        const payloadDate = (event.payload as Record<string, unknown> | null)?.['dateOperation'];
+        kpiDirtyDates.push(
+          typeof payloadDate === 'string' || payloadDate instanceof Date
+            ? payloadDate
+            : event.createdAt ?? undefined,
+        );
       } catch (error: any) {
         // Increment retry counter and record error
         const newTentative = (event.tentative || 0) + 1;
@@ -104,9 +113,9 @@ async function processOutboxEvents(): Promise<number> {
 
     if (publishedCount > 0) {
       logger.info({ count: publishedCount }, 'Published events');
-      // Tout événement métier publié rend les KPI de la période courante
-      // obsolètes : marquage dirty (le worker KPI debounce et recalcule).
-      markKpiDirty('outbox-events');
+      // Marquage dirty par période concernée : la date d'opération de chaque
+      // événement détermine le snapshot à recalculer (le worker KPI debounce).
+      markKpiDirtyForDates(kpiDirtyDates);
     }
 
     return publishedCount;
