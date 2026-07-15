@@ -1,5 +1,5 @@
 import React from 'react';
-import { useBranding } from '@/contexts/BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { MapPin, Phone, Mail } from 'lucide-react';
@@ -117,7 +117,7 @@ function formatDate(d?: string | null) {
 
 export const EnqueteReportTemplate = React.forwardRef<HTMLDivElement, EnqueteReportData>(
   ({ enquete, client, demande, creditPlan }, ref) => {
-    const { branding } = useBranding();
+    const branding = useDocumentBranding();
     const companyName = branding.appName || DEFAULT_COMPANY_INFO.nom;
     const e = enquete;
     const revenu = Number(e.revenuMensuel) || 0;

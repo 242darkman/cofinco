@@ -9,7 +9,7 @@ import { usePermissions } from '../auth/ProtectedFeature';
 import { Employe } from '../../hooks/hr/useEmployes';
 import { resolveStorageUrl } from '@/lib/format';
 import { toast } from '../../lib/toast';
-import { useBranding } from '../../contexts/BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 // P4.1: Lazy-load heavy export libraries
 import { loadPDFLibraries } from '@/lib/lazy-export';
 
@@ -230,7 +230,7 @@ const ExportMenu = ({
 
 // --- Main Component ---
 export default function OrganigrammeView({ employes }: OrganigrammeViewProps) {
-  const { branding } = useBranding();
+  const branding = useDocumentBranding();
   const { hasPermission } = usePermissions();
   const canViewOrganigramme = hasPermission('rh', 'view');
   const canEditOrganigramme = hasPermission('rh', 'edit');

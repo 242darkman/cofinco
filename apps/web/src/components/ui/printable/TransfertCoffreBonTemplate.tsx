@@ -1,5 +1,5 @@
 import React from 'react';
-import { useBranding } from '@/contexts/BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 import { currencySymbol } from '@shared/config/currency';
 import { getTypeConditionnementLabel } from '@shared/enum/status-constants';
 
@@ -80,7 +80,7 @@ interface Props {
 
 export const TransfertCoffreBonTemplate = React.forwardRef<HTMLDivElement, Props>(
   ({ data }, ref) => {
-    const { branding } = useBranding();
+    const branding = useDocumentBranding();
     const config = BON_CONFIG[data.bonType];
     const currency = data.devise || currencySymbol();
 

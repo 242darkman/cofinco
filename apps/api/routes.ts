@@ -36,7 +36,8 @@ import { registerEmployesRoutes } from "./routes/employes";
 import { registerDepartmentsRoutes } from "./routes/departments";
 import { registerOtpRoutes } from "./routes/otp";
 import { registerConfigRoutes, registerSecurityConfigRoutes } from "./routes/config";
-import { registerBrandingRoutes } from "./routes/branding";
+import { registerCompanyInfoRoutes } from "./routes/company-info";
+import { registerPwaRoutes } from "./routes/pwa";
 import { registerComptesRoutes } from "./routes/comptes";
 import { registerReevaluationRoutes } from "./routes/reevaluations";
 import { registerNotificationsRoutes } from "./routes/notifications";
@@ -194,8 +195,11 @@ export function registerRoutes(app: Express): Server {
   // Security Config Module (OTP bypass, presence verification)
   registerSecurityConfigRoutes(app);
 
-  // Branding Module (app name, logo, theme colors)
-  registerBrandingRoutes(app);
+  // Manifeste PWA dynamique (nom depuis la config tenant)
+  registerPwaRoutes(app);
+
+  // Informations société (reçus, factures) — identité visuelle gérée par le tenant
+  registerCompanyInfoRoutes(app);
 
   // Tenant Configuration (Feature Flags, White-label variables)
   registerTenantRoutes(app);

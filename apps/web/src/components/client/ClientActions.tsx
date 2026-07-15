@@ -2,7 +2,7 @@ import type { ClientWithIdentity } from '@shared/schema';
 import React, { useState } from 'react';
 import { Phone, Mail, MessageSquare, Send, X, CheckCircle, AlertTriangle } from 'lucide-react';
 import { Card, IconButton } from '../ui';
-import { useBranding } from '../../contexts/BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 
 interface ClientActionsProps {
   client: ClientWithIdentity;
@@ -12,7 +12,7 @@ interface ClientActionsProps {
 type SendStatus = 'idle' | 'sending' | 'success' | 'error';
 
 export default function ClientActions({ client, onActionComplete }: ClientActionsProps) {
-  const { branding } = useBranding();
+  const branding = useDocumentBranding();
   const [showSMSModal, setShowSMSModal] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [smsMessage, setSmsMessage] = useState('');

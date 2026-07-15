@@ -1,5 +1,5 @@
 import React from 'react';
-import { useBranding } from '@/contexts/BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Installment, getInstallmentStatusLabel } from '../../../lib/credit-logic';
@@ -33,7 +33,7 @@ const DEFAULT_COMPANY_INFO = {
 
 export const CreditSchedulePDF = React.forwardRef<HTMLDivElement, CreditSchedulePDFProps>(
   ({ credit, client, schedule, companyInfo: companyInfoProp = DEFAULT_COMPANY_INFO }, ref) => {
-    const { branding } = useBranding();
+    const branding = useDocumentBranding();
     const companyInfo = { ...companyInfoProp, nom: companyInfoProp === DEFAULT_COMPANY_INFO ? branding.appName : companyInfoProp.nom };
     const totalPrincipal = parseFloat(credit.montant) || 0;
     const totalWithInterest = parseFloat(credit.totalDu) || 0;

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { DollarSign, TrendingUp, TrendingDown, Filter, Download, Search, FileSpreadsheet, FileText, Shield } from 'lucide-react';
 import { addPdfLogoHeader } from '@/lib/pdf-logo';
-import { useBranding } from '@/contexts/BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 import { auditApi } from '../../../lib/api-client';
 // P4.1: Lazy-load heavy export libraries
 import { loadPDFLibraries } from '@/lib/lazy-export';
@@ -24,7 +24,7 @@ interface TransactionLog {
 }
 
 export default function TransactionAudit() {
-  const { branding } = useBranding();
+  const branding = useDocumentBranding();
   const [transactions, setTransactions] = useState<TransactionLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');

@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { Download, Printer, FileText, BookOpen, ClipboardList, RefreshCw } from 'lucide-react';
-import { useBranding } from '../../../contexts/BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 import {
   useJournalCentralisateur,
   useBilanOHADA,
@@ -58,7 +58,7 @@ const MONTH_NAMES = [
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function RapportsOHADA() {
-  const { branding } = useBranding();
+  const branding = useDocumentBranding();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);

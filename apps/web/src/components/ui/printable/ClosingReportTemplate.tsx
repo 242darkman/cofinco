@@ -1,5 +1,5 @@
 import React from 'react';
-import { useBranding } from '@/contexts/BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 import { LOGO_BASE64 } from '@/lib/pdf-logo';
 import {
   type ClosureReportData,
@@ -70,7 +70,7 @@ interface ClosingReportTemplateProps {
 
 export const ClosingReportTemplate = React.forwardRef<HTMLDivElement, ClosingReportTemplateProps>(
   ({ data }, ref) => {
-    const { branding } = useBranding();
+    const branding = useDocumentBranding();
     const signature = data.signatureNumérique || generateSignature(data);
 
     // Compute billetage rows (only non-zero)

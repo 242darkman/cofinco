@@ -8,7 +8,7 @@ import { Card, Button, Badge, ResponsiveTable } from '../../ui';
 import { useCompteResultat } from '../../../hooks/accounting/useAccounting';
 // P4.1: Lazy-load heavy export libraries
 import { loadPDFLibraries } from '@/lib/lazy-export';
-import { useBranding } from '@/contexts/BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 import {
   ResponsiveContainer,
   PieChart, Pie, Cell,
@@ -30,7 +30,7 @@ interface CompteResultatData {
 }
 
 export default function CompteResultat() {
-  const { branding } = useBranding();
+  const branding = useDocumentBranding();
   const [viewMode, setViewMode] = useState<'synthese' | 'charges' | 'produits'>('synthese');
   const [exercice, setExercice] = useState(String(new Date().getFullYear()));
 

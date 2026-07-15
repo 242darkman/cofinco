@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Users, Wallet, PiggyBank, UsersRound, ClipboardList, BarChart3, LucideIcon } from 'lucide-react';
-import { useBranding } from '../contexts/BrandingContext';
+import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 import { requestListAll, api } from '../lib/api-client';
 import { addPdfLogoHeader, addPdfLogoFooter } from '../lib/pdf-logo';
 // P4.1: Lazy-load heavy export libraries (saves ~650KB on initial bundle)
@@ -312,7 +312,7 @@ function buildConfigs(): Record<string, ReportConfig> {
 // ============================================================================
 
 export function useReportGenerator() {
-  const { branding } = useBranding();
+  const branding = useDocumentBranding();
   const COMPANY_NAME = branding.appName;
   const [reportType, setReportType] = useState('');
   const [format, setFormat] = useState<'pdf' | 'excel' | 'csv'>('pdf');
