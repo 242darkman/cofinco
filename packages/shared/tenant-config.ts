@@ -5,6 +5,22 @@ export const tenantFeatureFlagsSchema = z.object({
   enableTontine: z.boolean(),
   enableMobileMoney: z.boolean(),
   enableFieldAgents: z.boolean(),
+  // Modules fonctionnels activables par tenant. Défaut `true` = actif partout
+  // (opt-out par tenant) : une config existante sans la clé conserve le
+  // comportement standard (AGENTS.md §5). Chaque flag est consommé côté nav
+  // (routes-config), onglets admin (admin-constants) et garde serveur
+  // (middleware/tenant-features) — voir la recette dans tenant-config.ts.
+  enableCredits: z.boolean().default(true),
+  enableComptes: z.boolean().default(true),
+  enableCaisse: z.boolean().default(true),
+  enableCoffreFort: z.boolean().default(true),
+  enableTresorerie: z.boolean().default(true),
+  enableTransfert: z.boolean().default(true),
+  enableVirementsProgrammes: z.boolean().default(true),
+  enableComptabilite: z.boolean().default(true),
+  enableRapports: z.boolean().default(true),
+  enableKpi: z.boolean().default(true),
+  enableRH: z.boolean().default(true),
 }).strict();
 
 export const tenantThemeConfigSchema = z.object({
@@ -82,13 +98,24 @@ export const defaultTenantConfig: TenantConfig = {
   name: "MicroFlex",
   theme: {
     primaryColor: "hsl(210, 100%, 45%)", // A generic blue
-    logoUrl: "/microflex-logo.png",
+    logoUrl: "/brand/microflex/logo.png",
   },
   features: {
     enableSms: true,
     enableTontine: true,
     enableMobileMoney: true,
     enableFieldAgents: true,
+    enableCredits: true,
+    enableComptes: true,
+    enableCaisse: true,
+    enableCoffreFort: true,
+    enableTresorerie: true,
+    enableTransfert: true,
+    enableVirementsProgrammes: true,
+    enableComptabilite: true,
+    enableRapports: true,
+    enableKpi: true,
+    enableRH: true,
   },
 };
 
@@ -97,4 +124,38 @@ export function isTenantFeatureEnabled(
   feature: TenantFeatureKey,
 ): boolean {
   return config.features[feature] === true;
+}
+
+/**
+ * Nature d'un flag tenant :
+ * - `module` : capacité provisionnée au déploiement (fichier config = plafond).
+ *   Une surcharge en base ne peut que **désactiver** un module provisionné,
+ *   jamais **activer** un module non provisionné (pas d'auto-provisioning).
+ * - `integration` : intégration opérationnelle, librement basculable à chaud
+ *   par l'administrateur du tenant (aucun plafond).
+ */
+export type TenantFeatureKind = "module" | "integration";
+
+export const TENANT_FEATURE_KIND: Record<TenantFeatureKey, TenantFeatureKind> = {
+  // Intégrations opérationnelles (bascule libre à chaud)
+  enableSms: "integration",
+  enableMobileMoney: "integration",
+  // Modules (provisionnés au déploiement — plafond)
+  enableTontine: "module",
+  enableFieldAgents: "module",
+  enableCredits: "module",
+  enableComptes: "module",
+  enableCaisse: "module",
+  enableCoffreFort: "module",
+  enableTresorerie: "module",
+  enableTransfert: "module",
+  enableVirementsProgrammes: "module",
+  enableComptabilite: "module",
+  enableRapports: "module",
+  enableKpi: "module",
+  enableRH: "module",
+};
+
+export function isModuleFeature(feature: TenantFeatureKey): boolean {
+  return TENANT_FEATURE_KIND[feature] === "module";
 }

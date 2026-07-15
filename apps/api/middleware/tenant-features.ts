@@ -43,6 +43,58 @@ const FEATURE_ROUTE_RULES: FeatureRouteRule[] = [
       /^\/api\/webhooks\/mtn\/sms-[^/]+(?:\/|$)/,
     ],
   },
+  {
+    feature: "enableCredits",
+    paths: [
+      /^\/api\/credits(?:\/|$)/,
+      /^\/api\/remboursements(?:\/|$)/,
+    ],
+  },
+  {
+    feature: "enableComptes",
+    paths: [/^\/api\/comptes(?:\/|$)/],
+  },
+  {
+    feature: "enableCaisse",
+    paths: [
+      /^\/api\/caisse(?:\/|$)/,
+      /^\/api\/caisses(?:\/|$)/,
+      /^\/api\/caisse-transferts(?:\/|$)/,
+      /^\/api\/sessions-caisse(?:\/|$)/,
+      /^\/api\/operations-caisse(?:\/|$)/,
+    ],
+  },
+  {
+    feature: "enableCoffreFort",
+    paths: [
+      /^\/api\/coffre(?:\/|$)/,
+      /^\/api\/transferts-inter-coffres(?:\/|$)/,
+      /^\/api\/evacuations-coffre(?:\/|$)/,
+    ],
+  },
+  {
+    feature: "enableTransfert",
+    paths: [/^\/api\/transferts(?:\/|$)/],
+  },
+  {
+    feature: "enableComptabilite",
+    paths: [/^\/api\/comptabilite(?:\/|$)/],
+  },
+  {
+    feature: "enableKpi",
+    paths: [/^\/api\/kpi(?:\/|$)/],
+  },
+  {
+    feature: "enableRH",
+    paths: [
+      /^\/api\/hr(?:\/|$)/,
+      /^\/api\/departments(?:\/|$)/,
+    ],
+  },
+  // enableTresorerie / enableVirementsProgrammes / enableRapports : masqués côté
+  // nav + admin, mais sans garde API dédiée ici (pas de préfixe /api propre et
+  // vérifié). Leurs endpoints restent protégés par RBAC. Ajouter une règle ici
+  // dès qu'un préfixe stable est confirmé.
 ];
 
 export function getRequiredTenantFeature(path: string): TenantFeatureKey | undefined {

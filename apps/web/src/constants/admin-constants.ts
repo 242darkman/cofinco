@@ -2,6 +2,7 @@
  * Constantes pour le module Admin
  */
 import { SystemRole } from '@shared/types/roles';
+import type { TenantFeatureKey } from '@shared/tenant-config';
 
 export const ADMIN_ROLES = [
   SystemRole.ADMIN,
@@ -56,7 +57,7 @@ export const ADMIN_TABS = [
   { id: 'zones-commerciales', label: 'Arrondissements & Marchés', icon: 'MapPin', permission: 'zones.view' },
   { id: 'payment-methods', label: 'Paiements', icon: 'CreditCard', permission: 'admin.settings' },
   { id: 'currency', label: 'Devise', icon: 'Coins', permission: 'admin.settings' },
-  { id: 'branding', label: 'Branding', icon: 'Palette', permission: 'admin.settings' },
+  { id: 'company-info', label: 'Société', icon: 'Building2', permission: 'admin.settings' },
   { id: 'tenant', label: 'Tenant & Modules', icon: 'Settings', permission: 'admin.settings' },
   { id: 'reset-agence', label: 'Reset Agence', icon: 'RotateCcw', permission: 'admin.manage' },
   { id: 'scoring', label: 'Scoring', icon: 'BarChart3', permission: 'loyalty.view' },
@@ -64,3 +65,18 @@ export const ADMIN_TABS = [
 ] as const;
 
 export type AdminTabId = typeof ADMIN_TABS[number]['id'];
+
+/**
+ * Onglets d'administration liés à un flag tenant : masqués (et inaccessibles)
+ * quand la feature est désactivée pour le déploiement, en parité avec la
+ * navigation. Ajouter une entrée ici suffit à couvrir l'écran admin.
+ */
+export const ADMIN_TAB_TENANT_FEATURE: Partial<Record<AdminTabId, TenantFeatureKey>> = {
+  credits: 'enableCredits',
+  scoring: 'enableCredits',
+  'product-rates': 'enableCredits',
+  caisses: 'enableCaisse',
+  codes: 'enableCaisse',
+  tontines: 'enableTontine',
+  profils: 'enableRH',
+};

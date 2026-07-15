@@ -3,6 +3,7 @@ import { z } from "zod";
 import { Actions, Subjects } from "@shared/ability";
 import { createLogger } from "../lib/logger";
 import { getTenantConfig } from "../config/tenant-config";
+import { isModuleFeature } from "@shared/tenant-config";
 import { requireAuth } from "../auth";
 import { attachAbility, requireAbility } from "../authorization";
 import { logAudit } from "../audit";
@@ -82,6 +83,16 @@ export function registerTenantRoutes(app: Express) {
     const parsed = overrideBodySchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ code: "INVALID_BODY", issues: parsed.error.issues });
+      return;
+    }
+
+    // Plafond de provisioning : un module non provisionné ne peut pas être activé
+    // à chaud (seul un re-provisionnement du fichier client le permet).
+    if (isModuleFeature(feature) && parsed.data.enabled && !getTenantConfig().features[feature]) {
+      res.status(409).json({
+        code: "MODULE_NOT_PROVISIONED",
+        message: "Module non provisionné : activation impossible sans re-provisionnement du déploiement.",
+      });
       return;
     }
 

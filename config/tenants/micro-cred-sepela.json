@@ -1,0 +1,27 @@
+{
+  "id": "micro-cred-sepela",
+  "name": "Micro-Cred Sepela",
+  "theme": {
+    "primaryColor": "#C9A24E",
+    "secondaryColor": "#1C1A17",
+    "logoUrl": "/brand/micro-cred-sepela/logo-microcred-sepela.jpg",
+    "faviconUrl": "/brand/micro-cred-sepela/logo-microcred-sepela.jpg"
+  },
+  "features": {
+    "enableSms": true,
+    "enableMobileMoney": true,
+    "enableTontine": true,
+    "enableFieldAgents": true,
+    "enableCredits": true,
+    "enableComptes": true,
+    "enableCaisse": true,
+    "enableCoffreFort": true,
+    "enableTresorerie": true,
+    "enableTransfert": true,
+    "enableVirementsProgrammes": true,
+    "enableComptabilite": true,
+    "enableRapports": true,
+    "enableKpi": true,
+    "enableRH": true
+  }
+}

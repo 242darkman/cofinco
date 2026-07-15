@@ -1,5 +1,6 @@
 import {
   tenantFeatureFlagsSchema,
+  isModuleFeature,
   type TenantFeatureFlags,
   type TenantFeatureKey,
 } from "@shared/tenant-config";
@@ -30,11 +31,17 @@ export function mergeFeatureOverrides(
 ): TenantFeatureFlags {
   const merged = { ...staticFeatures };
   for (const override of overrides) {
-    if (isTenantFeatureKey(override.feature)) {
-      merged[override.feature] = override.enabled;
-    } else {
+    if (!isTenantFeatureKey(override.feature)) {
       logger.warn({ feature: override.feature }, "Surcharge de flag inconnue ignorée");
+      continue;
     }
+    const feature = override.feature;
+    // Plafond de provisioning : un module ne peut être activé que s'il a été
+    // provisionné (fichier config). Une surcharge peut seulement le désactiver.
+    // Une intégration reste librement basculable à chaud.
+    merged[feature] = isModuleFeature(feature)
+      ? staticFeatures[feature] && override.enabled
+      : override.enabled;
   }
   return merged;
 }
