@@ -543,10 +543,10 @@ export const statutTransfertInterCoffreEnum = pgEnum("statut_transfert_inter_cof
 ]);
 
 export const typeConditionnementEnum = pgEnum("type_conditionnement_enum", [
-  "Sac scellé",
-  "Mallette",
-  "Enveloppe",
-  "Autre",
+  "SAC_SCELLE",
+  "MALLETTE",
+  "ENVELOPPE",
+  "AUTRE",
 ]);
 
 export const typeDocumentTransfertEnum = pgEnum("type_document_transfert_enum", [
@@ -1184,3 +1184,4 @@ export type TypeCreditDz = (typeof typeCreditEnum.enumValues)[number];
 export type DureeUniteDz = (typeof dureeUniteEnum.enumValues)[number];
 export type StatutRefundRequestDz = (typeof statutRefundRequestEnum.enumValues)[number];
 export type TypeEvenementDz = (typeof typeEvenementEnum.enumValues)[number];
+export type TypeConditionnementDz = (typeof typeConditionnementEnum.enumValues)[number];

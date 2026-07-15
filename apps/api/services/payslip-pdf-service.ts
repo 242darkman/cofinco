@@ -1,86 +1,23 @@
 /**
- * Server-side payslip PDF generation using jsPDF + jspdf-autotable.
- * Produces an A4 PDF matching the visual style of the client PayslipTemplate.
+ * Génération serveur des bulletins de paie PDF.
+ *
+ * Le rendu jsPDF conserve la présentation du modèle web sans recalculer les
+ * montants issus du moteur de paie.
  */
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import autoTable, { type CellHookData } from 'jspdf-autotable';
 import { getLogoBase64 } from '../lib/company-logo';
 import { createLogger } from '../lib/logger';
 import { currencySymbol, currencyLabel } from '@shared/config/currency';
+import type { PayslipPdfData } from './payslip-pdf-types';
 
 const logger = createLogger('PayslipPDF');
 
-// ── Types ──────────────────────────────────────────────────────
-
-export interface PayslipPdfLine {
-  code: string;
-  libelle: string;
-  category: string; // GAIN | RETENUE | PATRONAL | SUBTOTAL | NET
-  base: number | null;
-  taux: string | number | null;
-  montantGain: number;
-  montantRetenue: number;
-  montantPatronal: number;
-  sortOrder: number;
-}
-
-export interface PayslipPdfData {
-  bulletin: {
-    id: number;
-    mois: string;
-    salaireBrut: string;
-    salaireNet: string;
-    totalChargesSalariales: string;
-    totalChargesPatronales: string;
-    irpp: string;
-    totalRetenues: string;
-    salaireBaseSnapshot: number;
-    version: number;
-    statut: string;
-    datePaiement: string | null;
-    createdAt: string | Date;
+type JsPDFWithAutoTable = jsPDF & {
+  lastAutoTable?: {
+    finalY?: number;
   };
-  lines: PayslipPdfLine[];
-  employe: {
-    matricule: string | null;
-    nom: string;
-    prenom: string | null;
-    typeContrat: string | null;
-    dateEmbauche: string | null;
-    dateSortie: string | null;
-    numeroCnss: string | null;
-    categorie: string | null;
-    coefficient: number | null;
-    paymentMethod: string | null;
-    jobTitle: string | null;
-    anciennete: string | null;
-    conventionCollective: string | null;
-  } | null;
-  company: {
-    appName: string | null;
-    adresse: string | null;
-    telephone: string | null;
-    niu: string | null;
-    rccm: string | null;
-  } | null;
-  agence: {
-    nom: string;
-    adresse: string | null;
-    telephone: string | null;
-  } | null;
-  leaves: {
-    acquired: number;
-    used: number;
-    balance: number;
-  } | null;
-  heuresTravaillees: {
-    joursTravailles: number;
-    heuresNormales: number;
-    heuresSupplementaires: number;
-  } | null;
-}
-
-// ── Helpers ────────────────────────────────────────────────────
+};
 
 const fmt = (v: number | string | null | undefined): string => {
   const n = typeof v === 'string' ? parseInt(v) || 0 : v || 0;
@@ -113,8 +50,12 @@ const LIGHT_BG: [number, number, number] = [248, 249, 250];
 const BORDER_GRAY: [number, number, number] = [200, 210, 220];
 const TEXT_GRAY: [number, number, number] = [100, 100, 100];
 
-// ── Main generator ─────────────────────────────────────────────
-
+/**
+ * Produit le fichier PDF A4 d'un bulletin de paie validé.
+ *
+ * @param data Données de paie et d'identité déjà agrégées par l'API RH.
+ * @returns Buffer PDF prêt à être transmis en réponse HTTP.
+ */
 export async function generatePayslipPdf(data: PayslipPdfData): Promise<Buffer> {
   const { bulletin, lines, employe, company, agence, leaves, heuresTravaillees } = data;
 
@@ -294,7 +235,7 @@ export async function generatePayslipPdf(data: PayslipPdfData): Promise<Buffer> 
       5: { cellWidth: 28, halign: 'right' },
       6: { cellWidth: 28, halign: 'right', textColor: TEXT_GRAY },
     },
-    didParseCell: (hookData: any) => {
+    didParseCell: (hookData: CellHookData) => {
       if (hookData.section === 'body') {
         const line = sortedLines[hookData.row.index];
         if (line?.category === 'SUBTOTAL') {
@@ -309,7 +250,7 @@ export async function generatePayslipPdf(data: PayslipPdfData): Promise<Buffer> 
     margin: { left: ML, right: MR },
   });
 
-  y = (doc as any).lastAutoTable.finalY + 5;
+  y = ((doc as JsPDFWithAutoTable).lastAutoTable?.finalY ?? y) + 5;
 
   // ── RECAP + NET ──
   const recapW = CW * 0.58;

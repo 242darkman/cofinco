@@ -1259,7 +1259,7 @@ caisseAgentRouter.get("/agents/:id/gl-account", async (req, res) => {
 // ROUTES - PAIEMENTS MOBILE MONEY AGENT
 // ============================================================================
 
-import { agentMmPaymentService } from "../services/caisse-agent/agent-mm-payment-service";
+import { initiatePayment, list as listAgentPayments, getById, cancelPaymentAgent, getAgentStats } from "../services/caisse-agent/agent-mm-payment-service";
 
 const initiateMmPaymentSchema = z.object({
   agentId: z.string().uuid(),
@@ -1323,7 +1323,7 @@ caisseAgentRouter.post(
         });
       }
 
-      const result = await agentMmPaymentService.initiatePayment({
+      const result = await initiatePayment({
         ...parsed.data,
         createdBy: userId,
       });
@@ -1384,7 +1384,7 @@ caisseAgentRouter.get(
         to: parsed.data.to ? new Date(parsed.data.to) : undefined,
       };
 
-      const result = await agentMmPaymentService.list(filter);
+      const result = await listAgentPayments(filter);
 
       res.json({
         data: result.data,
@@ -1418,7 +1418,7 @@ caisseAgentRouter.get(
         return res.status(401).json({ error: "Non authentifié" });
       }
 
-      const payment = await agentMmPaymentService.getById(req.params.id);
+      const payment = await getById(req.params.id);
 
       if (!payment) {
         return res.status(404).json({
@@ -1450,7 +1450,7 @@ caisseAgentRouter.post(
         return res.status(401).json({ error: "Non authentifié" });
       }
 
-      const result = await agentMmPaymentService.cancelPayment(req.params.id, userId);
+      const result = await cancelPaymentAgent(req.params.id, userId);
 
       if (!result.success) {
         return res.status(400).json({
@@ -1490,7 +1490,7 @@ caisseAgentRouter.get(
       const from = req.query.from ? new Date(req.query.from as string) : undefined;
       const to = req.query.to ? new Date(req.query.to as string) : undefined;
 
-      const stats = await agentMmPaymentService.getAgentStats(agentId, from, to);
+      const stats = await getAgentStats(agentId, from, to);
 
       res.json({ stats });
     } catch (error: any) {

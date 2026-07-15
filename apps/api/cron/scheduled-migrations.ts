@@ -37,7 +37,7 @@ export function startScheduledMigrationsCron() {
 
         try {
           // Exécuter la migration de manière asynchrone (fire & forget avec logging)
-          agencyMigrationService.processMigration(migration.id).catch((error) => {
+          agencyMigrationService.processMigration(migration.id).catch((error: any) => {
             logger.error({ err: error, migrationId: migration.id }, `Migration ${migration.id} failed`);
           });
 

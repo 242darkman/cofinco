@@ -23,7 +23,7 @@ import {
 import { Button, Badge } from '@/components/ui';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
-import { StatutEvacuationCoffre, TypeDestinationEvacuation, MOTIF_EVACUATION_LABELS } from '@shared/enum/status-constants';
+import { StatutEvacuationCoffre, TypeDestinationEvacuation, MOTIF_EVACUATION_LABELS, TypeConditionnement, type TypeConditionnementType, TYPE_CONDITIONNEMENT_OPTIONS, getTypeConditionnementLabel } from '@shared/enum/status-constants';
 
 interface EvacuationDetailProps {
   evacuation: any;
@@ -67,7 +67,7 @@ export default function EvacuationDetail({
   const [loading, setLoading] = useState(false);
 
   // Preparation form
-  const [typeConditionnement, setTypeConditionnement] = useState('Sac scellé');
+  const [typeConditionnement, setTypeConditionnement] = useState<TypeConditionnementType>(TypeConditionnement.SAC_SCELLE);
   const [numeroScelle, setNumeroScelle] = useState('');
   const [montantCompte, setMontantCompte] = useState('');
   const [agentsTransport, setAgentsTransport] = useState([{ nom: '', contact: '' }, { nom: '', contact: '' }]);
@@ -333,7 +333,7 @@ export default function EvacuationDetail({
                 <div className="space-y-2">
                   <InfoRow label="Montant compté" value={formatMoney(evacuation.montantCompte)} bold />
                   <InfoRow label="Écart préparation" value={formatMoney(evacuation.ecartPreparation || 0)} />
-                  <InfoRow label="Conditionnement" value={evacuation.typeConditionnement || '—'} />
+                  <InfoRow label="Conditionnement" value={getTypeConditionnementLabel(evacuation.typeConditionnement)} />
                   <InfoRow label="N° scellé" value={evacuation.numeroScelle || '—'} />
                   {evacuation.agentsTransport && (
                     <div>
@@ -364,13 +364,12 @@ export default function EvacuationDetail({
                       <label className="block text-[10px] font-bold text-content-muted mb-1">Conditionnement</label>
                       <select
                         value={typeConditionnement}
-                        onChange={(e) => setTypeConditionnement(e.target.value)}
+                        onChange={(e) => setTypeConditionnement(e.target.value as TypeConditionnementType)}
                         className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary focus:outline-none focus:border-status-info/50"
                       >
-                        <option>Sac scellé</option>
-                        <option>Mallette sécurisée</option>
-                        <option>Enveloppe scellée</option>
-                        <option>Autre</option>
+                        {TYPE_CONDITIONNEMENT_OPTIONS.map(({ value, label }) => (
+                          <option key={value} value={value}>{label}</option>
+                        ))}
                       </select>
                     </div>
                     <div>

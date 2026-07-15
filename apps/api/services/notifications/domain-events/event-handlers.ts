@@ -5,70 +5,40 @@ import { emitNotificationEvent } from "../notification-service";
 import { logNotificationEvent } from "../audit/notification-audit";
 import { createLogger } from "../../../lib/logger";
 import { StatutMembreTontine } from "@shared/enum/status-constants";
+import type {
+  CreditApprovedData, CreditDisbursedData, CreditInstallmentLateData, CreditInvestigationAssignedData,
+  CreditInvestigationSubmittedData, CreditOverdueData, CreditPaidOffData, CreditRefundApprovedData,
+  CreditRefundPaidData, CreditRejectedData, CreditRequestCreatedData,
+} from "./event-credit-data";
+import type {
+  TontineContributionOverdueData, TontineContributionReceivedData, TontineCycleStartedData,
+  TontineDistributionApprovedData, TontineDistributionPaidData, TontineMemberExitData,
+  TontineMemberJoinedData, TontinePenaltyAppliedData, TontineStatusChangedData,
+} from "./event-tontine-data";
+import type {
+  ScheduledTransferExecutedData, ScheduledTransferFailedData, TransferCancelledData,
+  TransferExecutedData, TransferRejectedData, TransferRequestedData, TransferReversedData,
+  TransferValidatedData,
+} from "./event-transfer-data";
+import type {
+  AccountActivatedData, AccountBlockedData, AccountClosedData, AccountCreatedData,
+  AccountDepositData, AccountSuspendedData, AccountUnblockedData, AccountUnsuspendedData,
+  AccountWithdrawalData, ClosureApprovedData, ClosureInitiatedData, InterestCapitalizedData,
+} from "./event-account-data";
+import type {
+  HrDocumentRequestCreatedData, HrLeaveApprovedData, HrLeaveRejectedData, HrLeaveRequestedData,
+  HrSanctionCreatedData, HrSanctionFinalizedData, HrSanctionNotifiedData,
+} from "./event-hr-data";
+import type {
+  ClientCreatedData, ClientSegmentChangedData, EmployeeCreatedData, PaiementTerrainValidatedData,
+  ProspectionCreatedData, SessionForceClosedData, SystemJobFailedData, UserPasswordChangedData,
+  UserPasswordResetData, UserRegisteredData,
+} from "./event-identity-data";
 
 const logger = createLogger('EventHandlers');
-import type {
-  CreditRequestCreatedData,
-  CreditApprovedData,
-  CreditRejectedData,
-  CreditDisbursedData,
-  CreditOverdueData,
-  CreditInvestigationAssignedData,
-  CreditInvestigationSubmittedData,
-  CreditPaidOffData,
-  CreditRefundApprovedData,
-  CreditRefundPaidData,
-  TontineMemberJoinedData,
-  TontineContributionReceivedData,
-  TontineContributionOverdueData,
-  TontinePenaltyAppliedData,
-  TontineDistributionApprovedData,
-  TontineDistributionPaidData,
-  TontineCycleStartedData,
-  TontineStatusChangedData,
-  TontineMemberExitData,
-  TransferRequestedData,
-  TransferValidatedData,
-  TransferRejectedData,
-  TransferExecutedData,
-  TransferCancelledData,
-  TransferReversedData,
-  ScheduledTransferExecutedData,
-  ScheduledTransferFailedData,
-  AccountCreatedData,
-  AccountActivatedData,
-  AccountDepositData,
-  AccountWithdrawalData,
-  AccountBlockedData,
-  AccountUnblockedData,
-  AccountClosedData,
-  InterestCapitalizedData,
-  HrLeaveRequestedData,
-  HrLeaveApprovedData,
-  HrLeaveRejectedData,
-  HrDocumentRequestCreatedData,
-  UserPasswordResetData,
-  SessionForceClosedData,
-  ClientCreatedData,
-  UserRegisteredData,
-  UserPasswordChangedData,
-  EmployeeCreatedData,
-  ProspectionCreatedData,
-  PaiementTerrainValidatedData,
-  HrSanctionCreatedData,
-  HrSanctionNotifiedData,
-  HrSanctionFinalizedData,
-  CreditInstallmentLateData,
-  SystemJobFailedData,
-  ClientSegmentChangedData,
-  AccountSuspendedData,
-  AccountUnsuspendedData,
-  ClosureInitiatedData,
-  ClosureApprovedData,
-} from "./event-types";
 
 // ============================================================================
-// HELPERS: Recipient Lookup
+// OUTILS : RÉSOLUTION DES DESTINATAIRES
 // ============================================================================
 
 async function getClientContact(clientId: string) {
@@ -143,7 +113,7 @@ async function getEmployeeContact(employeId: string) {
  * Falls back to global HR users (agenceId IS NULL) if none found for the specific agency.
  */
 async function getHrStaffContacts(agenceId?: string) {
-  // First try agency-specific HR staff, then fallback to global
+  // Cherche d'abord les RH de l'agence, puis utilise les RH globales.
   const conditions = agenceId
     ? or(eq(userRoles.agenceId, agenceId), isNull(userRoles.agenceId))
     : isNull(userRoles.agenceId);
@@ -170,7 +140,7 @@ async function getHrStaffContacts(agenceId?: string) {
 }
 
 // ============================================================================
-// CREDIT EVENT HANDLERS
+// GESTIONNAIRES DES ÉVÉNEMENTS DE CRÉDIT
 // ============================================================================
 
 export async function handleCreditRequestCreated(data: CreditRequestCreatedData) {
@@ -245,7 +215,7 @@ export async function handleCreditApproved(data: CreditApprovedData) {
           },
         ]
       : [],
-    inAppRecipients: [], // Handled by existing WS broadcast in finance.ts
+    inAppRecipients: [], // Déjà pris en charge par la diffusion WebSocket existante.
   });
 
   logNotificationEvent("info", "Domain event: CREDIT_APPROVED", {
@@ -338,7 +308,7 @@ export async function handleCreditDisbursed(data: CreditDisbursedData) {
 export async function handleCreditOverdue(data: CreditOverdueData) {
   if (!data.creditIds || data.creditIds.length === 0) return;
 
-  // Look up each overdue credit and send per-client notification
+  // Résout chaque crédit en retard et notifie le client concerné.
   try {
     const overdueCredits = await db
       .select({
@@ -596,7 +566,7 @@ export async function handleCreditRefundPaid(data: CreditRefundPaidData) {
 }
 
 // ============================================================================
-// TONTINE EVENT HANDLERS
+// GESTIONNAIRES DES ÉVÉNEMENTS DE TONTINE
 // ============================================================================
 
 export async function handleTontineMemberJoined(data: TontineMemberJoinedData) {
@@ -760,7 +730,7 @@ export async function handleTontineDistributionPaid(data: TontineDistributionPai
 }
 
 export async function handleTontineCycleStarted(data: TontineCycleStartedData) {
-  // Notify all active members of this tontine
+  // Notifie tous les membres actifs de cette tontine.
   try {
     const members = await db
       .select({ clientId: membresTontine.clientId })
@@ -806,7 +776,7 @@ export async function handleTontineCycleStarted(data: TontineCycleStartedData) {
 }
 
 export async function handleTontineStatusChanged(data: TontineStatusChangedData) {
-  // Notify all active members of the status change
+  // Notifie tous les membres actifs du changement de statut.
   try {
     const members = await db
       .select({ clientId: membresTontine.clientId })
@@ -881,7 +851,7 @@ export async function handleTontineMemberExit(data: TontineMemberExitData) {
 }
 
 // ============================================================================
-// ACCOUNT / SAVINGS EVENT HANDLERS
+// GESTIONNAIRES DES ÉVÉNEMENTS DE COMPTES ET D'ÉPARGNE
 // ============================================================================
 
 const ACCOUNT_TYPE_LABELS: Record<string, string> = {
@@ -1105,7 +1075,7 @@ export async function handleInterestCapitalized(data: InterestCapitalizedData) {
 }
 
 // ============================================================================
-// TRANSFER EVENT HANDLERS
+// GESTIONNAIRES DES ÉVÉNEMENTS DE TRANSFERT
 // ============================================================================
 
 const TRANSFER_TYPE_LABELS: Record<string, string> = {
@@ -1159,7 +1129,7 @@ export async function handleTransferValidated(data: TransferValidatedData) {
 }
 
 export async function handleTransferRejected(data: TransferRejectedData) {
-  // Notify the person who rejected (confirmation email)
+  // Notifie la personne ayant rejeté le transfert.
   const rejector = await getUserContact(data.rejectedByUserId);
 
   const payload = {
@@ -1255,13 +1225,13 @@ export async function handleTransferReversed(data: TransferReversedData) {
 }
 
 // ============================================================================
-// SCHEDULED TRANSFER EVENT HANDLERS
+// GESTIONNAIRES DES TRANSFERTS PROGRAMMÉS
 // ============================================================================
 
 export async function handleScheduledTransferExecuted(
   data: ScheduledTransferExecutedData
 ) {
-  // Look up source and destination accounts to notify the client
+  // Résout les comptes source et destination pour notifier le client.
   const [sourceCompte] = await db.select().from(comptes).where(eq(comptes.id, data.compteSourceId)).limit(1);
   const [destCompte] = await db.select().from(comptes).where(eq(comptes.id, data.compteDestId)).limit(1);
 
@@ -1295,7 +1265,7 @@ export async function handleScheduledTransferExecuted(
 export async function handleScheduledTransferFailed(
   data: ScheduledTransferFailedData
 ) {
-  // Look up the schedule to find the accounts and client
+  // Résout la programmation pour retrouver les comptes et le client.
   const [schedule] = await db.select().from(virementsProgrammes).where(eq(virementsProgrammes.id, data.scheduleId)).limit(1);
   if (!schedule) return;
 
@@ -1334,11 +1304,11 @@ export async function handleScheduledTransferFailed(
 }
 
 // ============================================================================
-// HR EVENT HANDLERS
+// GESTIONNAIRES DES ÉVÉNEMENTS RH
 // ============================================================================
 
 export async function handleHrLeaveRequested(data: HrLeaveRequestedData) {
-  // Notify the employee that their leave request was received
+  // Confirme à l'employé la réception de sa demande de congé.
   const employee = await getEmployeeContact(data.employeId);
   if (!employee) return;
 
@@ -1359,7 +1329,7 @@ export async function handleHrLeaveRequested(data: HrLeaveRequestedData) {
       : [],
   });
 
-  // Resolve direct manager userId (used for dedup + dedicated notification)
+  // Résout le responsable direct pour dédupliquer et personnaliser la notification.
   let managerUserId: string | null = null;
   let managerEmail: string | null = null;
   if (data.employeId) {
@@ -1377,7 +1347,7 @@ export async function handleHrLeaveRequested(data: HrLeaveRequestedData) {
     }
   }
 
-  // Notify HR staff (in-app + email) — exclude manager to avoid duplicate
+  // Notifie les RH, hors responsable direct pour éviter un doublon.
   const hrStaff = await getHrStaffContacts(data.agenceId);
   for (const hr of hrStaff) {
     if (managerUserId && hr.userId === managerUserId) continue;
@@ -1392,7 +1362,7 @@ export async function handleHrLeaveRequested(data: HrLeaveRequestedData) {
     });
   }
 
-  // Notify direct manager (in-app + email) with dedicated template
+  // Notifie le responsable direct avec un template dédié.
   if (managerUserId) {
     await emitNotificationEvent("HR_LEAVE_REQUESTED", data, {
       smsRecipients: [],
@@ -1475,7 +1445,7 @@ export async function handleHrLeaveRejected(data: HrLeaveRejectedData) {
 }
 
 // ============================================================================
-// HR SANCTION EVENT HANDLERS
+// GESTIONNAIRES DES SANCTIONS RH
 // ============================================================================
 
 export async function handleHrSanctionCreated(data: HrSanctionCreatedData) {
@@ -1553,11 +1523,11 @@ export async function handleHrSanctionFinalized(data: HrSanctionFinalizedData) {
 }
 
 // ============================================================================
-// HR DOCUMENT REQUEST EVENT HANDLERS
+// GESTIONNAIRES DES DEMANDES DE DOCUMENTS RH
 // ============================================================================
 
 export async function handleHrDocumentRequestCreated(data: HrDocumentRequestCreatedData) {
-  // 1) Confirm to employee (in-app)
+  // 1. Confirme la demande à l'employé.
   const employee = await getEmployeeContact(data.employeId);
   if (employee?.userId) {
     await emitNotificationEvent("HR_DOCUMENT_REQUEST_CREATED", data, {
@@ -1567,7 +1537,7 @@ export async function handleHrDocumentRequestCreated(data: HrDocumentRequestCrea
     });
   }
 
-  // 2) Notify HR staff (in-app + email)
+  // 2. Notifie les RH.
   const hrStaff = await getHrStaffContacts(data.agenceId);
   for (const hr of hrStaff) {
     const payload = {
@@ -1593,7 +1563,7 @@ export async function handleHrDocumentRequestCreated(data: HrDocumentRequestCrea
 }
 
 // ============================================================================
-// AUTH / SECURITY EVENT HANDLERS
+// GESTIONNAIRES D'AUTHENTIFICATION ET SÉCURITÉ
 // ============================================================================
 
 export async function handleUserPasswordReset(data: UserPasswordResetData) {
@@ -1632,7 +1602,7 @@ export async function handleUserPasswordReset(data: UserPasswordResetData) {
 }
 
 export async function handleSessionForceClosed(data: SessionForceClosedData) {
-  // Notify each cashier whose session was force-closed
+  // Notifie chaque caissier dont la session a été clôturée de force.
   for (const session of data.sessions) {
     if (!session.caissierId) continue;
 
@@ -1659,11 +1629,11 @@ export async function handleSessionForceClosed(data: SessionForceClosedData) {
 }
 
 // ============================================================================
-// CLIENT / USER / EMPLOYEE LIFECYCLE HANDLERS
+// GESTIONNAIRES DU CYCLE DE VIE CLIENT, UTILISATEUR ET EMPLOYÉ
 // ============================================================================
 
 export async function handleClientCreated(data: ClientCreatedData) {
-  // Send welcome notification to the new client
+  // Envoie la notification de bienvenue au nouveau client.
   const phone = data.telephone;
   const email = data.email;
 
@@ -1700,7 +1670,7 @@ export async function handleUserRegistered(data: UserRegisteredData) {
     username: data.username,
   };
 
-  // Include credentials in notification payload if auto-generated
+  // Ajoute les identifiants au payload lorsqu'ils ont été générés automatiquement.
   if (data.generatedPassword) {
     payload.password = data.generatedPassword;
     payload.hasCredentials = true;
@@ -1709,7 +1679,7 @@ export async function handleUserRegistered(data: UserRegisteredData) {
   const smsRecipients: Array<{ phone: string; templateCode: string; payload: Record<string, unknown>; agenceId?: string }> = [];
   const emailRecipients: Array<{ email: string; templateCode: string; payload: Record<string, unknown>; agenceId?: string }> = [];
 
-  // Send SMS with credentials if phone available
+  // Envoie les identifiants par SMS si un téléphone est disponible.
   if (data.telephone) {
     smsRecipients.push({
       phone: data.telephone,
@@ -1719,7 +1689,7 @@ export async function handleUserRegistered(data: UserRegisteredData) {
     });
   }
 
-  // Send email with credentials if email available
+  // Envoie les identifiants par email si une adresse est disponible.
   if (data.email) {
     emailRecipients.push({
       email: data.email,
@@ -1742,7 +1712,7 @@ export async function handleUserRegistered(data: UserRegisteredData) {
 }
 
 export async function handleUserPasswordChanged(data: UserPasswordChangedData) {
-  // Send security confirmation email
+  // Envoie l'email de confirmation de sécurité.
   if (!data.email) return;
 
   const payload = {
@@ -1761,7 +1731,7 @@ export async function handleUserPasswordChanged(data: UserPasswordChangedData) {
 }
 
 export async function handleEmployeeCreated(data: EmployeeCreatedData) {
-  // Send welcome email to the new employee
+  // Envoie l'email de bienvenue au nouvel employé.
   if (!data.email) return;
 
   const payload = {
@@ -1785,12 +1755,12 @@ export async function handleEmployeeCreated(data: EmployeeCreatedData) {
 }
 
 // ============================================================================
-// OPERATIONS TERRAIN HANDLERS
+// GESTIONNAIRES DES OPÉRATIONS TERRAIN
 // ============================================================================
 
 export async function handleProspectionCreated(data: ProspectionCreatedData) {
-  // Internal notification — send confirmation email to the agent who created the prospection
-  // data.userId is the logged-in user's ID (not agentsTerrain.id)
+  // Notification interne : confirme la création à l'agent ayant saisi la prospection.
+  // `data.userId` correspond à l'utilisateur connecté, pas à `agentsTerrain.id`.
   if (!data.userId) return;
 
   const agent = await getUserContact(data.userId);
@@ -1824,7 +1794,7 @@ export async function handleProspectConverted(data: { userId?: string; prospecti
 }
 
 export async function handlePaiementTerrainValidated(data: PaiementTerrainValidatedData) {
-  // Send confirmation to the client whose payment was validated
+  // Confirme le paiement au client concerné.
   if (!data.clientId) return;
 
   const client = await getClientContact(data.clientId);
@@ -1860,7 +1830,7 @@ export async function handlePaiementTerrainValidated(data: PaiementTerrainValida
 }
 
 // ============================================================================
-// ACCOUNT LIFECYCLE (SUSPENSION / CLOSURE) HANDLERS
+// GESTIONNAIRES DU CYCLE DE VIE DES COMPTES
 // ============================================================================
 
 export async function handleAccountSuspended(data: AccountSuspendedData) {
@@ -1909,7 +1879,7 @@ export async function handleAccountUnsuspended(data: AccountUnsuspendedData) {
 }
 
 export async function handleClosureInitiated(data: ClosureInitiatedData) {
-  // Look up account to get clientId
+  // Résout le compte pour obtenir le client.
   const [compte] = await db.select({ clientId: comptes.clientId }).from(comptes).where(eq(comptes.id, data.compteId));
   if (!compte) return;
 
@@ -1936,7 +1906,7 @@ export async function handleClosureInitiated(data: ClosureInitiatedData) {
 }
 
 export async function handleClosureApproved(data: ClosureApprovedData) {
-  // Look up account to get clientId
+  // Résout le compte pour obtenir le client.
   const [compte] = await db.select({ clientId: comptes.clientId }).from(comptes).where(eq(comptes.id, data.compteId));
   if (!compte) return;
 
@@ -1962,7 +1932,7 @@ export async function handleClosureApproved(data: ClosureApprovedData) {
 }
 
 // ============================================================================
-// CREDIT INSTALLMENT & SYSTEM EVENT HANDLERS
+// GESTIONNAIRES DES ÉCHÉANCES DE CRÉDIT ET ÉVÉNEMENTS SYSTÈME
 // ============================================================================
 
 export async function handleCreditInstallmentLate(data: CreditInstallmentLateData) {
@@ -1998,7 +1968,7 @@ export async function handleCreditInstallmentLate(data: CreditInstallmentLateDat
 }
 
 export async function handleSystemJobFailed(data: SystemJobFailedData) {
-  // System job failures are logged and notified to admins via in-app only
+  // Les échecs de tâches système sont journalisés et notifiés aux administrateurs.
   const payload = {
     jobName: data.jobName || data.jobId || 'Unknown',
     error: data.error || 'Unknown error',
@@ -2006,7 +1976,7 @@ export async function handleSystemJobFailed(data: SystemJobFailedData) {
   };
 
   await emitNotificationEvent("SYSTEM_JOB_FAILED", data, {
-    inAppRecipients: [],  // Admin-only, handled via WS broadcast
+    inAppRecipients: [], // Administrateurs uniquement, via diffusion WebSocket.
   });
 
   logNotificationEvent("error", `System job failed: ${payload.jobName}`, {
@@ -2018,10 +1988,10 @@ export async function handleSystemJobFailed(data: SystemJobFailedData) {
 export async function handleClientSegmentChanged(data: ClientSegmentChangedData) {
   const direction = data.scoreGlobal >= 65 ? 'upgrade' : 'downgrade';
 
-  // In-app notification via the notification service
+  // Notification dans l'application via le service de notifications.
   await emitNotificationEvent("CLIENT_SEGMENT_CHANGED", data, {
-    // TODO: inAppRecipients requires userId + titre + message (InAppNotificationParams);
-    // segment change is agency-level — skipping in-app until a per-user recipient is available
+    // À FAIRE : inAppRecipients exige userId, titre et message (InAppNotificationParams).
+    // Le changement de segment est au niveau agence : notification applicative ignorée sans destinataire utilisateur.
     inAppRecipients: [],
   });
 

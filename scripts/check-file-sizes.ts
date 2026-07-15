@@ -48,9 +48,17 @@ function listFiles(dir: string): string[] {
   return out;
 }
 
+/**
+ * Compte les lignes avec la sémantique de `wc -l` : le newline final d'un
+ * fichier bien formé ne crée pas de ligne fantôme. L'ancien comptage
+ * (`split("\n").length`) ajoutait +1 à tout fichier terminé par un newline,
+ * ce qui faisait diverger la baseline des valeurs `wc` réelles.
+ */
 function countLines(path: string): number {
   const content = readFileSync(path, "utf8");
-  return content.length === 0 ? 0 : content.split("\n").length;
+  if (content.length === 0) return 0;
+  const segments = content.split("\n").length;
+  return content.endsWith("\n") ? segments - 1 : segments;
 }
 
 const baseline: Record<string, number> = JSON.parse(readFileSync(BASELINE_PATH, "utf8"));

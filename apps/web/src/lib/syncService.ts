@@ -1030,11 +1030,16 @@ class SyncService {
         };
       });
 
+      // File restante déclarée APRÈS ce lot : alimente le compteur
+      // « opérations offline en attente » de l'écran KPI côté serveur
+      const stats = await getJournalStats();
+      const remainingPending = Math.max(0, stats.local + stats.syncing - entries.length);
+
       const response = await fetch('/api/sync/journal', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ entries: serverEntries }),
+        body: JSON.stringify({ entries: serverEntries, remainingPending }),
       });
 
       if (!response.ok) {

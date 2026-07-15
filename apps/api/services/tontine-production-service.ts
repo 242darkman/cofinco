@@ -12,7 +12,7 @@
 
 import { db } from "../db";
 import { createLogger } from "../lib/logger";
-import { paymentService } from "./mobile-money/payment-service";
+import { initiatePayout } from "./mobile-money/payment-service";
 
 const logger = createLogger('TontineProduction');
 import {
@@ -33,16 +33,9 @@ import {
   TontineTurnAuditActionType,
   TontineFrequency,
 } from "@shared/schema/tontines";
-import {
-  users,
-} from "@shared/schema/auth";
-import {
-  clients,
-} from "@shared/schema/clients";
-import {
-  mouvementsFinanciers,
-  comptes,
-} from "@shared/schema/finance";
+import { users } from "@shared/schema/auth";
+import { clients } from "@shared/schema/clients";
+import { mouvementsFinanciers, comptes } from "@shared/schema/finance";
 import { coffresForts } from "@shared/schema/coffres-forts";
 import { dispatchDomainEvent } from "./notifications/domain-events/event-registry";
 import { eq, and, sql, desc, asc, gte, lte, or, isNull, ne } from "drizzle-orm";
@@ -1095,7 +1088,8 @@ export async function approveDistribution(params: {
       finalStatus = TontineDistributionRequestStatus.PENDING_PROVIDER;
 
       try {
-        const paymentResult = await paymentService.initiatePayout({
+        logger.info({ provider: request.provider, targetMsisdn: request.targetMsisdn }, 'Initiating Mobile Money payout via pawaPay');
+        const paymentResult = await initiatePayout({
           provider: request.provider as 'MTN' | 'AIRTEL',
           amount: netAmount,
           phone: request.targetMsisdn!,

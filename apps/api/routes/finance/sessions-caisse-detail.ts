@@ -16,7 +16,9 @@ import { logAudit } from "../../audit";
 import { normalizeKeysDeep, coerceValueToSchema } from "../utils";
 import { getWsInstance } from "../../ws-server";
 import { eq, desc, and, sql, count, inArray } from "drizzle-orm";
-import { sessionClosingService } from "../../services/caisse/session-closing-service";
+import { getSessionCounts, submitCount, submitVerificationCount } from "../../services/caisse/session-closing-count";
+import { cancelClose } from "../../services/caisse/session-closing-initiate";
+import { finalizeClose } from "../../services/caisse/session-closing-finalize";
 import { countSuggestionService } from "../../services/caisse/count-suggestion-service";
 import { logger } from "./shared";
 
@@ -38,7 +40,7 @@ export function registerSessionsCaisseDetailRoutes(app: Express) {
       return res.status(400).json({ message: "Le billetage est obligatoire" });
     }
 
-    const result = await sessionClosingService.submitCount({
+    const result = await submitCount({
       sessionId: id,
       caissierId: user.id,
       billetageFermeture: data.billetageFermeture,
@@ -108,7 +110,7 @@ export function registerSessionsCaisseDetailRoutes(app: Express) {
       return res.status(400).json({ message: "Les montants ne peuvent pas être négatifs" });
     }
 
-    const result = await sessionClosingService.finalizeClose({
+    const result = await finalizeClose({
       sessionId: id,
       caissierId: user.id,
       montantVersCoffre: data.montantVersCoffre,
@@ -179,7 +181,7 @@ export function registerSessionsCaisseDetailRoutes(app: Express) {
     const user = req.session.user!;
     const data = normalizeKeysDeep(req.body) as any;
 
-    const result = await sessionClosingService.cancelClose({
+    const result = await cancelClose({
       sessionId: id,
       caissierId: user.id,
       reason: data.reason,
@@ -226,7 +228,7 @@ export function registerSessionsCaisseDetailRoutes(app: Express) {
     const user = req.session.user!;
     const data = normalizeKeysDeep(req.body) as any;
 
-    const result = await sessionClosingService.submitVerificationCount({
+    const result = await submitVerificationCount({
       sessionId: id,
       verifierId: user.id,
       billetage: data.billetage || data.billetageFermeture || {},
@@ -267,7 +269,7 @@ export function registerSessionsCaisseDetailRoutes(app: Express) {
   app.get("/api/sessions-caisse/:id/counts", requireAuth, async (req, res) => {
     const { id } = req.params;
     try {
-      const counts = await sessionClosingService.getSessionCounts(id);
+      const counts = await getSessionCounts(id);
       res.json(counts);
     } catch (error) {
       logger.error({ err: error }, 'Session counts error');

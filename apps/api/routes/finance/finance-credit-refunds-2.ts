@@ -20,7 +20,7 @@ import { dispatchDomainEvent } from "../../services/notifications/domain-events/
 import { db } from "../../db";
 import { getWsInstance } from "../../ws-server";
 import { eq, desc, and, sql, count, inArray } from "drizzle-orm";
-import { paymentService } from "../../services/mobile-money/payment-service";
+import { initiatePayout } from "../../services/mobile-money/payment-service";
 import { logger } from "./shared";
 
 export function registerFinanceCreditRefunds2Routes(app: Express) {
@@ -125,8 +125,8 @@ export function registerFinanceCreditRefunds2Routes(app: Express) {
                throw new Error("Données Mobile Money manquantes sur la demande de remboursement (opérateur ou numéro)");
              }
 
-             const { paymentService } = await import("../../services/mobile-money/payment-service");
-             await paymentService.initiatePayout({
+             const { initiatePayout } = await import("../../services/mobile-money/payment-service");
+             await initiatePayout({
                provider: momoProvider,
                amount,
                phone: momoPhone,

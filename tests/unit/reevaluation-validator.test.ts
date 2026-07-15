@@ -7,8 +7,8 @@ import {
   REEVALUATION_RULES,
   validateReevaluationCreation,
   checkEligibilityQuick,
-  CreateReevaluationPayload
 } from '../../apps/api/services/reevaluation-validator';
+import type { CreateReevaluationPayload } from '../../apps/api/services/reevaluation-validation-types';
 import { DemandeCredit, ConfigReevaluation, ReevaluationCredit } from '@shared/schema/finance';
 import { StatutDemande, StatutReevaluation } from '@shared/enum/status-constants';
 import { addDays, subDays } from 'date-fns';

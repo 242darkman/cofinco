@@ -28,6 +28,7 @@ import {
 import { Button, Badge } from '@/components/ui';
 import { formatMoney } from '../../../lib/format';
 import { ALL_STATUS_LABELS } from '../../../lib/status-labels';
+import { getTypeConditionnementLabel } from '@shared/enum/status-constants';
 import { TransfertCoffreBonTemplate, type BonType, type TransfertCoffreBonData } from '../../ui/printable';
 import { useReactToPrint } from 'react-to-print';
 import { currencyCode } from '@shared/config/currency';
@@ -504,7 +505,7 @@ export default function TransfertInterCoffresDetail({
                 </div>
                 <div>
                   <p className="text-xs text-content-muted uppercase tracking-wide mb-1">Conditionnement</p>
-                  <p className="text-base text-content-primary font-medium">{transfert.typeConditionnement}</p>
+                  <p className="text-base text-content-primary font-medium">{getTypeConditionnementLabel(transfert.typeConditionnement)}</p>
                 </div>
               </div>
 

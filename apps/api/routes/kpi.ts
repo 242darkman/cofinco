@@ -6,12 +6,12 @@ import { requireAuth } from "../auth";
 import { attachAbility, requireAbility, hasAbility, Actions, Subjects } from "../authorization";
 import { requireAgenceIdAccess } from "../middleware";
 import { createLogger } from "../lib/logger";
-import { getSnapshot, upsertSnapshot, listSnapshotPeriods } from "../services/kpi/kpi-store";
-import { computeKpiPayload } from "../services/kpi/kpi-engine";
-import { db } from "../db";
-import { agences } from "@shared/schema";
-import { eq } from "drizzle-orm";
-import type { KpiPeriodType, KpiScopeType } from "@shared/schema/kpi";
+import { getSnapshot, listSnapshotPeriods, listSnapshotSeries } from "../services/kpi/kpi-store";
+import { buildSeriesPoints } from "../services/kpi/kpi-series";
+import { refreshAgencyScope, refreshAllScopes } from "../services/kpi/kpi-refresh-service";
+import { broadcastKpiUpdated } from "../services/kpi/kpi-refresh-worker";
+import { getPendingSyncSummary } from "../services/sync-journal/sync-state";
+import type { KpiPayload, KpiPeriodType, KpiScopeType } from "@shared/schema/kpi";
 
 const logger = createLogger('Routes:KPI');
 
@@ -89,6 +89,93 @@ export function registerKpiRoutes(app: Express) {
   );
 
   // ============================================
+  // GET /api/kpi/series — Séries temporelles compactes (sparklines)
+  // ============================================
+  app.get("/api/kpi/series",
+    requireAuth,
+    attachAbility,
+    requireAbility(Actions.VIEW, Subjects.KPI),
+    requireAgenceIdAccess(),
+    async (req, res) => {
+      try {
+        const periodType = (req.query.periodType as string || 'MONTH') as KpiPeriodType;
+        if (periodType !== 'MONTH' && periodType !== 'YEAR') {
+          return res.status(400).json({ message: "periodType invalide. Attendu: MONTH ou YEAR" });
+        }
+
+        // Nombre de périodes borné : 12 par défaut, 24 maximum
+        const requestedLimit = Number.parseInt(req.query.limit as string, 10);
+        const limit = Number.isFinite(requestedLimit)
+          ? Math.min(24, Math.max(2, requestedLimit))
+          : 12;
+
+        // Résolution de scope identique à GET /api/kpi
+        const isAdmin = req.agenceFilter === null;
+        const agencyId = req.selectedAgenceId;
+
+        let scopeType: KpiScopeType;
+        let scopeAgencyId: string | null;
+        if (isAdmin && agencyId) {
+          scopeType = 'AGENCY';
+          scopeAgencyId = agencyId;
+        } else if (!isAdmin && req.agenceFilter?.agenceId) {
+          scopeType = 'AGENCY';
+          scopeAgencyId = req.agenceFilter.agenceId;
+        } else if (isAdmin) {
+          scopeType = 'CONSOLIDATED';
+          scopeAgencyId = null;
+        } else {
+          return res.status(400).json({ message: "Impossible de déterminer l'agence" });
+        }
+
+        const rows = await listSnapshotSeries(periodType, scopeType, scopeAgencyId, limit);
+        const points = buildSeriesPoints(
+          rows.map((r) => ({ periodKey: r.periodKey, generatedAt: r.generatedAt, payload: r.payload as KpiPayload })),
+        );
+
+        res.json({ data: points });
+      } catch (error) {
+        logger.error({ err: error }, 'Error fetching KPI series');
+        res.status(500).json({ message: "Erreur lors de la récupération des séries KPI" });
+      }
+    }
+  );
+
+  // ============================================
+  // GET /api/kpi/offline-pending — Opérations offline en attente de sync
+  // ============================================
+  app.get("/api/kpi/offline-pending",
+    requireAuth,
+    attachAbility,
+    requireAbility(Actions.VIEW, Subjects.KPI),
+    requireAgenceIdAccess(),
+    async (req, res) => {
+      try {
+        // Résolution de scope identique à GET /api/kpi/series
+        const isAdmin = req.agenceFilter === null;
+        const agencyId = req.selectedAgenceId;
+
+        let scopeAgencyId: string | null;
+        if (isAdmin && agencyId) {
+          scopeAgencyId = agencyId;
+        } else if (!isAdmin && req.agenceFilter?.agenceId) {
+          scopeAgencyId = req.agenceFilter.agenceId;
+        } else if (isAdmin) {
+          scopeAgencyId = null; // consolidé
+        } else {
+          return res.status(400).json({ message: "Impossible de déterminer l'agence" });
+        }
+
+        const summary = await getPendingSyncSummary(scopeAgencyId);
+        res.json({ data: summary });
+      } catch (error) {
+        logger.error({ err: error }, 'Error fetching offline pending summary');
+        res.status(500).json({ message: "Erreur lors de la récupération des opérations en attente" });
+      }
+    }
+  );
+
+  // ============================================
   // GET /api/kpi/periods — List available periods
   // ============================================
   app.get("/api/kpi/periods",
@@ -133,62 +220,23 @@ export function registerKpiRoutes(app: Express) {
 
         if (agencyId) {
           // Single agency calculation
-          const { payload, metadata } = await computeKpiPayload({
-            periodType, periodKey, agencyId, generatedBy: userId,
+          const snapshot = await refreshAgencyScope({
+            periodType, periodKey, agencyId, generatedBy: userId, source: 'manual',
           });
-
-          const snapshot = await upsertSnapshot({
-            periodType, periodKey,
-            scopeType: 'AGENCY',
-            agencyId,
-            payload,
-            generatedBy: userId,
-            metadata,
-          });
-
+          // Notifier TOUS les clients connectés, pas seulement l'initiateur
+          broadcastKpiUpdated([periodKey]);
           return res.json({ data: snapshot, message: 'KPI recalculé avec succès pour cette agence' });
         }
 
-        // All agencies + consolidated
-        const allAgencies = await db
-          .select({ id: agences.id, nom: agences.nom })
-          .from(agences)
-          .where(eq(agences.statut, 'ACTIVE'));
-
-        const results = [];
-
-        // Compute per agency in sequence to avoid overwhelming DB
-        for (const agency of allAgencies) {
-          const { payload, metadata } = await computeKpiPayload({
-            periodType, periodKey, agencyId: agency.id, generatedBy: userId,
-          });
-          const snapshot = await upsertSnapshot({
-            periodType, periodKey,
-            scopeType: 'AGENCY',
-            agencyId: agency.id,
-            payload,
-            generatedBy: userId,
-            metadata,
-          });
-          results.push({ agencyId: agency.id, agencyName: agency.nom, version: (snapshot as any).version });
-        }
-
-        // Compute consolidated (no agency filter)
-        const { payload: consolidatedPayload, metadata: consolidatedMeta } = await computeKpiPayload({
-          periodType, periodKey, agencyId: null, generatedBy: userId,
+        // All agencies + consolidated, avec contrôle consolidé = somme des agences
+        const result = await refreshAllScopes({
+          periodType, periodKey, generatedBy: userId, source: 'manual',
         });
-        await upsertSnapshot({
-          periodType, periodKey,
-          scopeType: 'CONSOLIDATED',
-          agencyId: null,
-          payload: consolidatedPayload,
-          generatedBy: userId,
-          metadata: consolidatedMeta,
-        });
+        broadcastKpiUpdated([periodKey]);
 
         res.json({
-          data: { agencies: results, consolidated: true },
-          message: `KPI recalculé pour ${allAgencies.length} agence(s) + vue consolidée`,
+          data: { agencies: result.agencies, consolidated: true, warnings: result.consolidated.warnings },
+          message: `KPI recalculé pour ${result.agencies.length} agence(s) + vue consolidée`,
         });
       } catch (error) {
         logger.error({ err: error }, 'Error recalculating KPI');

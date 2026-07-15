@@ -10,12 +10,10 @@ import { SmtpEmailProvider } from "./providers/email.provider";
 import type {
   SmsProvider,
   EmailProvider,
-  EmailAttachment,
   SendResult,
 } from "./providers/provider.interface";
 import { createLogger } from "../../lib/logger";
-import { getLogoBuffer } from "../../lib/company-logo";
-import { StorageService } from "../storage-service";
+import { buildEmailAttachments } from "./notification-worker-email-attachments";
 
 const logger = createLogger('NotifWorker');
 
@@ -23,17 +21,17 @@ const logger = createLogger('NotifWorker');
 // CONFIGURATION
 // ============================================================================
 
-const POLL_INTERVAL_MS = 2000; // Poll every 2 seconds
-const BATCH_SIZE = 20; // Process 20 jobs per poll cycle
-const LOCK_DURATION_MS = 60_000; // Lock a job for 60 seconds max
-const BACKOFF_BASE_MS = 30_000; // 30s base for exponential backoff
+const POLL_INTERVAL_MS = 2000; // Interroge la file toutes les 2 secondes
+const BATCH_SIZE = 20; // Traite 20 tâches maximum par cycle
+const LOCK_DURATION_MS = 60_000; // Verrouille une tâche pendant 60 secondes maximum
+const BACKOFF_BASE_MS = 30_000; // Base de 30 secondes pour l'attente exponentielle
 const MAX_ATTEMPTS = 5;
 
 let isRunning = false;
 let pollInterval: NodeJS.Timeout | null = null;
 
 // ============================================================================
-// PROVIDER INSTANCES (lazy-initialized singletons)
+// INSTANCES FOURNISSEURS INITIALISÉES À LA DEMANDE
 // ============================================================================
 
 let mtnSms: MtnSmsProvider | null = null;
@@ -50,26 +48,24 @@ function getEmailProvider(): EmailProvider {
 }
 
 // ============================================================================
-// WORKER LOOP
+// BOUCLE DU TRAITEMENT
 // ============================================================================
 
 /**
- * Process pending notification jobs using SELECT FOR UPDATE SKIP LOCKED.
- * This ensures safe concurrent processing (even if multiple instances run).
+ * Traite les tâches de notification prêtes avec un verrou SQL concurrent-safe.
  *
- * Flow per job:
- * 1. Lock and mark as PROCESSING
- * 2. Render template (SMS or Email)
- * 3. Send via provider
- * 4. On success: mark SENT + store delivery receipt
- * 5. On failure: increment attempts + exponential backoff OR move to DEAD_LETTER
+ * Chaque tâche est verrouillée, rendue, envoyée puis marquée comme livrée ou replacée
+ * dans la file avec attente exponentielle. Le `SKIP LOCKED` permet plusieurs
+ * instances sans double traitement de la même tâche.
+ *
+ * @returns Le nombre de tâches envoyées avec succès pendant ce cycle.
  */
 async function processNotificationJobs(): Promise<number> {
   try {
     const now = new Date();
     const lockUntil = new Date(now.getTime() + LOCK_DURATION_MS);
 
-    // Atomically lock a batch of QUEUED jobs that are ready for processing
+    // Verrouille atomiquement un lot de tâches QUEUED prêtes à être traitées.
     const jobs = await db.execute<{
       id: string;
       channel: string;
@@ -123,7 +119,7 @@ async function processNotificationJobs(): Promise<number> {
         if (result.success) {
           await markJobSent(job.id, result);
 
-          // Store delivery receipt for providers that support it (MTN)
+          // Enregistre l'accusé de livraison pour les fournisseurs compatibles.
           if (result.requestId) {
             await db
               .insert(notificationDeliveryReceipts)
@@ -142,9 +138,10 @@ async function processNotificationJobs(): Promise<number> {
         } else {
           await handleJobFailure(job, result.error || "Unknown error", result.rawResponse, result.permanent);
         }
-      } catch (error: any) {
-        // Unexpected error processing this job
-        await handleJobFailure(job, error.message || "Unexpected error");
+      } catch (error: unknown) {
+        // Erreur inattendue pendant le traitement de la tâche.
+        const errorMessage = error instanceof Error ? error.message : "Unexpected error";
+        await handleJobFailure(job, errorMessage);
       }
     }
 
@@ -153,14 +150,14 @@ async function processNotificationJobs(): Promise<number> {
     }
 
     return processedCount;
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, 'Error in process loop');
     return 0;
   }
 }
 
 // ============================================================================
-// JOB PROCESSORS
+// TRAITEMENT DES TÂCHES
 // ============================================================================
 
 async function processSmsJob(job: {
@@ -178,10 +175,11 @@ async function processSmsJob(job: {
     return provider.send(job.recipient, rendered, {
       correlationId: job.correlation_id,
     });
-  } catch (err: any) {
-    // "not configured" / "settings incomplete" → permanent, no point retrying
-    if (err.message?.includes("not configured") || err.message?.includes("settings incomplete")) {
-      return { success: false, error: err.message, permanent: true };
+  } catch (err: unknown) {
+    // Les erreurs de configuration sont permanentes : inutile de réessayer.
+    const message = err instanceof Error ? err.message : "";
+    if (message.includes("not configured") || message.includes("settings incomplete")) {
+      return { success: false, error: message, permanent: true };
     }
     throw err;
   }
@@ -197,38 +195,7 @@ async function processEmailJob(job: {
     job.payload
   );
 
-  // Build attachments list
-  const attachments: EmailAttachment[] = [];
-
-  // Always include company logo as inline CID (for <img src="cid:company-logo">)
-  const logoBuffer = getLogoBuffer();
-  if (logoBuffer) {
-    attachments.push({
-      filename: 'microflex-logo.png',
-      content: logoBuffer,
-      contentType: 'image/png',
-      cid: 'company-logo',
-    });
-  }
-
-  // Resolve storage-based file attachments from payload._attachments
-  const payloadAttachments = job.payload._attachments;
-  if (Array.isArray(payloadAttachments)) {
-    for (const att of payloadAttachments as Array<{ storageKey: string; filename: string; contentType?: string }>) {
-      try {
-        const obj = await StorageService.getPrivateObject(att.storageKey);
-        const bytes = await obj.Body!.transformToByteArray();
-        attachments.push({
-          filename: att.filename,
-          content: Buffer.from(bytes),
-          contentType: att.contentType || 'application/pdf',
-        });
-      } catch (err) {
-        logger.warn({ err, storageKey: att.storageKey }, 'Failed to fetch attachment from storage');
-      }
-    }
-  }
-
+  const attachments = await buildEmailAttachments(job.payload);
   const provider = getEmailProvider();
   return provider.send(job.recipient, subject, html, text,
     attachments.length > 0 ? { attachments } : undefined
@@ -236,7 +203,7 @@ async function processEmailJob(job: {
 }
 
 // ============================================================================
-// STATUS UPDATES
+// MISES À JOUR DE STATUT
 // ============================================================================
 
 async function markJobSent(jobId: string, result: SendResult): Promise<void> {
@@ -258,7 +225,7 @@ async function handleJobFailure(
   rawResponse?: unknown,
   permanent?: boolean
 ): Promise<void> {
-  // Permanent errors (provider not configured) → FAILED immediately, no retries
+  // Les erreurs permanentes passent directement en FAILED, sans nouvelle tentative.
   if (permanent) {
     await db
       .update(notificationJobs)
@@ -280,7 +247,7 @@ async function handleJobFailure(
   const newAttempts = (job.attempts || 0) + 1;
   const isDeadLetter = newAttempts >= (job.max_attempts || MAX_ATTEMPTS);
 
-  // Exponential backoff: 30s, 60s, 2m, 4m, 8m
+  // Attente exponentielle : 30 s, 60 s, 2 min, 4 min, 8 min.
   const nextAttemptAt = isDeadLetter
     ? null
     : new Date(
@@ -292,7 +259,7 @@ async function handleJobFailure(
     .set({
       status: isDeadLetter ? "DEAD_LETTER" : "QUEUED",
       attempts: newAttempts,
-      lastError: errorMsg.substring(0, 2000), // Truncate long errors
+      lastError: errorMsg.substring(0, 2000), // Tronque les erreurs longues.
       nextAttemptAt,
       lockedAt: null,
       lockedUntil: null,
@@ -306,12 +273,14 @@ async function handleJobFailure(
 }
 
 // ============================================================================
-// LIFECYCLE
+// CYCLE DE VIE
 // ============================================================================
 
 /**
- * Start the notification delivery worker.
- * Polls `notification_jobs` table every 2 seconds for QUEUED jobs.
+ * Démarre le processus de livraison des notifications.
+ *
+ * Le processus interroge périodiquement `notification_jobs` pour traiter les tâches
+ * en attente.
  */
 export function startNotificationWorker(): void {
   if (isRunning) {
@@ -322,10 +291,10 @@ export function startNotificationWorker(): void {
   isRunning = true;
   logger.info({ pollIntervalMs: POLL_INTERVAL_MS }, 'Worker started');
 
-  // Initial run
+  // Premier passage immédiat.
   processNotificationJobs();
 
-  // Set up polling
+  // Mise en place de l'interrogation périodique.
   pollInterval = setInterval(async () => {
     if (isRunning) {
       await processNotificationJobs();
@@ -334,7 +303,7 @@ export function startNotificationWorker(): void {
 }
 
 /**
- * Stop the notification delivery worker gracefully.
+ * Arrête proprement le processus de livraison des notifications.
  */
 export function stopNotificationWorker(): void {
   if (!isRunning) return;
@@ -350,14 +319,14 @@ export function stopNotificationWorker(): void {
 }
 
 /**
- * Check if the worker is running.
+ * Indique si le processus de notification est actif.
  */
 export function isNotificationWorkerRunning(): boolean {
   return isRunning;
 }
 
 /**
- * Get counts of jobs by status (for monitoring).
+ * Compte les tâches de notification par statut pour la supervision.
  */
 export async function getNotificationJobCounts(): Promise<
   Record<string, number>
@@ -376,7 +345,7 @@ export async function getNotificationJobCounts(): Promise<
 }
 
 /**
- * Retry all DEAD_LETTER jobs (reset attempts and status to QUEUED).
+ * Réessaie toutes les tâches DEAD_LETTER en les replaçant dans la file.
  */
 export async function retryDeadLetterJobs(): Promise<number> {
   const result = await db
@@ -396,8 +365,9 @@ export async function retryDeadLetterJobs(): Promise<number> {
 }
 
 /**
- * Retry a single DEAD_LETTER or FAILED job by ID.
- * Returns true if the job was found and re-queued, false otherwise.
+ * Réessaie une tâche DEAD_LETTER ou FAILED précise.
+ *
+ * @returns `true` si la tâche a été retrouvée et remise en file, sinon `false`.
  */
 export async function retrySingleJob(jobId: string): Promise<boolean> {
   const result = await db

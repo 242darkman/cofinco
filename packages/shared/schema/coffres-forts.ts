@@ -93,7 +93,7 @@ export const transfertsInterCoffres = pgTable("transferts_inter_coffres", {
   // Type et conditionnement
   typeTransfert: typeTransfertInterCoffreEnum("type_transfert").notNull(),
   typeConditionnement: typeConditionnementEnum("type_conditionnement").notNull(),
-  numeroScelle: text("numero_scelle"), // Obligatoire si Sac scellé
+  numeroScelle: text("numero_scelle"), // Obligatoire si SAC_SCELLE
   motif: text("motif").notNull(),
 
   // Statut workflow

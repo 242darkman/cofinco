@@ -1,74 +1,29 @@
 import { db } from "../db";
-import {
-  sessionsCaisse,
-  operationsCaisse,
-  tontines,
-  tontineTurns,
-  comptes,
-  credits,
-  remboursements,
-  echeancesCredits,
-  type MouvementFinancier
-} from "@shared/schema";
-import { eq, and, or, asc, sql } from "drizzle-orm";
-import { allocateRepaymentToSchedule } from "./repayment-allocation-service";
-import {
-  executeWithLedger,
-  validateUserId,
-  updateSessionSolde,
-  generateReference
-} from "./ledger";
-import {
-  TypeOperationCaisse,
-  MethodePaiement,
-  StatutSessionCaisse,
-  TypeCompte,
-  StatutCompte,
-  StatutCredit
-} from "@shared/enum/status-constants";
-import { dispatchDomainEvent } from "./notifications/domain-events/event-registry";
-import {
-  processTontineContribution,
-  processTontineDistribution,
-  getMemberTontineState,
-  isTourFullyPaid
-} from "./tontine-logic";
-import {
-  processCompteDepot,
-  processCompteRetrait,
-  canDeposit,
-  canWithdraw
-} from "./comptes";
+import { sessionsCaisse } from "@shared/schema";
+import { eq, and } from "drizzle-orm";
+import { executeWithLedger } from "./ledger";
+import { TypeOperationCaisse, MethodePaiement, StatutSessionCaisse } from "@shared/enum/status-constants";
 
-// Payload definition
-export interface GlobalTransactionPayload {
-  clientId: string;
-  amount: number;
-  paymentMethod: string; // "CASH" | "MOMO" | "TRANSFER"
-  natureOperation: string; // Enum TypeOperationCaisse
-  targetId?: string; // TontineId, CompteId, CreditId
-  description?: string;
+import type { GlobalTransactionPayload, TransactionHandlerContext } from "./global-transaction/global-transaction-types";
+import { handleTontineTransaction } from "./global-transaction/handlers/tontine-handler";
+import { handleAccountTransaction } from "./global-transaction/handlers/account-handler";
+import { handleCreditTransaction } from "./global-transaction/handlers/credit-handler";
+import { handleMiscTransaction } from "./global-transaction/handlers/misc-handler";
 
-  // Specific fields
-  tontineId?: string;
-  membreId?: string;
-  compteId?: string;
-  creditId?: string;
-
-  // Agence (required for GL posting)
-  agenceId?: string;
-
-  // Metadata for external refs
-  referenceExterne?: string;
-  numeroTransaction?: string;
-  numeroTelephone?: string;
-}
-
+/**
+ * Service de gestion globale des transactions financières (Switch Central).
+ * Garantit l'atomicité des opérations (ACID) en encapsulant la logique
+ * de chaque domaine (Caisse, Tontine, Épargne, Crédit) via `executeWithLedger`.
+ */
 export class GlobalTransactionService {
   
   /**
-   * Process a global transaction
-   * Acts as an orchestrator ensuring ACID properties and accounting rules
+   * Traite une transaction globale.
+   * Agit comme un orchestrateur garantissant les propriétés ACID et les règles comptables.
+   * 
+   * @param userId - ID de l'utilisateur effectuant la transaction
+   * @param payload - Détails de la transaction
+   * @returns Le résultat de la transaction métier spécifique
    */
   static async process(userId: string | undefined, payload: GlobalTransactionPayload) {
     // Sanitize payload: convert empty strings to undefined for UUID fields
@@ -135,9 +90,6 @@ export class GlobalTransactionService {
     }
 
     // 3. Routage & Exécution (Switch Central)
-    // On utilise executeWithLedger une seule fois pour garantir l'atomicité
-    // Le module "SOURCE" dépend de l'opération, mais on peut utiliser "CAISSE" ou le module spécifique
-    
     let sourceModule: any = "CAISSE";
     if (payload.natureOperation.startsWith("TONTINE")) sourceModule = "TONTINE";
     else if (payload.natureOperation.includes("SAVINGS") || payload.natureOperation.includes("CURRENT")) sourceModule = "EPARGNE";
@@ -163,388 +115,46 @@ export class GlobalTransactionService {
         },
       },
       async (tx, mouvement) => {
-        let result: any;
-        let additionalData: any = {};
+        const ctx: TransactionHandlerContext = {
+          tx,
+          mouvement,
+          payload,
+          sessionCaisseId,
+          userId
+        };
 
-        switch (payload.natureOperation) {
-          // ==================== TONTINES ====================
-          case TypeOperationCaisse.TONTINE_CONTRIBUTION: {
-            if (!payload.tontineId) throw new Error("ID Tontine requis");
-            
-            // Récupérer l'état actuel (nécessaire pour le smart dispatch)
-            const state = await getMemberTontineState(payload.clientId, payload.tontineId);
-            if (!state) throw new Error("Membre non trouvé dans cette tontine");
-
-            const tontineResult = await processTontineContribution(tx, mouvement, {
-              clientId: payload.clientId,
-              tontineId: payload.tontineId,
-              amountTotal: payload.amount,
-              sessionCaisseId,
-              userId,
-              state
-            });
-            result = tontineResult.result;
-            additionalData = tontineResult.additionalEventData;
-            break;
-          }
-
-          case TypeOperationCaisse.TONTINE_WITHDRAWAL: {
-             if (!payload.tontineId) throw new Error("ID Tontine requis");
-             if (!payload.membreId) throw new Error("ID Membre requis");
-
-             // Retrait tontine = Distribution de bénéfice au membre bénéficiaire du tour
-             const tontine = await db.query.tontines.findFirst({
-                 where: eq(tontines.id, payload.tontineId)
-             });
-
-             if (!tontine) throw new Error("Tontine introuvable");
-
-             // Déterminer le numéro de tour correct
-             let tourNumero: number;
-
-             if (tontine.currentCycleId) {
-               // Système production : chercher le tour SCHEDULED/READY du membre dans le cycle actif
-               const [turn] = await db
-                 .select({ turnNumber: tontineTurns.turnNumber })
-                 .from(tontineTurns)
-                 .where(and(
-                   eq(tontineTurns.cycleId, tontine.currentCycleId),
-                   eq(tontineTurns.beneficiaryMemberId, payload.membreId!),
-                   or(
-                     eq(tontineTurns.status, 'SCHEDULED'),
-                     eq(tontineTurns.status, 'READY')
-                   )
-                 ))
-                 .orderBy(asc(tontineTurns.turnNumber))
-                 .limit(1);
-
-               if (!turn) throw new Error("Aucun tour programmé pour ce membre dans le cycle actif");
-               tourNumero = turn.turnNumber;
-             } else {
-               // Tour actuel depuis la colonne typée
-               const [result] = await db
-                 .select({
-                   tourActuel: sql<number>`COALESCE(${tontines.currentRound}, 0) + 1`.mapWith(Number)
-                 })
-                 .from(tontines)
-                 .where(eq(tontines.id, payload.tontineId));
-               tourNumero = result.tourActuel;
-             }
-
-             const distResult = await processTontineDistribution(tx, mouvement, {
-                tontineId: payload.tontineId,
-                membreId: payload.membreId,
-                clientId: payload.clientId, // Pour l'affichage dans le journal caisse
-                tourNumero,
-                montantTotal: payload.amount,
-                modeDistribution: "CASH_WITHDRAWAL",
-                modePaiement: payload.paymentMethod,
-                sessionCaisseId,
-                userId,
-                notes: payload.description,
-                reference: mouvement.reference,
-                tontineNom: tontine.nom
-             });
-             result = distResult.result;
-             break;
-          }
-
-          // ==================== COMPTES (ÉPARGNE/COURANT) ====================
-          case TypeOperationCaisse.DEPOSIT_SAVINGS:
-          case TypeOperationCaisse.DEPOSIT_CURRENT: 
-          case TypeOperationCaisse.DEPOSIT_BLOCKED: {
-            if (!payload.compteId) throw new Error("ID Compte requis");
-            
-            // Vérifier autorisation
-            const compte = await db.query.comptes.findFirst({ where: eq(comptes.id, payload.compteId) });
-            if (!compte) throw new Error("Compte introuvable");
-            
-            const check = canDeposit(compte);
-            if (!check.allowed) throw new Error(check.reason);
-
-            const opResult = await processCompteDepot(tx, mouvement, {
-              compteId: payload.compteId,
-              montant: payload.amount,
-              sessionCaisseId,
-              observations: payload.description,
-              typePaiement: payload.natureOperation,
-              methodePaiement: payload.paymentMethod,
-              userId
-            });
-            result = opResult.result;
-            additionalData = opResult.additionalEventData;
-            break;
-          }
-
-          case TypeOperationCaisse.WITHDRAWAL_SAVINGS:
-          case TypeOperationCaisse.WITHDRAWAL_CURRENT:
-          case TypeOperationCaisse.WITHDRAWAL_BLOCKED: {
-             if (!payload.compteId) throw new Error("ID Compte requis");
-
-             const compte = await db.query.comptes.findFirst({ where: eq(comptes.id, payload.compteId) });
-             if (!compte) throw new Error("Compte introuvable");
-
-             const check = canWithdraw(compte);
-             if (!check.allowed) throw new Error(check.reason);
-
-             // Solde check handled by processCompteRetrait implicitly via updateCompteSolde? 
-             // updateCompteSolde doesn't check negative balance unless constraint exists.
-             // Manual check here is safer.
-             if (Number(compte.soldeCourant) < payload.amount) {
-                 throw new Error("Solde compte insuffisant");
-             }
-
-             const opResult = await processCompteRetrait(tx, mouvement, {
-               compteId: payload.compteId,
-               montant: payload.amount,
-               sessionCaisseId,
-               observations: payload.description,
-               typePaiement: payload.natureOperation,
-               methodePaiement: payload.paymentMethod,
-               userId
-             });
-             result = opResult.result;
-             additionalData = opResult.additionalEventData;
-             break;
-          }
-
-          // ==================== CRÉDITS ====================
-          case TypeOperationCaisse.LOAN_REPAYMENT:
-          case TypeOperationCaisse.CREDIT_REPAYMENT: {
-            // Remboursement de prêt - ENTRÉE d'argent
-            const creditId = payload.creditId || payload.targetId;
-            if (!creditId) throw new Error("ID Crédit requis pour un remboursement");
-
-            const credit = await db.query.credits.findFirst({
-              where: eq(credits.id, creditId)
-            });
-            if (!credit) throw new Error("Crédit introuvable");
-            if (credit.statut !== StatutCredit.ACTIVE && credit.statut !== StatutCredit.LATE) {
-              throw new Error(`Ce crédit ne peut pas recevoir de remboursement (statut: ${credit.statut})`);
-            }
-
-            // Vérifier que le montant ne dépasse pas le solde restant
-            const soldeRestant = Number(credit.soldeRestant);
-            if (payload.amount > soldeRestant) {
-              throw new Error(`Le montant (${payload.amount}) dépasse le solde restant (${soldeRestant})`);
-            }
-
-            // 1. Mettre à jour la session caisse (entrée d'argent)
-            if (sessionCaisseId) {
-              const nouveauSolde = await updateSessionSolde(tx, sessionCaisseId, payload.amount);
-              additionalData.nouveauSoldeSession = nouveauSolde;
-            }
-
-            // 2. Créer le remboursement
-            const validatedUserIdRemb = await validateUserId(tx, userId);
-            const [remboursement] = await tx.insert(remboursements).values({
-              creditId: creditId,
-              mouvementId: mouvement.id,
-              montant: payload.amount.toString(),
-              dateRemboursement: new Date(),
-              methodePaiement: payload.paymentMethod as any,
-              observations: payload.description,
-              createdBy: validatedUserIdRemb,
-            }).returning();
-
-            // 3. Allouer aux échéances (FIFO) et recalculer soldeRestant
-            const allocationResult = await allocateRepaymentToSchedule(
-              tx,
-              remboursement.id,
-              creditId,
-              payload.amount,
-              validatedUserIdRemb
-            );
-
-            // soldeRestant = somme des échéances non entièrement payées
-            const echeancesNonPayees = allocationResult.updatedEcheances.filter(e =>
-              Number(e.montantPaye || 0) < Number(e.montantTotal)
-            );
-            const nouveauSoldeCredit = echeancesNonPayees.reduce((sum, e) => {
-              return sum + (Number(e.montantTotal) - Number(e.montantPaye || 0));
-            }, 0);
-
-            // 4. Mettre à jour le crédit
-            const creditSolde = nouveauSoldeCredit <= 0 && echeancesNonPayees.length === 0;
-            await tx.update(credits)
-              .set({
-                soldeRestant: nouveauSoldeCredit.toString(),
-                statut: creditSolde ? StatutCredit.PAID : credit.statut,
-                dateSolde: creditSolde ? new Date() : undefined,
-                updatedAt: new Date()
-              })
-              .where(eq(credits.id, creditId));
-
-            // 5. Créer opération caisse
-            if (sessionCaisseId) {
-              await tx.insert(operationsCaisse).values({
-                sessionId: sessionCaisseId,
-                mouvementId: mouvement.id,
-                typeOperation: TypeOperationCaisse.LOAN_REPAYMENT as any,
-                montant: payload.amount.toString(),
-                methodePaiement: "CASH",
-                reference: `REMB-${mouvement.reference}`,
-                description: payload.description || `Remboursement crédit ${credit.numeroCredit}`,
-                clientId: payload.clientId,
-                createdBy: validatedUserIdRemb
-              });
-            }
-
-            result = { ...remboursement, nouveauSoldeCredit, creditSolde };
-            additionalData.nouveauSoldeCredit = nouveauSoldeCredit;
-            additionalData.creditSolde = creditSolde;
-
-            // Domain event: credit fully paid off
-            if (creditSolde && credit.clientId) {
-              dispatchDomainEvent({
-                type: "CREDIT_PAID_OFF",
-                data: {
-                  creditId: credit.id,
-                  numeroCredit: credit.numeroCredit || credit.id,
-                  clientId: credit.clientId,
-                  totalPaid: Number(credit.totalDu),
-                  agenceId: credit.agenceId,
-                },
-                timestamp: new Date(),
-              });
-            }
-
-            break;
-          }
-
-          case TypeOperationCaisse.CREDIT_DISBURSEMENT:
-          case TypeOperationCaisse.LOAN_DISBURSEMENT: {
-            // Décaissement de prêt - SORTIE d'argent
-            const creditIdDisb = payload.creditId || payload.targetId;
-            if (!creditIdDisb) throw new Error("ID Crédit requis pour un décaissement");
-
-            const creditDisb = await db.query.credits.findFirst({
-              where: eq(credits.id, creditIdDisb)
-            });
-            if (!creditDisb) throw new Error("Crédit introuvable");
-
-            // Vérifier que le crédit est en statut PENDING (approuvé mais pas encore décaissé)
-            if (creditDisb.statut !== StatutCredit.PENDING) {
-              throw new Error(`Ce crédit ne peut pas être décaissé (statut: ${creditDisb.statut})`);
-            }
-
-            // Vérifier que le crédit n'a pas déjà été décaissé
-            if (creditDisb.dateDecaissementEffectif) {
-              throw new Error(`Ce crédit a déjà été décaissé le ${creditDisb.dateDecaissementEffectif.toLocaleDateString()}`);
-            }
-
-            // Le montant décaissé doit correspondre au montant du crédit
-            const montantCredit = Number(creditDisb.montant);
-            if (payload.amount !== montantCredit) {
-              throw new Error(`Le montant doit être égal au montant du crédit (${montantCredit})`);
-            }
-
-            // 1. Mettre à jour la session caisse (sortie d'argent)
-            if (sessionCaisseId) {
-              const nouveauSolde = await updateSessionSolde(tx, sessionCaisseId, -payload.amount);
-              additionalData.nouveauSoldeSession = nouveauSolde;
-            }
-
-            // 2. Mettre à jour le crédit (statut ACTIVE, date décaissement)
-            await tx.update(credits)
-              .set({
-                statut: StatutCredit.ACTIVE,
-                dateDebut: new Date(),
-                dateDecaissementEffectif: new Date(),
-                soldeRestant: creditDisb.montant, // Le solde restant = montant total au départ
-                updatedAt: new Date()
-              })
-              .where(eq(credits.id, creditIdDisb));
-
-            // 3. Créditer le compte courant du client si mode = virement sur compte
-            // Pour CASH, on donne directement au client (pas de crédit compte)
-            if (payload.paymentMethod !== MethodePaiement.CASH) {
-              // Trouver le compte courant du client
-              const compteClient = await db.query.comptes.findFirst({
-                where: and(
-                  eq(comptes.clientId, payload.clientId),
-                  eq(comptes.typeCompte, TypeCompte.CURRENT),
-                  eq(comptes.statut, StatutCompte.ACTIVE)
-                )
-              });
-
-              if (compteClient) {
-                // Créditer le compte
-                await tx.update(comptes)
-                  .set({
-                    soldeCourant: sql`${comptes.soldeCourant} + ${payload.amount}`,
-                    updatedAt: new Date()
-                  })
-                  .where(eq(comptes.id, compteClient.id));
-                additionalData.compteCredite = compteClient.id;
-              }
-            }
-
-            // 4. Créer opération caisse
-            const validatedUserIdDisb = await validateUserId(tx, userId);
-            if (sessionCaisseId) {
-              const [opDisb] = await tx.insert(operationsCaisse).values({
-                sessionId: sessionCaisseId,
-                mouvementId: mouvement.id,
-                typeOperation: TypeOperationCaisse.CREDIT_DISBURSEMENT as any,
-                montant: payload.amount.toString(),
-                methodePaiement: payload.paymentMethod as any,
-                reference: `DEC-${mouvement.reference}`,
-                description: payload.description || `Décaissement crédit ${creditDisb.numeroCredit}`,
-                clientId: payload.clientId,
-                createdBy: validatedUserIdDisb
-              }).returning();
-              result = opDisb;
-            } else {
-              result = { creditId: creditIdDisb, montant: payload.amount, statut: 'DISBURSED' };
-            }
-
-            additionalData.creditId = creditIdDisb;
-            additionalData.creditNumero = creditDisb.numeroCredit;
-            break;
-          }
-
-          // ==================== DIVERS ====================
-          case TypeOperationCaisse.MISC_COLLECTION:
-          case TypeOperationCaisse.MISC_DISBURSEMENT: {
-             // Simplement une écriture caisse + mouvement financier
-             // Le ledger a déjà créé le mouvement. Il reste à mettre à jour la caisse si ESPÈCES
-             
-             if (sessionCaisseId) {
-                const sens = payload.natureOperation === TypeOperationCaisse.MISC_COLLECTION ? 1 : -1;
-                const nouveauSolde = await updateSessionSolde(tx, sessionCaisseId, payload.amount * sens);
-                additionalData.nouveauSoldeSession = nouveauSolde;
-                
-                // Créer opération caisse
-                const validatedUserId = await validateUserId(tx, userId);
-                const [op] = await tx.insert(operationsCaisse).values({
-                    sessionId: sessionCaisseId,
-                    mouvementId: mouvement.id,
-                    typeOperation: payload.natureOperation as any,
-                    montant: payload.amount.toString(),
-                    methodePaiement: "CASH",
-                    reference: `DIV-${mouvement.reference}`,
-                    description: payload.description || "Opération Divers",
-                    createdBy: validatedUserId
-                }).returning();
-                result = op;
-             }
-             break;
-          }
-          
-          default:
-            throw new Error(`Opération non supportée: ${payload.natureOperation}`);
+        if (payload.natureOperation.startsWith("TONTINE")) {
+          return await handleTontineTransaction(ctx);
+        } else if (
+          payload.natureOperation.includes("SAVINGS") ||
+          payload.natureOperation.includes("CURRENT") ||
+          payload.natureOperation.includes("BLOCKED")
+        ) {
+          return await handleAccountTransaction(ctx);
+        } else if (
+          payload.natureOperation.includes("LOAN") ||
+          payload.natureOperation.includes("CREDIT")
+        ) {
+          return await handleCreditTransaction(ctx);
+        } else if (
+          payload.natureOperation.startsWith("MISC_")
+        ) {
+          return await handleMiscTransaction(ctx);
+        } else {
+          throw new Error(`Opération non supportée: ${payload.natureOperation}`);
         }
-
-        return { result, additionalEventData: additionalData };
       },
       userId
     );
   }
 
+  /**
+   * Détermine le sens comptable (CRÉDIT/DÉBIT) en fonction du type d'opération.
+   * 
+   * @param op - Type de l'opération
+   * @returns "CREDIT" (entrée de fonds) ou "DEBIT" (sortie de fonds)
+   */
   static getSensByOperation(op: string): "CREDIT" | "DEBIT" {
-     // CREDIT = entrée d'argent en caisse (le client nous donne de l'argent)
-     // DEBIT = sortie d'argent de la caisse (nous donnons de l'argent au client)
      const entrees = [
          TypeOperationCaisse.TONTINE_CONTRIBUTION,
          TypeOperationCaisse.DEPOSIT_SAVINGS,

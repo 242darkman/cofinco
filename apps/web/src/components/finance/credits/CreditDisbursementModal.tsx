@@ -10,7 +10,7 @@ import { toast } from '../../../lib/toast';
 import { formatMoney, formatClientName } from '../../../lib/format';
 import ConfirmDialog from '../../ui/ConfirmDialog';
 import { Button, FormField } from '../../ui';
-import { StatutCoffre, DisbursementChannel, DISBURSEMENT_CHANNEL_LABELS, type DisbursementChannelType } from '@shared/enum/status-constants';
+import { StatutCoffre, DisbursementChannel, DISBURSEMENT_CHANNEL_LABELS, type DisbursementChannelType, TypeConditionnement, type TypeConditionnementType, TYPE_CONDITIONNEMENT_OPTIONS } from '@shared/enum/status-constants';
 import mtnLogo from '@/assets/logos/mtn-logo.png';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
 import { currencyCode } from '@shared/config/currency';
@@ -730,7 +730,7 @@ function TransfertInterCoffresFormWithPrefill({
   const [coffreDestinationId, setCoffreDestinationId] = useState(prefilledDestinationCoffreId || '');
   const [montant, setMontant] = useState(prefilledMontant || '');
   const [motif, setMotif] = useState(prefilledMotif || '');
-  const [typeConditionnement, setTypeConditionnement] = useState('Sac scellé');
+  const [typeConditionnement, setTypeConditionnement] = useState<TypeConditionnementType>(TypeConditionnement.SAC_SCELLE);
   const [numeroScelle, setNumeroScelle] = useState('');
   const [dateTransfert, setDateTransfert] = useState(new Date().toISOString().split('T')[0]);
   const [heureDepart, setHeureDepart] = useState('');
@@ -817,7 +817,7 @@ function TransfertInterCoffresFormWithPrefill({
 
     if (!motif || motif.trim().length < 10) newErrors.motif = 'Le motif doit contenir au moins 10 caractères';
 
-    if (typeConditionnement === 'Sac scellé' && !numeroScelle) {
+    if (typeConditionnement === TypeConditionnement.SAC_SCELLE && !numeroScelle) {
       newErrors.numeroScelle = 'Le numéro de scellé est obligatoire pour un sac scellé';
     }
 
@@ -858,7 +858,7 @@ function TransfertInterCoffresFormWithPrefill({
           devise: currencyCode(),
           motif: motif.trim(),
           typeConditionnement,
-          numeroScelle: typeConditionnement === 'Sac scellé' ? numeroScelle : undefined,
+          numeroScelle: typeConditionnement === TypeConditionnement.SAC_SCELLE ? numeroScelle : undefined,
           dateTransfert,
           heureDepart: heureDepart || undefined,
           agentsTransport: validAgents,
@@ -1056,23 +1056,23 @@ function TransfertInterCoffresFormWithPrefill({
           <section className="space-y-4">
             <h3 className="text-sm font-semibold text-content-secondary uppercase tracking-wide">Conditionnement</h3>
             <div className="grid grid-cols-2 gap-2">
-              {['Sac scellé', 'Mallette', 'Enveloppe', 'Autre'].map((type) => (
+              {TYPE_CONDITIONNEMENT_OPTIONS.map(({ value, label }) => (
                 <button
-                  key={type}
+                  key={value}
                   type="button"
-                  onClick={() => setTypeConditionnement(type)}
+                  onClick={() => setTypeConditionnement(value)}
                   className={`px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                    typeConditionnement === type
+                    typeConditionnement === value
                       ? 'bg-accent/10 text-accent border border-accent/50'
                       : 'bg-surface text-content-muted border border-edge hover:border-edge-strong'
                   }`}
                 >
-                  {type}
+                  {label}
                 </button>
               ))}
             </div>
 
-            {typeConditionnement === 'Sac scellé' && (
+            {typeConditionnement === TypeConditionnement.SAC_SCELLE && (
               <div className="space-y-2">
                 <label className="text-xs font-medium text-content-muted uppercase">Numéro de scellé *</label>
                 <input

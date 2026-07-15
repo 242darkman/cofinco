@@ -1,6 +1,19 @@
 import type { Express } from "express";
 import { createLogger } from "./lib/logger";
-import { registerAuthRoutes } from "./routes/auth";
+import { registerAuthCoreRoutes } from "./routes/auth/core";
+import { registerAuthProfileRoutes } from "./routes/auth/profile";
+import { registerAuthSessionRoutes } from "./routes/auth/session";
+import { registerAuthRefreshRoutes } from "./routes/auth/refresh";
+import { registerAuthPasswordResetRoutes } from "./routes/auth/password-reset";
+import { registerAuthPinRoutes } from "./routes/auth/pin";
+import { registerAuthActiveSessionsRoutes } from "./routes/auth/sessions-actives";
+import { registerAuthAgencyRoutes } from "./routes/auth/agences-roles";
+import { registerUsersRoutes } from "./routes/users";
+import { registerUsersPermissionsRoutes } from "./routes/users-permissions";
+import { registerUsersRolesRoutes } from "./routes/users-roles";
+import { registerSessionsRoutes } from "./routes/sessions";
+import { registerAuditLogsRoutes } from "./routes/audit-logs";
+import { registerAdminDashboardRoutes } from "./routes/admin-dashboard";
 import { registerClientRoutes } from "./routes/clients";
 import { registerFinanceRoutes } from "./routes/finance";
 import { registerTontineRoutes } from "./routes/tontines";
@@ -37,18 +50,36 @@ import { maintenanceRouter } from "./routes/maintenance";
 import { checkMaintenanceMode } from "./middleware/maintenance";
 import { transfertsInterCoffresRouter } from "./routes/transferts-inter-coffres";
 import { evacuationCoffreRouter } from "./routes/evacuation-coffre";
-import storageRouter from "./routes/storage";
-import { regularisationRouter } from "./routes/regularisation";
-import { paymentsRouter, webhooksRouter } from "./routes/payments";
+import { registerStoragePublicRoutes } from "./routes/storage/public";
+import { registerStorageDocumentsRoutes } from "./routes/storage/documents";
+import { registerStorageEntitiesRoutes } from "./routes/storage/entities";
+import { registerRegularisationListRoutes } from "./routes/regularisation/list";
+import { registerRegularisationStatsRoutes } from "./routes/regularisation/stats";
+import { registerRegularisationDetailsRoutes } from "./routes/regularisation/details";
+import { registerRegularisationActionsRoutes } from "./routes/regularisation/actions";
+
+import { registerPaymentsWebhooksRoutes } from "./routes/payments/webhooks";
+import { registerPaymentsCollectionRoutes } from "./routes/payments/collection";
+import { registerPaymentsPayoutRoutes } from "./routes/payments/payout";
+import { registerPaymentsReconciliationRoutes } from "./routes/payments/reconciliation";
+import { registerPaymentsManagementRoutes } from "./routes/payments/management";
+
 import { paymentsTestRouter } from "./routes/payments-test";
 import balancesRouter from "./routes/balances";
 import permissionAnalyticsRouter from "./routes/permission-analytics";
-import { registerMonitoringRoutes } from "./routes/monitoring";
+import { registerMonitoringDashboardRoutes } from "./routes/monitoring/dashboard";
+import { registerMonitoringAlertsRoutes } from "./routes/monitoring/alerts";
+import { registerMonitoringReconciliationRoutes } from "./routes/monitoring/reconciliation";
+import { registerMonitoringSystemRoutes } from "./routes/monitoring/system";
 import { registerKpiRoutes } from "./routes/kpi";
-import syncRouter from "./routes/sync";
+import { registerSyncHeartbeatRoutes } from "./routes/sync/heartbeat";
+import { registerSyncPushRoutes } from "./routes/sync/push";
+import { registerSyncPullRoutes } from "./routes/sync/pull";
 import { syncJournalRouter } from "./routes/sync-journal";
-import { registerZoneManagementRoutes } from "./routes/zone-management";
-import { registerProspectionPrimesRoutes } from "./routes/prospection-primes";
+import { registerArrondissementsRoutes } from "./routes/zones/arrondissements";
+import { registerMarchesRoutes } from "./routes/zones/marches";
+import { registerProspectionPrimesRoutes } from "./routes/prospections/primes";
+import { registerProspectionPrimeConfigRoutes } from "./routes/prospections/prime-config";
 import { registerVilleRoutes } from "./routes/villes";
 import { registerCatalogRoutes } from "./routes/catalog";
 import { scoringAdminRouter } from "./routes/scoring-admin";
@@ -70,30 +101,55 @@ export function registerRoutes(app: Express): Server {
   app.use("/api/evacuations-coffre", evacuationCoffreRouter);
   app.use("/api/transactions", transactionsRouter);
 
-  // Admin - Regularisation Module (gestion des tâches de régularisation)
-  app.use("/api/admin/regularisations", regularisationRouter);
+  // Regularisation (Admin only)
+  registerRegularisationListRoutes(app);
+  registerRegularisationStatsRoutes(app);
+  registerRegularisationDetailsRoutes(app);
+  registerRegularisationActionsRoutes(app);
 
   // Mobile Money Payments & Webhooks
-  app.use("/api/payments", paymentsRouter);
-  app.use("/api/webhooks", webhooksRouter); // Webhooks pawaPay (router dédié, sans auth)
+  registerPaymentsWebhooksRoutes(app);
+  registerPaymentsCollectionRoutes(app);
+  registerPaymentsPayoutRoutes(app);
+  registerPaymentsReconciliationRoutes(app);
+  registerPaymentsManagementRoutes(app);
+
+  // Pour les tests en dev
   app.use("/api/payments-test", paymentsTestRouter); // Test endpoints (dev only)
 
-  // Storage routes (unified)
-  app.use("/api/storage", storageRouter);
+  // Storage API
+  registerStoragePublicRoutes(app);
+  registerStorageDocumentsRoutes(app);
+  registerStorageEntitiesRoutes(app);
 
   // Balances routes (unified source of truth)
   app.use("/api/balances", balancesRouter);
 
   // Register modular routes
-  registerAuthRoutes(app);
+  registerAuthCoreRoutes(app);
+  registerAuthSessionRoutes(app);
+  registerAuthRefreshRoutes(app);
+  registerAuthPasswordResetRoutes(app);
+  registerAuthPinRoutes(app);
+  registerAuthProfileRoutes(app);
+  registerAuthActiveSessionsRoutes(app);
+  registerAuthAgencyRoutes(app);
+  registerUsersRoutes(app);
+  registerUsersPermissionsRoutes(app);
+  registerUsersRolesRoutes(app);
+  registerSessionsRoutes(app);
+  registerAuditLogsRoutes(app);
+  registerAdminDashboardRoutes(app);
   registerClientRoutes(app);
   registerFinanceRoutes(app);
   registerComptesRoutes(app); // Comptes microfinance (dépôt, retrait, blocage, transfert)
   registerTontineRoutes(app);
   registerOperationsRoutes(app); // Agents, prospection
   registerTrackingRoutes(app); // GPS tracking batch sync + sessions
-  registerZoneManagementRoutes(app); // Arrondissements & Marchés CRUD
+  registerArrondissementsRoutes(app); // Arrondissements CRUD
+  registerMarchesRoutes(app); // Marchés CRUD
   registerProspectionPrimesRoutes(app); // Prospection primes management
+  registerProspectionPrimeConfigRoutes(app); // Prospection primes config
   registerVilleRoutes(app); // Départements & Villes reference data
   registerCatalogRoutes(app); // Catalog Module (sectors, professions, activity types)
   registerAgentModulesRoutes(app); // Agent sub-modules (commissions, planning, objectifs, etc.)
@@ -148,13 +204,18 @@ export function registerRoutes(app: Express): Server {
   registerReevaluationRoutes(app);
 
   // Financial Monitoring Module (alerts, reconciliation, real-time monitoring)
-  registerMonitoringRoutes(app);
+  registerMonitoringDashboardRoutes(app);
+  registerMonitoringAlertsRoutes(app);
+  registerMonitoringReconciliationRoutes(app);
+  registerMonitoringSystemRoutes(app);
 
   // KPI Module (Indicateurs clés de performance et pilotage)
   registerKpiRoutes(app);
 
   // Sync Heartbeat Module (real-time connection status)
-  app.use("/api/sync", syncRouter);
+  registerSyncHeartbeatRoutes(app);
+  registerSyncPushRoutes(app);
+  registerSyncPullRoutes(app);
 
   // Offline-Native Sync Journal (ECDSA-signed journal entries, device keys, COBAC audit)
   app.use("/api/sync", syncJournalRouter);

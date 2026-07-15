@@ -11,7 +11,7 @@
  */
 
 import cron from "node-cron";
-import { paymentService } from "../services/mobile-money/payment-service";
+import { handleReconciliationSuccess, handleWebhook } from "../services/mobile-money/payment-service";
 import { providerRegistry } from "../services/mobile-money/provider-registry";
 import * as storage from "../storage/mobile-money";
 import { createLogger } from "../lib/logger";
@@ -243,7 +243,7 @@ async function reconcilePendingPayments(): Promise<void> {
 
         switch (statusResponse.status) {
           case "SUCCESS":
-            await paymentService.handleReconciliationSuccess(intent, statusResponse);
+            await handleReconciliationSuccess(intent, statusResponse);
             stats.success++;
             break;
 
@@ -380,7 +380,7 @@ async function expireTimedOutPayments(): Promise<void> {
 /**
  * DLQ Recovery: Replay des provider_events non traités
  * Récupère les événements webhook qui n'ont pas été traités avec succès
- * et tente de les rejouer via le paymentService
+ * et tente de les rejouer via le payment-service
  */
 async function recoverUnprocessedEvents(): Promise<void> {
   const startTime = Date.now();
@@ -407,7 +407,7 @@ async function recoverUnprocessedEvents(): Promise<void> {
         }
 
         // Replay the webhook payload through the payment service
-        await paymentService.handleWebhook(
+        await handleWebhook(
           event.payload,
           JSON.stringify(event.payload), // Reconstruct raw body from stored payload
           event.signature || "",

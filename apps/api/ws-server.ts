@@ -11,19 +11,19 @@ import { SystemRole } from "@shared/types/roles";
 
 const logger = createLogger('WebSocket');
 
-// Extend WebSocket interface
+// Étend l'interface WebSocket avec l'état de session MicroFlex.
 interface ExtendedWebSocket extends WebSocket {
   isAlive: boolean;
   messageCount?: number;
   lastMessageReset?: number;
 }
 
-// Rate limiting configuration
+// Configuration de limitation du débit WebSocket.
 const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
-const RATE_LIMIT_MAX_MESSAGES = 100; // max messages per window
-const RATE_LIMIT_WARNING_THRESHOLD = 80; // warn at 80 messages
+const RATE_LIMIT_MAX_MESSAGES = 100; // messages maximum par fenêtre
+const RATE_LIMIT_WARNING_THRESHOLD = 80; // seuil d'avertissement
 
-// Rate limiter state per user
+// État de limitation par utilisateur.
 const rateLimiters = new Map<string, { count: number; windowStart: number; warned: boolean }>();
 
 function checkRateLimit(userId: string): { allowed: boolean; remaining: number; warn: boolean } {
@@ -31,7 +31,7 @@ function checkRateLimit(userId: string): { allowed: boolean; remaining: number; 
   let limiter = rateLimiters.get(userId);
 
   if (!limiter || now - limiter.windowStart > RATE_LIMIT_WINDOW_MS) {
-    // Start new window
+    // Démarre une nouvelle fenêtre de comptage.
     limiter = { count: 0, windowStart: now, warned: false };
     rateLimiters.set(userId, limiter);
   }
@@ -52,7 +52,7 @@ function checkRateLimit(userId: string): { allowed: boolean; remaining: number; 
   };
 }
 
-// Clean up old rate limit entries periodically
+// Nettoie périodiquement les anciennes entrées de limitation.
 setInterval(() => {
   const now = Date.now();
   rateLimiters.forEach((limiter, userId) => {
@@ -64,14 +64,14 @@ setInterval(() => {
 
 /**
  * Types de messages WebSocket unifiés
- * SOURCE UNIQUE DE VERITE - Synchronisé avec client/src/contexts/WebSocketContext.tsx
+ * SOURCE UNIQUE DE VÉRITÉ - Synchronisé avec apps/web/src/contexts/WebSocketContext.tsx.
  */
 export type GlobalMessage = {
   type:
     // =============================================
-    // MESSAGING
+    // MESSAGERIE
     // =============================================
-    // V1 - Typing (still used for DM typing indicators)
+    // V1 - saisie encore utilisée pour les conversations directes.
     | "TYPING" | "READ_RECEIPT"
     // V2 - Conversations (routes/conversations.ts)
     | "CHAT_MESSAGE_V2" | "TYPING_V2" | "READ_UPDATE"
@@ -94,6 +94,7 @@ export type GlobalMessage = {
     | "EMPLOYE_UPDATE" | "AGENCE_UPDATE" | "HR_UPDATE"
     | "ACCOUNTING_UPDATE" | "LIQUIDITY_CHANGED" | "SCORE_UPDATED"
     | "SETTINGS_UPDATE" | "RBAC_UPDATE"
+    | "PRESETS_CHANGED"
     | "AGENT_MODULES_UPDATE"
     | "SESSION_AGENT_UPDATE"
 
@@ -115,7 +116,7 @@ export type GlobalMessage = {
     | "REFUND_PENDING_CAISSE" | "REFUND_PAID"
 
     // =============================================
-    // CAISSE PAYMENT REQUESTS (Queue centralisée)
+    // DEMANDES CAISSE (file centralisée)
     // =============================================
     | "CAISSE_REQUEST_CREATED" | "CAISSE_REQUEST_COMPLETED" | "CAISSE_REQUEST_CANCELLED"
 
@@ -126,10 +127,10 @@ export type GlobalMessage = {
     | "BALANCE_ALERT" | "RECONCILIATION_COMPLETE" | "RECONCILIATION_ERROR"
 
     // =============================================
-    // GL GUARD - OUVERTURE CAISSE SECURISEE
+    // GARDE GL - OUVERTURE CAISSE SÉCURISÉE
     // =============================================
     | "CAISSE_OPENING_BLOCKED"        // Ouverture bloquée pour écart GL
-    | "CAISSE_OPENING_WITH_ECART"     // Ouverture autorisée avec écart (justifiée ou log only)
+    | "CAISSE_OPENING_WITH_ECART"     // Ouverture autorisée avec écart (justifiée ou journalisée uniquement)
 
     // =============================================
     // MONITORING FINANCIER & ALERTES
@@ -138,7 +139,7 @@ export type GlobalMessage = {
     | "MONITORING_DASHBOARD" | "ALERT_CREATED"
 
     // =============================================
-    // RAPPELS & SCHEDULES
+    // RAPPELS ET PLANIFICATIONS
     // =============================================
     | "SCHEDULE_UPDATED"
 
@@ -187,15 +188,15 @@ export type GlobalMessage = {
   payload: any;
 };
 
-// Map userId -> WebSocket[] (user can have multiple tabs open)
+// Associe un utilisateur à ses connexions WebSocket actives.
 const clients = new Map<string, WebSocket[]>();
 
-// Location log throttle: max 1 DB insert per 10s per user
+// Limite les journaux de localisation à une insertion DB toutes les 10 s par utilisateur.
 const locationLogThrottles = new Map<string, number>();
 const LOC_LOG_MIN_INTERVAL = 10_000;
 
-// Map channel -> Set<WebSocket> for aggregate subscriptions
-// Channels: client:{id}, compte:{id}, credit:{id}, tontine:{id}, session_caisse:{id}, agent:{id}
+// Associe un canal aux sockets abonnées aux agrégats métier.
+// Canaux : client:{id}, compte:{id}, credit:{id}, tontine:{id}, session_caisse:{id}, agent:{id}
 const subscriptions = new Map<string, Set<WebSocket>>();
 
 export function setupWebSocket(server: Server) {
@@ -205,7 +206,7 @@ export function setupWebSocket(server: Server) {
     (this as ExtendedWebSocket).isAlive = true;
   }
 
-  // Heartbeat Interval
+  // Intervalle de battement de présence.
   const interval = setInterval(() => {
     wss.clients.forEach((ws) => {
       const extWs = ws as ExtendedWebSocket;
@@ -226,7 +227,7 @@ export function setupWebSocket(server: Server) {
   const SESSION_MIDDLEWARE_TIMEOUT_MS = 5000;
 
   server.prependListener("upgrade", (request, socket, head) => {
-    // Handle socket errors to prevent EPIPE crashes
+    // Gère les erreurs socket pour éviter les crashs EPIPE.
     socket.on('error', (err: any) => {
       if (err.code === 'ECONNRESET' || err.code === 'EPIPE' || err.code === 'ECONNREFUSED') {
         return;
@@ -235,10 +236,10 @@ export function setupWebSocket(server: Server) {
     });
 
     try {
-      // Parse URL for path only (no query params)
+      // Analyse uniquement le chemin de l'URL, sans paramètres de requête.
       const url = parse(request.url || '', true);
 
-      // Only handle /ws path
+      // Ne traite que le chemin /ws.
       if (!url.pathname?.startsWith('/ws')) {
         return;
       }
@@ -247,7 +248,7 @@ export function setupWebSocket(server: Server) {
 
       const isProduction = process.env.NODE_ENV === 'production';
 
-      // 1. Strict Cookie Authentication
+      // 1. Authentification stricte par cookie.
       const cookieHeader = request.headers.cookie;
       if (!cookieHeader) {
           logger.warn('Rejected: No cookie header');
@@ -257,7 +258,7 @@ export function setupWebSocket(server: Server) {
       }
 
       const cookies = parseCookie(cookieHeader);
-      // Need to match the logic in auth.ts
+      // Doit rester aligné avec la logique de auth.ts.
       const cookieName = isProduction ? '__Host-microflex_sess' : 'microflex_sess';
       const signedSessionId = cookies[cookieName];
 
@@ -268,8 +269,8 @@ export function setupWebSocket(server: Server) {
           return;
       }
 
-      // 2. Unsign Cookie
-      // express-session cookies are prefixed with "s:"
+      // 2. Vérification de signature du cookie.
+      // Les cookies express-session sont préfixés par "s:".
       if (!signedSessionId.startsWith('s:')) {
            logger.warn('Rejected: Invalid cookie format');
            socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
@@ -287,9 +288,8 @@ export function setupWebSocket(server: Server) {
           return;
       }
 
-      // 3. Validate Session from Store (via Middleware access or direct DB check)
-      // Since we need to hydrate the user, running the session middleware is the standard way.
-      // It will fetch the session from DB (PostgresStore) and populate req.session.
+      // 3. Valide la session depuis le store.
+      // Le middleware hydrate l'utilisateur depuis la session Postgres.
 
       if (!sessionMiddleware) {
          logger.error('Session middleware not available');
@@ -304,8 +304,7 @@ export function setupWebSocket(server: Server) {
         setHeader: () => {}
       };
 
-      // Timeout guard: if sessionMiddleware never calls back (DB hang, pool exhaustion),
-      // destroy the socket instead of leaving it hanging indefinitely.
+      // Garde-fou de timeout : si le middleware ne répond pas, détruit la socket.
       let callbackFired = false;
       const sessionTimeout = setTimeout(() => {
         if (!callbackFired) {
@@ -314,12 +313,12 @@ export function setupWebSocket(server: Server) {
           try {
             socket.write('HTTP/1.1 503 Service Unavailable\r\n\r\n');
             socket.destroy();
-          } catch { /* ignore */ }
+          } catch { /* ignore volontairement */ }
         }
       }, SESSION_MIDDLEWARE_TIMEOUT_MS);
 
       sessionMiddleware(request, mockRes as any, (err?: Error) => {
-        if (callbackFired) return; // Already timed out
+        if (callbackFired) return; // Timeout déjà déclenché.
         callbackFired = true;
         clearTimeout(sessionTimeout);
 
@@ -332,8 +331,7 @@ export function setupWebSocket(server: Server) {
 
         const session = (request as any).session;
 
-        // Final sanity check: session ID must match what we unsigned
-        // (Middleware usually handles this, but good to be sure)
+        // Vérification finale : l'identifiant de session doit correspondre au cookie validé.
         if (session.id !== sessionId) {
              logger.warn({ sessionId, middlewareId: session.id }, 'Session ID mismatch (middleware vs cookie)');
         }
@@ -347,9 +345,9 @@ export function setupWebSocket(server: Server) {
           return;
         }
 
-        // 4. Proceed with Upgrade
+        // 4. Poursuit la montée de protocole WebSocket.
         try {
-              // Store userId and sessionId in request for connection handler
+              // Stocke l'utilisateur et la session pour le gestionnaire de connexion.
               (request as any).authenticatedUserId = userId;
               (request as any).authenticatedSessionId = sessionId;
               (request as any).userAgence = session?.user?.agence;
@@ -371,7 +369,7 @@ export function setupWebSocket(server: Server) {
               logger.error({ err: error }, 'Error inside upgrading');
               try {
                   socket.destroy();
-              } catch (e) { /* ignore */ }
+              } catch (e) { /* ignore volontairement */ }
           }
       });
     } catch (unexpectedError) {
@@ -379,22 +377,22 @@ export function setupWebSocket(server: Server) {
       try {
         socket.write('HTTP/1.1 500 Internal Server Error\r\n\r\n');
         socket.destroy();
-      } catch (e) { /* ignore */ }
+      } catch (e) { /* ignore volontairement */ }
     }
   });
 
   wss.on("connection", (ws, request) => {
-    // Handle WebSocket errors to prevent EPIPE crashes
+    // Gère les erreurs WebSocket pour éviter les crashs EPIPE.
     ws.on('error', (err: any) => {
       if (err.code === 'ECONNRESET' || err.code === 'EPIPE' || err.code === 'ECONNREFUSED' ||
           err.message?.includes('ECONNRESET') || err.message?.includes('EPIPE')) {
-        // Ignore benign connection errors
+        // Ignore les erreurs bénignes de connexion.
         return;
       }
       logger.error({ err }, 'Connection error');
     });
 
-    // Use pre-authenticated values from upgrade handler
+    // Utilise les valeurs pré-authentifiées pendant la montée de protocole.
     const userId = (request as any).authenticatedUserId as string;
     const sessionId = (request as any).authenticatedSessionId as string;
     logger.info({ userId, sessionId: sessionId?.slice(0, 8) + '...' }, 'Connection established');
@@ -402,7 +400,7 @@ export function setupWebSocket(server: Server) {
     const userRole = (request as any).userRole as string | undefined;
 
     if (userId) {
-      // Store user metadata in WebSocket (including sessionId for heartbeat validation)
+      // Stocke les métadonnées utilisateur sur la socket.
       (ws as any).userId = userId;
       (ws as any).sessionId = sessionId;
       (ws as any).agence = userAgence;
@@ -413,12 +411,12 @@ export function setupWebSocket(server: Server) {
       }
       clients.get(userId)?.push(ws);
       
-      // Update Connection Status (Dead Man Switch)
+      // Met à jour le statut de connexion.
       storage.updateUserConnectionStatus(userId, 'CONNECTED').catch(err => {
           logger.error({ err, userId }, 'Failed to update CONNECTED status');
       });
 
-      // Notify everyone of new user presence
+      // Notifie la présence du nouvel utilisateur.
       wss.clients.forEach((client) => {
         if (client.readyState === WebSocket.OPEN) {
           client.send(JSON.stringify({
@@ -428,8 +426,7 @@ export function setupWebSocket(server: Server) {
         }
       });
 
-      // Send the list of currently online users to the newly connected user
-      // This ensures they have accurate presence info from the start
+      // Envoie la liste des utilisateurs en ligne au nouvel utilisateur connecté.
       const onlineUserIds: string[] = [];
       clients.forEach((sockets, onlineUserId) => {
         if (sockets.length > 0 && onlineUserId !== userId) {
@@ -449,7 +446,7 @@ export function setupWebSocket(server: Server) {
     ws.on("message", async (message) => {
        (ws as ExtendedWebSocket).isAlive = true;
 
-       // Rate limiting check
+       // Vérification de limitation du débit.
        if (userId) {
          const { allowed, remaining, warn } = checkRateLimit(userId);
 
@@ -483,11 +480,11 @@ export function setupWebSocket(server: Server) {
              ws.send(JSON.stringify({ type: 'PONG' }));
          }
 
-         // Session heartbeat - validates session is still active server-side
+         // Battement de session : valide que la session reste active côté serveur.
          if (data.type === 'SESSION_HEARTBEAT') {
            const sessionId = (ws as any).sessionId;
            if (sessionId) {
-             // Update session activity - proves client is responsive
+             // Met à jour l'activité de session pour confirmer que le client répond.
              updateSessionActivity(sessionId).catch(() => {});
 
              const validity = await isSessionValid(sessionId);
@@ -500,7 +497,7 @@ export function setupWebSocket(server: Server) {
                }
              }));
 
-             // If session is invalid, notify and close
+             // Si la session est invalide, notifie puis ferme la connexion.
              if (!validity.valid) {
                logger.info({ userId, sessionId, reason: validity.reason }, 'Session invalid during WS heartbeat');
                ws.send(JSON.stringify({
@@ -519,16 +516,16 @@ export function setupWebSocket(server: Server) {
            }
          }
 
-         // Handle subscription to aggregate channels
+         // Gère l'abonnement aux canaux d'agrégats.
          if (data.type === 'SUBSCRIBE') {
-           const { aggregate } = data; // e.g., 'client:uuid-xxx' or 'compte:uuid-xxx'
+           const { aggregate } = data; // Exemple : 'client:uuid-xxx' ou 'compte:uuid-xxx'.
            if (aggregate && typeof aggregate === 'string') {
              if (!subscriptions.has(aggregate)) {
                subscriptions.set(aggregate, new Set());
              }
              subscriptions.get(aggregate)?.add(ws);
              
-             // Track subscriptions on the WebSocket for cleanup
+             // Suit les abonnements sur la socket pour le nettoyage.
              if (!(ws as any).subscriptions) {
                (ws as any).subscriptions = new Set<string>();
              }
@@ -539,7 +536,7 @@ export function setupWebSocket(server: Server) {
            }
          }
 
-         // Handle unsubscription
+         // Gère le désabonnement.
          if (data.type === 'UNSUBSCRIBE') {
            const { aggregate } = data;
            if (aggregate && typeof aggregate === 'string') {
@@ -551,7 +548,7 @@ export function setupWebSocket(server: Server) {
          }
          
          if (data.type === 'TYPING') {
-           // Legacy: Forward typing status to receiver (DM only)
+           // Historique : transmet l'état de saisie au destinataire en conversation directe.
            const { receiverId, isTyping } = data.payload;
            const userSockets = clients.get(receiverId);
            if (userSockets) {
@@ -566,15 +563,15 @@ export function setupWebSocket(server: Server) {
            }
          }
 
-         // V2: Typing by conversationId (broadcast to all participants via subscription)
+         // V2 : saisie par conversationId, diffusée aux participants abonnés.
          if (data.type === 'TYPING_V2') {
            const { conversationId, isTyping } = data.payload;
-           // Broadcast to conversation subscribers
+           // Diffuse aux abonnés de la conversation.
            const channel = `conversation:${conversationId}`;
            const channelSubs = subscriptions.get(channel);
            if (channelSubs) {
              channelSubs.forEach((client) => {
-               // Don't send back to the sender
+               // Ne renvoie pas le message à l'émetteur.
                if (client.readyState === WebSocket.OPEN && (client as any).userId !== userId) {
                  client.send(JSON.stringify({
                    type: "TYPING_V2",
@@ -585,7 +582,7 @@ export function setupWebSocket(server: Server) {
            }
          }
 
-         // V2: Subscribe to a conversation (for real-time updates)
+         // V2 : abonnement à une conversation pour les mises à jour temps réel.
          if (data.type === 'SUBSCRIBE_CONVERSATION') {
            const { conversationId } = data.payload;
            if (conversationId && typeof conversationId === 'string') {
@@ -595,7 +592,7 @@ export function setupWebSocket(server: Server) {
              }
              subscriptions.get(channel)?.add(ws);
 
-             // Track subscriptions on the WebSocket for cleanup
+             // Suit les abonnements sur la socket pour le nettoyage.
              if (!(ws as any).subscriptions) {
                (ws as any).subscriptions = new Set<string>();
              }
@@ -605,7 +602,7 @@ export function setupWebSocket(server: Server) {
            }
          }
 
-         // V2: Unsubscribe from a conversation
+         // V2 : désabonnement d'une conversation.
          if (data.type === 'UNSUBSCRIBE_CONVERSATION') {
            const { conversationId } = data.payload;
            if (conversationId && typeof conversationId === 'string') {
@@ -619,7 +616,7 @@ export function setupWebSocket(server: Server) {
           if (data.type === 'LOCATION_UPDATE') {
             const { latitude, longitude, accuracy, altitude, speed, heading, batteryLevel } = data.payload;
 
-            // Broadcast to all connected clients
+            // Diffuse à tous les clients connectés.
             wss.clients.forEach((client) => {
                if (client.readyState === WebSocket.OPEN) {
                  client.send(JSON.stringify({
@@ -629,14 +626,14 @@ export function setupWebSocket(server: Server) {
                }
             });
 
-            // Persist last position to agentsTerrain
+            // Persiste la dernière position sur agentsTerrain.
             try {
                storage.updateAgentLocation(userId, String(latitude), String(longitude));
             } catch (err) {
                logger.error({ err, userId }, 'Failed to persist agent location');
             }
 
-            // Insert into agent_location_logs (throttled: max 1 insert per 10s per user)
+            // Insère dans agent_location_logs avec limitation par utilisateur.
             const now = Date.now();
             const lastInsert = locationLogThrottles.get(userId) || 0;
             if (now - lastInsert >= LOC_LOG_MIN_INTERVAL) {
@@ -655,17 +652,17 @@ export function setupWebSocket(server: Server) {
             }
           }
        } catch (e) {
-         // ignore
+         // Ignore volontairement les erreurs de parsing.
        }
     });
 
     ws.on("close", () => {
-      // Clean up subscriptions
+      // Nettoie les abonnements.
       const wsSubscriptions = (ws as any).subscriptions as Set<string> | undefined;
       if (wsSubscriptions) {
         wsSubscriptions.forEach((channel) => {
           subscriptions.get(channel)?.delete(ws);
-          // Clean up empty subscription sets
+          // Supprime les ensembles d'abonnements vides.
           if (subscriptions.get(channel)?.size === 0) {
             subscriptions.delete(channel);
           }
@@ -681,12 +678,12 @@ export function setupWebSocket(server: Server) {
         if (userSockets.length === 0) {
           clients.delete(userId);
 
-          // Update Connection Status (Dead Man Switch)
+          // Met à jour le statut de connexion.
           storage.updateUserConnectionStatus(userId, 'DISCONNECTED').catch(err => {
               logger.error({ err, userId }, 'Failed to update DISCONNECTED status');
           });
 
-          // Notify everyone of offline status
+          // Notifie le statut hors ligne.
           wss.clients.forEach((client) => {
              if (client.readyState === WebSocket.OPEN) {
                client.send(JSON.stringify({
@@ -726,13 +723,13 @@ export function setupWebSocket(server: Server) {
         if (client.readyState !== WebSocket.OPEN) return;
         const clientAgence = (client as any).agence;
         const clientRole = (client as any).role;
-        // Send to same agency OR admin users (who need visibility across all agencies)
+        // Envoie à la même agence ou aux administrateurs ayant une visibilité globale.
         if (clientAgence === agency || clientRole === SystemRole.ADMIN) {
           client.send(JSON.stringify(message));
         }
       });
     },
-    // Broadcast to all subscribers of a specific aggregate channel
+    // Diffuse à tous les abonnés d'un canal d'agrégat précis.
     broadcastToAggregate: (aggregateType: string, aggregateId: string, message: GlobalMessage) => {
       const channel = `${aggregateType}:${aggregateId}`;
       const channelSubs = subscriptions.get(channel);
@@ -744,7 +741,7 @@ export function setupWebSocket(server: Server) {
         });
       }
     },
-    // Get subscription stats (for debugging/monitoring)
+    // Retourne les statistiques d'abonnement pour diagnostic et supervision.
     getSubscriptionStats: () => {
       const stats: Record<string, number> = {};
       subscriptions.forEach((subs, channel) => {
@@ -752,14 +749,14 @@ export function setupWebSocket(server: Server) {
       });
       return stats;
     },
-    // V2: Broadcast to all subscribers of a conversation
+    // V2 : diffuse à tous les abonnés d'une conversation.
     broadcastToConversation: (conversationId: string, message: GlobalMessage, excludeUserId?: string) => {
       const channel = `conversation:${conversationId}`;
       const channelSubs = subscriptions.get(channel);
       if (channelSubs) {
         channelSubs.forEach((client) => {
           if (client.readyState === WebSocket.OPEN) {
-            // Optionally exclude a specific user (e.g., the sender)
+            // Exclut éventuellement un utilisateur précis, par exemple l'émetteur.
             if (excludeUserId && (client as any).userId === excludeUserId) {
               return;
             }

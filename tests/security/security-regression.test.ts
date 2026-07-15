@@ -28,6 +28,19 @@ const FINANCE_ROUTE_FILES = readdirSync(join(ROOT, "routes/finance"))
   .map((f) => `routes/finance/${f}`);
 
 /**
+ * Concatène tous les .ts d'un dossier (récursif). Les invariants sécurité qui
+ * ciblaient d'anciens monolithes balaient ainsi l'ensemble de leurs
+ * sous-modules — résilient aux découpages de la règle des 400 lignes.
+ */
+const readDirConcat = (relDir: string): string => {
+  const abs = join(ROOT, relDir);
+  return (readdirSync(abs, { recursive: true }) as string[])
+    .filter((f) => typeof f === "string" && f.endsWith(".ts"))
+    .map((f) => readFileSync(join(abs, f), "utf-8"))
+    .join("\n");
+};
+
+/**
  * Recursively collect all .ts files under a directory (excluding node_modules, __tests__, .d.ts)
  */
 function collectTsFiles(dir: string): string[] {
@@ -144,7 +157,8 @@ describe("Guard coverage — Key files use guards", () => {
   });
 
   it("finance.ts should import coffre guards for disbursement functions", () => {
-    const content = readFileSync(join(ROOT, "storage/finance.ts"), "utf-8");
+    // storage/finance.ts est un baril : les guards vivent dans ses sous-modules
+    const content = readDirConcat("storage/finance");
     expect(content).toContain("assertCoffreCanDebit");
     expect(content).toContain("assertCoffreCanCredit");
     expect(content).toContain("updateCoffreBalance");
@@ -178,7 +192,8 @@ describe("Broadcast coverage — Balance updates are broadcast", () => {
   });
 
   it("finance.ts should broadcast coffre balance updates", () => {
-    const content = readFileSync(join(ROOT, "storage/finance.ts"), "utf-8");
+    // storage/finance.ts est un baril : les broadcasts vivent dans ses sous-modules
+    const content = readDirConcat("storage/finance");
     expect(content).toContain("balanceService.broadcastBalanceUpdate");
   });
 
@@ -213,7 +228,8 @@ describe("Error handling — Routes catch guard errors", () => {
 describe("Session fixation — Session regeneration on login", () => {
 
   it("auth routes should call session.regenerate before setting session data on login", () => {
-    const content = readFileSync(join(ROOT, "routes/auth.ts"), "utf-8");
+    // Le login vit dans routes/auth/core.ts depuis le découpage 400 lignes
+    const content = readFileSync(join(ROOT, "routes/auth/core.ts"), "utf-8");
     const regenerateIdx = content.indexOf("req.session.regenerate");
     const setUserIdx = content.indexOf("req.session.userId = user.id");
     // regenerate must appear BEFORE the first session assignment
@@ -301,7 +317,7 @@ describe("Authentication — All reevaluation endpoints require auth", () => {
 describe("Open redirect — Storage route rejects external URLs", () => {
 
   it("storage file route should not redirect to external URLs", () => {
-    const content = readFileSync(join(ROOT, "routes/storage.ts"), "utf-8");
+    const content = readFileSync(join(ROOT, "routes/storage/public.ts"), "utf-8");
     // Should NOT contain res.redirect(key) for user-supplied keys
     expect(content).not.toMatch(/res\.redirect\(key\)/);
     expect(content).not.toMatch(/res\.redirect\(rawKey\)/);
@@ -315,7 +331,7 @@ describe("Open redirect — Storage route rejects external URLs", () => {
 describe("Debug logging — No console.log in webhook handlers", () => {
 
   it("payments.ts should not contain console.log", () => {
-    const content = readFileSync(join(ROOT, "routes/payments.ts"), "utf-8");
+    const content = readFileSync(join(ROOT, "routes/payments/webhooks.ts"), "utf-8");
     expect(content).not.toMatch(/console\.log/);
   });
 });
@@ -441,7 +457,8 @@ describe("Password policy — Minimum length >= 12", () => {
 describe("Session timeout — Aligned with ABSOLUTE_TIMEOUT_MS", () => {
 
   it("login flow should use SESSION_CONFIG.ABSOLUTE_TIMEOUT_MS for session tracking", () => {
-    const content = readFileSync(join(ROOT, "routes/auth.ts"), "utf-8");
+    // Balaye tous les sous-modules auth (login dans core.ts, refresh dans refresh.ts)
+    const content = readDirConcat("routes/auth");
     // Should NOT have hardcoded 24h in session tracking
     expect(content).not.toMatch(/expiresAt.*24 \* 60 \* 60 \* 1000/);
     expect(content).toContain("SESSION_CONFIG.ABSOLUTE_TIMEOUT_MS");
@@ -474,7 +491,7 @@ describe("CSRF — Origin/Referer validation middleware", () => {
 describe("File upload — Ownership verification", () => {
 
   it("storage entity upload should check user authorization", () => {
-    const content = readFileSync(join(ROOT, "routes/storage.ts"), "utf-8");
+    const content = readFileSync(join(ROOT, "routes/storage/entities.ts"), "utf-8");
     const uploadSection = content.substring(content.indexOf("entity/upload"));
     expect(uploadSection).toContain("isPrivileged");
     expect(uploadSection).toContain("ability");
@@ -495,14 +512,14 @@ describe("Math.random() elimination — Server-side references and IDs", () => {
     "routes/accounting.ts",
     "services/coffre/transfert-service.ts",
     "services/coffre/transfer-executor.ts",
-    "services/caisse/session-opening-service.ts",
+    "services/caisse/session-opening-direct.ts",
     "services/ledger.ts",
     "services/prospection-prime-service.ts",
     "services/hr-accounting-service.ts",
     "services/financial-monitoring-service.ts",
     "services/agency-migration.ts",
     "services/caisse-agent/operation-service.ts",
-    "services/transfert-inter-coffres/transfert-service.ts",
+    "services/transfert-inter-coffres/transfert-creation.ts",
     "services/hr-import-service.ts",
     "storage/operations.ts",
     "storage/tontines.ts",
@@ -649,21 +666,21 @@ describe("Decimal precision — money.ts utility functions", () => {
     // Sum must equal exactly 1000 (no floating-point loss)
     const sum = parts.reduce((acc, p) => acc.plus(p), D(0));
     expect(sum.toNumber()).toBe(1000);
-    // First two parts = 333.33, last = 333.34
+    // Les deux premières parts valent 333.33, la dernière vaut 333.34.
     expect(parts[0].toNumber()).toBe(333.33);
     expect(parts[1].toNumber()).toBe(333.33);
     expect(parts[2].toNumber()).toBe(333.34);
   });
 
   it("Decimal division then multiplication should not lose precision (unlike float)", () => {
-    // Classic float failure: 0.1 + 0.2 !== 0.3 with Number
+    // Échec classique des flottants : 0.1 + 0.2 !== 0.3 avec Number.
     const floatResult = 0.1 + 0.2;
-    expect(floatResult).not.toBe(0.3); // float fails (gives 0.30000000000000004)
+    expect(floatResult).not.toBe(0.3); // Le flottant donne 0.30000000000000004.
 
-    // Decimal should preserve precision through splitEvenly
+    // Decimal conserve la précision avec splitEvenly.
     const parts = splitEvenly(D("1000"), 3);
     const decimalSum = parts.reduce((acc, p) => acc.plus(p), D(0));
-    expect(decimalSum.eq(1000)).toBe(true); // Decimal succeeds
+    expect(decimalSum.eq(1000)).toBe(true); // Decimal conserve le total.
   });
 });
 
@@ -673,10 +690,11 @@ describe("Decimal precision — critical files use Decimal imports", () => {
     "services/interest-scheduler.ts",
     "services/repayment-allocation-service.ts",
     "services/credit-allocation-service.ts",
-    "storage/finance.ts",
+    // storage/finance.ts est un baril : le calcul monétaire vit dans misc.ts
+    "storage/finance/misc.ts",
     "routes/finance/credit-plans.ts",
     "routes/finance/sessions-caisse-request-opening.ts",
-    "routes/config.ts",
+    "routes/config-credit-durations.ts",
   ];
 
   it("all critical financial files should import from money.ts", () => {
@@ -688,10 +706,15 @@ describe("Decimal precision — critical files use Decimal imports", () => {
   });
 
   it("schedule generation should not use raw toFixed(2) for installment amounts", () => {
-    // storage/finance.ts et les sous-modules d'échéancier doivent utiliser roundMoney/splitEvenly
-    for (const relPath of ["storage/finance.ts", "routes/finance/credit-plans.ts", "routes/finance/sessions-caisse-request-opening.ts"]) {
-      const content = readFileSync(join(ROOT, relPath), "utf-8");
-      // Should not have the old pattern: capitalPerInstallment.toFixed(2)
+    // Tous les sous-modules finance (storage) + les routes d'échéancier
+    // doivent utiliser roundMoney/splitEvenly, jamais toFixed(2) direct.
+    const contents = [
+      readDirConcat("storage/finance"),
+      readFileSync(join(ROOT, "routes/finance/credit-plans.ts"), "utf-8"),
+      readFileSync(join(ROOT, "routes/finance/sessions-caisse-request-opening.ts"), "utf-8"),
+    ];
+    for (const content of contents) {
+      // Ne doit pas réintroduire l'ancien arrondi direct par toFixed(2).
       expect(content).not.toMatch(/capitalPerInstallment\.toFixed/);
       expect(content).not.toMatch(/interestPerInstallment\.toFixed/);
       expect(content).not.toMatch(/installmentAmount\.toFixed/);

@@ -21,7 +21,6 @@ import {
   type OfflineLimits,
   type JournalEventType,
 } from './offline-db';
-import { verifyHmac } from './offline-crypto';
 import {
   appendJournalEntry,
   generateOperationRef,
@@ -205,11 +204,11 @@ export async function canExecuteOffline(
     return { allowed: false, reason: 'NO_LIMITS', details: 'Offline limits not configured. Sync required.' };
   }
 
-  // 1. Verify limits integrity (server signature)
-  const { serverSignature, ...limitsData } = limits;
-  const signatureValid = await verifyHmac(JSON.stringify(limitsData), serverSignature);
-  if (!signatureValid) {
-    return { allowed: false, reason: 'LIMITS_TAMPERED', details: 'Offline limits signature invalid. Sync required.' };
+  // 1. Validation structurelle des limites stockées. L'application réelle
+  // des plafonds est faite par le serveur au rejeu du journal — un client
+  // qui altère ses limites locales verra ses opérations rejetées à la sync.
+  if (!isStructurallyValidLimits(limits)) {
+    return { allowed: false, reason: 'LIMITS_INVALID', details: 'Offline limits malformed. Sync required.' };
   }
 
   // 2. Check allowed operation types
@@ -429,25 +428,58 @@ export async function getReconciliationSummary(agentId: string): Promise<{
 // ========== LIMITS UPDATE ==========
 
 /**
+ * Validation structurelle des limites reçues du serveur.
+ *
+ * Modèle de menace : le client ne peut PAS vérifier cryptographiquement les
+ * limites — un secret HMAC partagé embarqué dans un bundle public serait
+ * forgeable par n'importe qui (l'ancienne vérification était de toute façon
+ * inopérante : la clé n'était jamais initialisée, 100 % des mises à jour
+ * étaient rejetées). L'intégrité en transit est garantie par TLS + session
+ * authentifiée ; l'application RÉELLE des plafonds est faite par le serveur
+ * au rejeu du journal (apps/api/routes/sync-journal/journal.ts). Le contrôle
+ * client reste un garde-fou UX pour éviter de saisir des opérations vouées
+ * au rejet.
+ */
+function isStructurallyValidLimits(limits: OfflineLimits): boolean {
+  const positiveNumbers: Array<number | undefined> = [
+    limits.maxCaisseBalance,
+    limits.maxSingleOperation,
+    limits.maxDailyOperations,
+    limits.maxDailyVolume,
+    limits.maxOfflineDays,
+    limits.maxPendingSync,
+  ];
+  return (
+    positiveNumbers.every(v => typeof v === 'number' && Number.isFinite(v) && v > 0) &&
+    Array.isArray(limits.allowedOperationTypes) &&
+    limits.allowedOperationTypes.length > 0 &&
+    typeof limits.lastUpdated === 'number' &&
+    typeof limits.serverSignature === 'string' &&
+    limits.serverSignature.length > 0
+  );
+}
+
+/**
  * Update offline limits from server (during sync handshake).
- * Validates the server signature before storing.
+ * Reçues via TLS sur une session authentifiée ; validation structurelle
+ * avant stockage (voir modèle de menace ci-dessus).
  */
 export async function updateOfflineLimits(
   limits: OfflineLimits
 ): Promise<boolean> {
-  // Verify server signature
-  const { serverSignature, id, ...limitsData } = limits;
-  const signatureValid = await verifyHmac(
-    JSON.stringify({ ...limitsData, lastUpdated: limits.lastUpdated }),
-    serverSignature
-  );
-
-  if (!signatureValid) {
-    console.warn('[OfflineTreasury] Invalid server signature on limits. Rejecting update.');
+  if (!isStructurallyValidLimits(limits)) {
+    console.warn('[OfflineTreasury] Limites serveur malformées. Mise à jour rejetée.');
     return false;
   }
 
-  // Store (or update) limits
+  // Anti-rejeu : ne jamais remplacer par des limites plus anciennes
+  const existing = await db.offlineLimits.get('current');
+  if (existing && limits.lastUpdated < existing.lastUpdated) {
+    console.warn('[OfflineTreasury] Limites plus anciennes que les limites locales. Mise à jour ignorée.');
+    return false;
+  }
+
+  // Store (or update) limits — serverSignature conservée (opaque) pour audit serveur
   await db.offlineLimits.put({ ...limits, id: 'current' });
   return true;
 }

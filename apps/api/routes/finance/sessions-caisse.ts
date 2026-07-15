@@ -27,8 +27,8 @@ import { normalizeKeysDeep, coerceValueToSchema } from "../utils";
 import { getWsInstance } from "../../ws-server";
 import { eq, desc, and, sql, count, inArray } from "drizzle-orm";
 import * as sessionService from "../../services/caisse/session-service";
-import { sessionOpeningService } from "../../services/caisse/session-opening-service";
-import { sessionClosingService } from "../../services/caisse/session-closing-service";
+import { getPendingSession } from "../../services/caisse/session-opening-queries";
+import { getClosingSessionsForAgence } from "../../services/caisse/session-closing-queries";
 import { isIncomingOperation, isOutgoingOperation, getOperationDelta, CAISSE_IN_OPERATIONS } from "@shared/config/caisse-operations";
 import { logger } from "./shared";
 
@@ -90,7 +90,7 @@ export function registerSessionsCaisseRoutes(app: Express) {
       return res.status(400).json({ message: "L'agence est requise" });
     }
 
-    const sessions = await sessionClosingService.getClosingSessionsForAgence(agenceId);
+    const sessions = await getClosingSessionsForAgence(agenceId);
     res.json(sessions);
   });
 
@@ -104,7 +104,7 @@ export function registerSessionsCaisseRoutes(app: Express) {
    */
   app.get("/api/sessions-caisse/pending", requireAuth, async (req, res) => {
     const user = req.session.user!;
-    const session = await sessionOpeningService.getPendingSession(user.id);
+    const session = await getPendingSession(user.id);
     res.json(session || null);
   });
 

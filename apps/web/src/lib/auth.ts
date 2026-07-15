@@ -1,5 +1,5 @@
 import { authApi, AuthUser, setOnUnauthorized, ApiError } from './api-client';
-import { initEncryptionKey, clearEncryptionKey, clearSigningKey, clearHmacKey } from './offline-crypto';
+import { initEncryptionKey, clearEncryptionKey, clearSigningKey } from './offline-crypto';
 import { initializeDeviceKey, teardownDeviceKey } from './device-key-manager';
 import { SystemRole, hasRole as hasSystemRole } from '@shared/types/roles';
 import { StatutUser } from '@shared/enum/status-constants';
@@ -121,7 +121,6 @@ class AuthService {
     this.stopSessionCheck();
     clearEncryptionKey();
     clearSigningKey();
-    clearHmacKey();
     teardownDeviceKey();
 
     // Nettoyer l'ancien localStorage (migration)

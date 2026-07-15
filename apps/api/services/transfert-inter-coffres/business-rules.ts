@@ -8,6 +8,7 @@ import {
 import { eq, and, isNull } from "drizzle-orm";
 import { currencySymbol } from "@shared/config/currency";
 import { SystemRole } from "@shared/types/roles";
+import { TypeConditionnement } from "@shared/enum/status-constants";
 
 export interface ValidationResult {
   valid: boolean;
@@ -267,7 +268,7 @@ export class TransfertInterCoffresValidator {
     }
 
     // RG-009: Numéro de scellé obligatoire si sac scellé
-    if (data.typeConditionnement === "Sac scellé" && !data.numeroScelle) {
+    if (data.typeConditionnement === TypeConditionnement.SAC_SCELLE && !data.numeroScelle) {
       return { valid: false, errorCode: "TIC_009", error: "Le numéro de scellé est obligatoire pour un sac scellé" };
     }
 

@@ -1,4 +1,4 @@
-import { pgTable, pgEnum, text, timestamp, jsonb, index, uuid } from "drizzle-orm/pg-core";
+import { pgTable, pgEnum, text, timestamp, jsonb, index, uuid, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { users } from "./auth";
@@ -51,6 +51,42 @@ export const deviceKeys = pgTable("device_keys", {
 export const insertDeviceKeySchema = createInsertSchema(deviceKeys);
 export type InsertDeviceKey = z.infer<typeof insertDeviceKeySchema>;
 export type DeviceKey = typeof deviceKeys.$inferSelect;
+
+// ========== DEVICE SYNC STATES TABLE ==========
+
+/**
+ * État de synchronisation déclaré par chaque appareil offline.
+ *
+ * Le client annonce son nombre d'opérations en attente au handshake
+ * (pendingCount) puis après chaque lot uploadé (remainingPending).
+ * Ces déclarations alimentent le compteur « opérations offline en
+ * attente » de l'écran KPI : tant qu'il est non nul, les indicateurs
+ * temps réel sont potentiellement incomplets.
+ *
+ * Une ligne par appareil (clé = empreinte de l'appareil).
+ */
+export const deviceSyncStates = pgTable("device_sync_states", {
+  deviceId: text("device_id").primaryKey(),
+
+  agentId: uuid("agent_id").notNull().references(() => users.id),
+  /** Agence de rattachement au dernier contact (scoping des agrégats) */
+  agenceId: uuid("agence_id"),
+
+  /** Opérations en attente déclarées par l'appareil (dernier rapport) */
+  reportedPendingCount: integer("reported_pending_count").notNull().default(0),
+
+  lastHandshakeAt: timestamp("last_handshake_at"),
+  lastUploadAt: timestamp("last_upload_at"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_dss_agent").on(table.agentId),
+  index("idx_dss_agence").on(table.agenceId),
+  index("idx_dss_pending").on(table.reportedPendingCount),
+]);
+
+export const insertDeviceSyncStateSchema = createInsertSchema(deviceSyncStates);
+export type InsertDeviceSyncState = z.infer<typeof insertDeviceSyncStateSchema>;
+export type DeviceSyncState = typeof deviceSyncStates.$inferSelect;
 
 // ========== OFFLINE JOURNAL ENTRIES TABLE ==========
 

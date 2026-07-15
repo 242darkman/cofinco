@@ -1,7 +1,9 @@
 /**
  * KPI Hooks — React Query hooks for KPI data
  */
+import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useWebSocket } from './useWebSocket';
 
 const KPI_STALE_TIME = 5 * 60 * 1000; // 5 min
 
@@ -33,6 +35,53 @@ export function useKpiSnapshot(periodType: string, periodKey: string, scope?: st
     },
     staleTime: KPI_STALE_TIME,
     enabled: !!periodKey,
+  });
+}
+
+export interface KpiSeriesPoint {
+  periodKey: string;
+  generatedAt: string;
+  metrics: Record<string, number>;
+}
+
+/**
+ * Séries temporelles compactes (12 dernières périodes) pour les sparklines.
+ * L'agence est résolue côté serveur (header X-Agence-Id / agence de
+ * l'utilisateur), comme pour le snapshot ; `scope` ne sert qu'à la clé de
+ * cache. Invalidée par le rafraîchissement temps réel (préfixe ['kpi']).
+ */
+export function useKpiSeries(periodType: string, scope?: string) {
+  const apiPeriodType = toApiPeriodType(periodType);
+  return useQuery<{ data: KpiSeriesPoint[] }>({
+    queryKey: ['kpi', 'series', apiPeriodType, scope],
+    queryFn: async () => {
+      const params = new URLSearchParams({ periodType: apiPeriodType });
+      const res = await fetch(`/api/kpi/series?${params}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Erreur chargement séries KPI');
+      return res.json();
+    },
+    staleTime: KPI_STALE_TIME,
+  });
+}
+
+import type { PendingSyncSummary } from '@shared/types/offline-sync';
+
+/**
+ * Opérations offline en attente de synchronisation (scope courant).
+ * Un total non nul signifie que les indicateurs affichés sont
+ * potentiellement incomplets. Rafraîchi périodiquement : les appareils
+ * hors ligne ne génèrent pas d'événement temps réel par définition.
+ */
+export function useOfflinePendingSummary(scope?: string) {
+  return useQuery<{ data: PendingSyncSummary }>({
+    queryKey: ['kpi', 'offline-pending', scope],
+    queryFn: async () => {
+      const res = await fetch('/api/kpi/offline-pending', { credentials: 'include' });
+      if (!res.ok) throw new Error('Erreur chargement opérations en attente');
+      return res.json();
+    },
+    staleTime: 60 * 1000,
+    refetchInterval: 2 * 60 * 1000,
   });
 }
 
@@ -68,4 +117,34 @@ export function useKpiRecalculate() {
       queryClient.invalidateQueries({ queryKey: ['kpi'] });
     },
   });
+}
+
+/**
+ * Rafraîchissement temps réel : écoute les événements WebSocket `kpi`
+ * diffusés par le worker serveur après chaque recalcul de snapshot,
+ * et invalide le cache TanStack Query correspondant.
+ *
+ * À monter sur toute page affichant des KPI (ex. KpiDashboard).
+ */
+export function useKpiRealtimeRefresh() {
+  const { socket } = useWebSocket();
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleMessage = (event: MessageEvent) => {
+      try {
+        const message = JSON.parse(event.data);
+        if (message.type === 'REALTIME_EVENT' && message.payload?.aggregateType === 'kpi') {
+          queryClient.invalidateQueries({ queryKey: ['kpi'] });
+        }
+      } catch {
+        // Message non-JSON : ignorer
+      }
+    };
+
+    socket.addEventListener('message', handleMessage);
+    return () => socket.removeEventListener('message', handleMessage);
+  }, [socket, queryClient]);
 }

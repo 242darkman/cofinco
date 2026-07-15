@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { StatutCoffre } from '@shared/enum/status-constants';
+import { StatutCoffre, TypeConditionnement, type TypeConditionnementType, TYPE_CONDITIONNEMENT_OPTIONS, getTypeConditionnementLabel } from '@shared/enum/status-constants';
 import {
   X,
   Vault,
@@ -53,7 +53,7 @@ export default function TransfertInterCoffresForm({
   const [coffreDestinationId, setCoffreDestinationId] = useState('');
   const [montant, setMontant] = useState('');
   const [motif, setMotif] = useState('');
-  const [typeConditionnement, setTypeConditionnement] = useState('Sac scellé');
+  const [typeConditionnement, setTypeConditionnement] = useState<TypeConditionnementType>(TypeConditionnement.SAC_SCELLE);
   const [numeroScelle, setNumeroScelle] = useState('');
   const [dateTransfert, setDateTransfert] = useState(new Date().toISOString().split('T')[0]);
   const [heureDepart, setHeureDepart] = useState('');
@@ -157,7 +157,7 @@ export default function TransfertInterCoffresForm({
 
     if (!motif || motif.trim().length < 10) newErrors.motif = 'Le motif doit contenir au moins 10 caractères';
 
-    if (typeConditionnement === 'Sac scellé' && !numeroScelle) {
+    if (typeConditionnement === TypeConditionnement.SAC_SCELLE && !numeroScelle) {
       newErrors.numeroScelle = 'Le numéro de scellé est obligatoire pour un sac scellé';
     }
 
@@ -199,7 +199,7 @@ export default function TransfertInterCoffresForm({
           devise: currencyCode(),
           motif: motif.trim(),
           typeConditionnement,
-          numeroScelle: typeConditionnement === 'Sac scellé' ? numeroScelle : undefined,
+          numeroScelle: typeConditionnement === TypeConditionnement.SAC_SCELLE ? numeroScelle : undefined,
           dateTransfert,
           heureDepart: heureDepart || undefined,
           agentsTransport: validAgents,
@@ -432,24 +432,24 @@ export default function TransfertInterCoffresForm({
               <div className="space-y-2">
                 <label className="text-xs font-medium text-content-muted uppercase">Type de conditionnement *</label>
                 <div className="grid grid-cols-2 gap-2">
-                  {['Sac scellé', 'Mallette', 'Enveloppe', 'Autre'].map((type) => (
+                  {TYPE_CONDITIONNEMENT_OPTIONS.map(({ value, label }) => (
                     <button
-                      key={type}
+                      key={value}
                       type="button"
-                      onClick={() => setTypeConditionnement(type)}
+                      onClick={() => setTypeConditionnement(value)}
                       className={`px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                        typeConditionnement === type
+                        typeConditionnement === value
                           ? 'bg-accent/10 text-accent border border-accent/50'
                           : 'bg-surface text-content-muted border border-edge hover:border-edge-strong'
                       }`}
                     >
-                      {type}
+                      {label}
                     </button>
                   ))}
                 </div>
               </div>
 
-              {typeConditionnement === 'Sac scellé' && (
+              {typeConditionnement === TypeConditionnement.SAC_SCELLE && (
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-content-muted uppercase">Numéro de scellé *</label>
                   <input
@@ -537,7 +537,7 @@ export default function TransfertInterCoffresForm({
               </div>
               <div className="text-2xl font-bold text-content-primary">{formatMoney(parseFloat(montant))}</div>
               <div className="text-xs text-content-muted">
-                Conditionnement: {typeConditionnement}
+                Conditionnement: {getTypeConditionnementLabel(typeConditionnement)}
                 {numeroScelle && ` - Scellé: ${numeroScelle}`}
               </div>
             </section>

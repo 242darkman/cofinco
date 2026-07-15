@@ -29,9 +29,9 @@ import { clients } from '@shared/schema/clients';
 import {
   validateReevaluationCreation,
   checkEligibilityQuick,
-  CreateReevaluationPayload,
   REEVALUATION_RULES
 } from './reevaluation-validator';
+import type { CreateReevaluationPayload } from './reevaluation-validation-types';
 import {
   StatutDemande,
   StatutReevaluation,
