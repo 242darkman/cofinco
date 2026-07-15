@@ -28,6 +28,19 @@ const FINANCE_ROUTE_FILES = readdirSync(join(ROOT, "routes/finance"))
   .map((f) => `routes/finance/${f}`);
 
 /**
+ * Concatène tous les .ts d'un dossier (récursif). Les invariants sécurité qui
+ * ciblaient d'anciens monolithes balaient ainsi l'ensemble de leurs
+ * sous-modules — résilient aux découpages de la règle des 400 lignes.
+ */
+const readDirConcat = (relDir: string): string => {
+  const abs = join(ROOT, relDir);
+  return (readdirSync(abs, { recursive: true }) as string[])
+    .filter((f) => typeof f === "string" && f.endsWith(".ts"))
+    .map((f) => readFileSync(join(abs, f), "utf-8"))
+    .join("\n");
+};
+
+/**
  * Recursively collect all .ts files under a directory (excluding node_modules, __tests__, .d.ts)
  */
 function collectTsFiles(dir: string): string[] {
@@ -144,7 +157,8 @@ describe("Guard coverage — Key files use guards", () => {
   });
 
   it("finance.ts should import coffre guards for disbursement functions", () => {
-    const content = readFileSync(join(ROOT, "storage/finance.ts"), "utf-8");
+    // storage/finance.ts est un baril : les guards vivent dans ses sous-modules
+    const content = readDirConcat("storage/finance");
     expect(content).toContain("assertCoffreCanDebit");
     expect(content).toContain("assertCoffreCanCredit");
     expect(content).toContain("updateCoffreBalance");
@@ -178,7 +192,8 @@ describe("Broadcast coverage — Balance updates are broadcast", () => {
   });
 
   it("finance.ts should broadcast coffre balance updates", () => {
-    const content = readFileSync(join(ROOT, "storage/finance.ts"), "utf-8");
+    // storage/finance.ts est un baril : les broadcasts vivent dans ses sous-modules
+    const content = readDirConcat("storage/finance");
     expect(content).toContain("balanceService.broadcastBalanceUpdate");
   });
 
@@ -213,7 +228,8 @@ describe("Error handling — Routes catch guard errors", () => {
 describe("Session fixation — Session regeneration on login", () => {
 
   it("auth routes should call session.regenerate before setting session data on login", () => {
-    const content = readFileSync(join(ROOT, "routes/auth.ts"), "utf-8");
+    // Le login vit dans routes/auth/core.ts depuis le découpage 400 lignes
+    const content = readFileSync(join(ROOT, "routes/auth/core.ts"), "utf-8");
     const regenerateIdx = content.indexOf("req.session.regenerate");
     const setUserIdx = content.indexOf("req.session.userId = user.id");
     // regenerate must appear BEFORE the first session assignment
@@ -441,7 +457,8 @@ describe("Password policy — Minimum length >= 12", () => {
 describe("Session timeout — Aligned with ABSOLUTE_TIMEOUT_MS", () => {
 
   it("login flow should use SESSION_CONFIG.ABSOLUTE_TIMEOUT_MS for session tracking", () => {
-    const content = readFileSync(join(ROOT, "routes/auth.ts"), "utf-8");
+    // Balaye tous les sous-modules auth (login dans core.ts, refresh dans refresh.ts)
+    const content = readDirConcat("routes/auth");
     // Should NOT have hardcoded 24h in session tracking
     expect(content).not.toMatch(/expiresAt.*24 \* 60 \* 60 \* 1000/);
     expect(content).toContain("SESSION_CONFIG.ABSOLUTE_TIMEOUT_MS");
@@ -673,7 +690,8 @@ describe("Decimal precision — critical files use Decimal imports", () => {
     "services/interest-scheduler.ts",
     "services/repayment-allocation-service.ts",
     "services/credit-allocation-service.ts",
-    "storage/finance.ts",
+    // storage/finance.ts est un baril : le calcul monétaire vit dans misc.ts
+    "storage/finance/misc.ts",
     "routes/finance/credit-plans.ts",
     "routes/finance/sessions-caisse-request-opening.ts",
     "routes/config-credit-durations.ts",
@@ -688,9 +706,14 @@ describe("Decimal precision — critical files use Decimal imports", () => {
   });
 
   it("schedule generation should not use raw toFixed(2) for installment amounts", () => {
-    // storage/finance.ts et les sous-modules d'échéancier doivent utiliser roundMoney/splitEvenly
-    for (const relPath of ["storage/finance.ts", "routes/finance/credit-plans.ts", "routes/finance/sessions-caisse-request-opening.ts"]) {
-      const content = readFileSync(join(ROOT, relPath), "utf-8");
+    // Tous les sous-modules finance (storage) + les routes d'échéancier
+    // doivent utiliser roundMoney/splitEvenly, jamais toFixed(2) direct.
+    const contents = [
+      readDirConcat("storage/finance"),
+      readFileSync(join(ROOT, "routes/finance/credit-plans.ts"), "utf-8"),
+      readFileSync(join(ROOT, "routes/finance/sessions-caisse-request-opening.ts"), "utf-8"),
+    ];
+    for (const content of contents) {
       // Ne doit pas réintroduire l'ancien arrondi direct par toFixed(2).
       expect(content).not.toMatch(/capitalPerInstallment\.toFixed/);
       expect(content).not.toMatch(/interestPerInstallment\.toFixed/);

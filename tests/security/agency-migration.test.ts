@@ -12,13 +12,27 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "fs";
+import { readFileSync, readdirSync } from "fs";
 import { resolve, join } from "path";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (relPath: string) => readFileSync(join(ROOT, relPath), "utf-8");
 
-const migrationService = read("apps/api/services/agency-migration.ts");
+/**
+ * Concatène tous les .ts d'un dossier (récursif). agency-migration.ts est un
+ * baril depuis le découpage 400 lignes : les invariants sécurité balaient
+ * l'ensemble des sous-modules (execution, execution-donnees,
+ * execution-tresorerie, checks, checks-integrite, rollback, helpers...).
+ */
+const readDirConcat = (relDir: string): string => {
+  const abs = join(ROOT, relDir);
+  return (readdirSync(abs, { recursive: true }) as string[])
+    .filter((f) => typeof f === "string" && f.endsWith(".ts"))
+    .map((f) => readFileSync(join(abs, f), "utf-8"))
+    .join("\n");
+};
+
+const migrationService = readDirConcat("apps/api/services/agency-migration");
 const settingsRoute = read("apps/api/routes/settings.ts");
 const agencesRoute = read("apps/api/routes/agences/agences-migrations.ts");
 const wsServer = read("apps/api/ws-server.ts");
@@ -253,7 +267,8 @@ describe("Migration Pre-Flight Checks", () => {
 describe("Migration Rollback", () => {
 
   it("should have rollbackMigration method", () => {
-    expect(migrationService).toContain("async rollbackMigration(");
+    // Fonction exportée depuis le découpage (anciennement méthode de classe)
+    expect(migrationService).toContain("async function rollbackMigration(");
   });
 
   it("should verify migration status is COMPLETED before rollback", () => {
@@ -268,18 +283,14 @@ describe("Migration Rollback", () => {
 
   it("should use advisory lock in rollback transaction", () => {
     // Rollback should also acquire advisory lock
-    const rollbackSection = migrationService.slice(
-      migrationService.indexOf("async rollbackMigration("),
-      migrationService.indexOf("// MÉTHODES UTILITAIRES")
-    );
+    // rollback.ts est le module dédié depuis le découpage 400 lignes
+    const rollbackSection = read("apps/api/services/agency-migration/rollback.ts");
     expect(rollbackSection).toContain("pg_advisory_xact_lock");
   });
 
   it("should reverse treasury with coffre-guards", () => {
-    const rollbackSection = migrationService.slice(
-      migrationService.indexOf("async rollbackMigration("),
-      migrationService.indexOf("// MÉTHODES UTILITAIRES")
-    );
+    // rollback.ts est le module dédié depuis le découpage 400 lignes
+    const rollbackSection = read("apps/api/services/agency-migration/rollback.ts");
     expect(rollbackSection).toContain("assertCoffreCanDebit");
     expect(rollbackSection).toContain("assertCoffreCanCredit");
     expect(rollbackSection).toContain("updateCoffreBalance");
@@ -291,10 +302,8 @@ describe("Migration Rollback", () => {
   });
 
   it("should reverse entities in correct FK-safe order", () => {
-    const rollbackSection = migrationService.slice(
-      migrationService.indexOf("async rollbackMigration("),
-      migrationService.indexOf("// MÉTHODES UTILITAIRES")
-    );
+    // rollback.ts est le module dédié depuis le découpage 400 lignes
+    const rollbackSection = read("apps/api/services/agency-migration/rollback.ts");
     // Should have reverseOrder array with children before parents
     expect(rollbackSection).toContain("reverseOrder");
     // CLIENT should be after COMPTE in the reverse order
@@ -304,18 +313,14 @@ describe("Migration Rollback", () => {
   });
 
   it("should restore source agency to ACTIVE after rollback", () => {
-    const rollbackSection = migrationService.slice(
-      migrationService.indexOf("async rollbackMigration("),
-      migrationService.indexOf("// MÉTHODES UTILITAIRES")
-    );
+    // rollback.ts est le module dédié depuis le découpage 400 lignes
+    const rollbackSection = read("apps/api/services/agency-migration/rollback.ts");
     expect(rollbackSection).toContain("AGENCY_MIGRATION_MODE.ACTIVE");
   });
 
   it("should set migration status to ROLLED_BACK", () => {
-    const rollbackSection = migrationService.slice(
-      migrationService.indexOf("async rollbackMigration("),
-      migrationService.indexOf("// MÉTHODES UTILITAIRES")
-    );
+    // rollback.ts est le module dédié depuis le découpage 400 lignes
+    const rollbackSection = read("apps/api/services/agency-migration/rollback.ts");
     expect(rollbackSection).toContain("MIGRATION_STATUS.ROLLED_BACK");
   });
 });
