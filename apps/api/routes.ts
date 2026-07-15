@@ -2,6 +2,12 @@ import type { Express } from "express";
 import { createLogger } from "./lib/logger";
 import { registerAuthCoreRoutes } from "./routes/auth/core";
 import { registerAuthProfileRoutes } from "./routes/auth/profile";
+import { registerAuthSessionRoutes } from "./routes/auth/session";
+import { registerAuthRefreshRoutes } from "./routes/auth/refresh";
+import { registerAuthPasswordResetRoutes } from "./routes/auth/password-reset";
+import { registerAuthPinRoutes } from "./routes/auth/pin";
+import { registerAuthActiveSessionsRoutes } from "./routes/auth/sessions-actives";
+import { registerAuthAgencyRoutes } from "./routes/auth/agences-roles";
 import { registerUsersRoutes } from "./routes/users";
 import { registerUsersPermissionsRoutes } from "./routes/users-permissions";
 import { registerUsersRolesRoutes } from "./routes/users-roles";
@@ -121,7 +127,13 @@ export function registerRoutes(app: Express): Server {
 
   // Register modular routes
   registerAuthCoreRoutes(app);
+  registerAuthSessionRoutes(app);
+  registerAuthRefreshRoutes(app);
+  registerAuthPasswordResetRoutes(app);
+  registerAuthPinRoutes(app);
   registerAuthProfileRoutes(app);
+  registerAuthActiveSessionsRoutes(app);
+  registerAuthAgencyRoutes(app);
   registerUsersRoutes(app);
   registerUsersPermissionsRoutes(app);
   registerUsersRolesRoutes(app);
