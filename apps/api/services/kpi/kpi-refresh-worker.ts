@@ -38,8 +38,12 @@ function envInt(name: string, fallback: number): number {
 let scheduler: KpiRefreshScheduler | null = null;
 let lastYearRefreshAt = 0;
 
-/** Diffuse l'événement de mise à jour KPI à tous les clients WebSocket. */
-function broadcastKpiUpdated(periodKeys: string[]): void {
+/**
+ * Diffuse l'événement de mise à jour KPI à tous les clients WebSocket.
+ * Utilisé par le worker ET par le recalcul manuel (route /recalculate) :
+ * quel que soit le déclencheur, tous les écrans connectés se rafraîchissent.
+ */
+export function broadcastKpiUpdated(periodKeys: string[]): void {
   const ws = getWsInstance();
   if (!ws) return;
   ws.broadcast({

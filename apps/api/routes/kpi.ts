@@ -9,6 +9,7 @@ import { createLogger } from "../lib/logger";
 import { getSnapshot, listSnapshotPeriods, listSnapshotSeries } from "../services/kpi/kpi-store";
 import { buildSeriesPoints } from "../services/kpi/kpi-series";
 import { refreshAgencyScope, refreshAllScopes } from "../services/kpi/kpi-refresh-service";
+import { broadcastKpiUpdated } from "../services/kpi/kpi-refresh-worker";
 import type { KpiPayload, KpiPeriodType, KpiScopeType } from "@shared/schema/kpi";
 
 const logger = createLogger('Routes:KPI');
@@ -187,6 +188,8 @@ export function registerKpiRoutes(app: Express) {
           const snapshot = await refreshAgencyScope({
             periodType, periodKey, agencyId, generatedBy: userId, source: 'manual',
           });
+          // Notifier TOUS les clients connectés, pas seulement l'initiateur
+          broadcastKpiUpdated([periodKey]);
           return res.json({ data: snapshot, message: 'KPI recalculé avec succès pour cette agence' });
         }
 
@@ -194,6 +197,7 @@ export function registerKpiRoutes(app: Express) {
         const result = await refreshAllScopes({
           periodType, periodKey, generatedBy: userId, source: 'manual',
         });
+        broadcastKpiUpdated([periodKey]);
 
         res.json({
           data: { agencies: result.agencies, consolidated: true, warnings: result.consolidated.warnings },
