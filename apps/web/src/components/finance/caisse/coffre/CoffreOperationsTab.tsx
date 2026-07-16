@@ -315,7 +315,7 @@ export function CoffreOperationsTab({
                    >
                       <Loader2
                           size={12}
-                          className={`mr-1 ${isRefetchingTransferts ? 'animate-spin text-status-info' : 'text-content-muted'}`}
+                          className={`mr-1 ${isRefetchingTransferts ? 'animate-spin text-accent' : 'text-content-muted'}`}
                       />
                       <span className="hidden xs:inline">Actualiser</span>
                       <span className="xs:hidden">Act.</span>

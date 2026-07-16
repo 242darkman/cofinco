@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { TabGroup, ConfirmDialog, PageHeader, FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui';
 import { Users, Calendar, UserPlus, AlertTriangle, Gift, GraduationCap, ClipboardCheck, Building2, FileText, Upload, BarChart3, Star, Briefcase, FileBarChart, FolderOpen, Clock, Crown } from 'lucide-react';
 import { usePermissions } from '../auth/ProtectedFeature';
@@ -216,7 +217,7 @@ export default function RessourcesHumaines() {
     if (loading && activeTab === 'list') {
       return (
         <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div>
+          <Spinner size="xl" />
         </div>
       );
     }

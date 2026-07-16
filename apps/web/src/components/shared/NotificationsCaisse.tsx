@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { Bell, AlertCircle, CheckCircle, Clock, X, Eye, Check, User, Phone as PhoneIcon, CreditCard } from 'lucide-react';
 import { Card, Button, Modal, TabGroup, ResponsiveTable } from '../ui';
 import { authService } from '../../lib/auth';
@@ -214,7 +215,7 @@ export default function NotificationsCaisse({ onClose, compact = false }: Notifi
       <div className="flex-1 overflow-hidden min-h-0 bg-surface-base/50 rounded-lg border border-edge flex flex-col">
          {loading ? (
             <div className="flex items-center justify-center h-full">
-               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-status-info"></div>
+               <Spinner size="md" />
             </div>
          ) : notifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-content-muted">

@@ -1,4 +1,5 @@
 import type { ClientWithIdentity } from '@shared/schema';
+import { Spinner } from '@/components/ui/Spinner';
 import React, { useState, useMemo } from 'react';
 import {
   AlertCircle, Info, X, ShieldAlert, BadgeCheck, Clock,
@@ -361,7 +362,7 @@ export default function ClientAlerts({ client, onUpdate, onNavigateToTab }: Clie
 
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
+            <Spinner size="md" />
           </div>
         ) : fetchError ? (
           <div className="text-center py-12 border border-dashed border-status-danger/30 rounded-lg bg-status-danger-bg/30">

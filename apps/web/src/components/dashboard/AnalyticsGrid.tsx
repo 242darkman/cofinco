@@ -1,5 +1,6 @@
 
 import React, { Suspense } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { Card, Button } from '../ui';
@@ -55,7 +56,7 @@ export default function AnalyticsGrid({ stats, chartHeight = 250 }: AnalyticsGri
          <ErrorBoundary fallback={<ChartErrorFallback />}>
            <Suspense fallback={
              <Card variant="default" className="flex items-center justify-center bg-surface-base border-edge" style={{ height: chartHeight }}>
-               <div className="animate-spin w-8 h-8 border-2 border-status-success border-t-transparent rounded-full" aria-label={t('chargement')} />
+               <Spinner size="md" label={t('chargement')} />
              </Card>
            }>
              <BalanceHistoryChart height={chartHeight} />
@@ -72,7 +73,7 @@ export default function AnalyticsGrid({ stats, chartHeight = 250 }: AnalyticsGri
          <ErrorBoundary fallback={<ChartErrorFallback />}>
            <Suspense fallback={
              <Card variant="default" className="flex items-center justify-center bg-surface-base border-edge" style={{ height: chartHeight }}>
-               <div className="animate-spin w-8 h-8 border-2 border-status-info border-t-transparent rounded-full" aria-label={t('chargement')} />
+               <Spinner size="md" label={t('chargement')} />
              </Card>
            }>
              <PortfolioDistributionChart

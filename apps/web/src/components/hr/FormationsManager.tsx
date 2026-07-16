@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { Plus, GraduationCap, Users as UsersIcon, Calendar, MapPin, Clock, User, FileText, X, Pencil, Trash2, Star, ChevronDown, ChevronUp, Award } from 'lucide-react';
 import { Formation, FormationParticipant } from '../../hooks/hr/useFormations';
 import { Employe } from '../../hooks/hr/useEmployes';
@@ -482,7 +483,7 @@ export default function FormationsManager({
 
                 {loadingParticipants ? (
                   <div className="flex items-center justify-center py-6">
-                    <div className="w-6 h-6 border-2 border-status-info border-t-transparent rounded-full animate-spin"></div>
+                    <Spinner size="sm" />
                   </div>
                 ) : participants.length > 0 ? (
                   <div className="space-y-2 max-h-72 overflow-y-auto">

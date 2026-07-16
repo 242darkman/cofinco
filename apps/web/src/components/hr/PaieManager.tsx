@@ -263,7 +263,7 @@ export default function PaieManager() {
     if (loadingDetail) {
       return (
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="animate-spin text-status-success" size={24} />
+          <Loader2 className="animate-spin text-accent" size={24} />
           <span className="ml-2 text-content-muted text-sm">Chargement du run...</span>
         </div>
       );

@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   X, User, TrendingUp, TrendingDown, Calendar,
@@ -246,7 +247,7 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
           <div className="flex-1 overflow-y-auto pro-scrollbar">
              {loading ? (
                 <div className="p-6 flex justify-center">
-                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                   <Spinner size="md" tone="onAccent" />
                 </div>
              ) : (
                 <div className="p-3 sm:p-4 space-y-3 sm:space-y-4">

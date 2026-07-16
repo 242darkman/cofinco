@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import {
   DollarSign,
   CheckCircle,
@@ -392,7 +393,7 @@ export default function SettlementModal({ isOpen, onClose, onSuccess, agentId, a
               `}
             >
               {submitting ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <Spinner size="sm" tone="onAccent" />
               ) : (
                 <>
                   {canSubmitNormally ? <Send size={18} /> : <CloudOff size={18} />}

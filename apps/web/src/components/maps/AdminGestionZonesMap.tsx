@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { MapContainer, TileLayer, Marker, Circle as LeafletCircle, Popup, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -63,7 +64,7 @@ export default function AdminGestionZonesMap({
   if (!isClient) {
     return (
       <div className="h-full flex items-center justify-center">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-status-info"></div>
+        <Spinner size="lg" />
       </div>
     );
   }

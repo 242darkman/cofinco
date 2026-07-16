@@ -1130,7 +1130,7 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
                 }`}>
                   <p className="text-[9px] text-content-muted uppercase tracking-wider mb-0.5 truncate">{infoCardData.title}</p>
                   {infoLoading ? (
-                    <Loader className="w-3 h-3 animate-spin mx-auto text-status-success" />
+                    <Loader className="w-3 h-3 animate-spin mx-auto text-accent" />
                   ) : (
                     <>
                       <p className={`font-mono text-sm font-bold ${infoCardData.amount !== null ? 'text-content-primary' : 'text-content-muted'}`}>

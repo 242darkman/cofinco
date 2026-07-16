@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { X, Search, Filter, ArrowDownLeft, ArrowUpRight, Calendar, Download, FileText, Loader2 } from 'lucide-react';
 import { Badge } from '../ui';
 import { ALL_STATUS_LABELS } from '../../lib/status-labels';
@@ -187,7 +188,7 @@ export default function AccountHistory({ compteId, numeroCompte, isOpen, onClose
              <div className="bg-surface-base/50 border border-edge rounded-xl overflow-hidden min-h-[300px]">
                 {loading ? (
                   <div className="flex items-center justify-center h-40">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
+                      <Spinner size="md" />
                   </div>
                 ) : filteredTransactions.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-content-muted">

@@ -119,7 +119,7 @@ export const ReceiptViewer: React.FC<ReceiptViewerProps> = ({
       {/* Content */}
       {isLoading && (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="animate-spin text-status-success" size={32} />
+          <Loader2 className="animate-spin text-accent" size={32} />
         </div>
       )}
 

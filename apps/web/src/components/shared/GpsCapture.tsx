@@ -478,7 +478,7 @@ export default function GpsCapture({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="relative">
-                  <Loader2 size={20} className="text-status-success animate-spin" />
+                  <Loader2 size={20} className="text-accent animate-spin" />
                 </div>
                 <span className="text-sm font-medium text-status-success">
                   {accuracy !== null ? 'Raffinement en cours...' : 'Acquisition GPS...'}

@@ -805,7 +805,7 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
           {/* Pending State */}
           {isPending && (
             <div className="flex flex-col items-center justify-center py-10 space-y-3">
-              <Loader2 className="animate-spin text-status-info" size={36} />
+              <Loader2 className="animate-spin text-accent" size={36} />
               <h3 className="text-lg font-bold text-content-primary">Migration soumise</h3>
               <p className="text-content-muted text-sm text-center">
                 En attente de démarrage du traitement...
@@ -818,7 +818,7 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
             <div className="space-y-3">
               {/* Global progress */}
               <div className="flex items-center gap-3">
-                <Loader2 className="animate-spin text-status-info shrink-0" size={20} />
+                <Loader2 className="animate-spin text-accent shrink-0" size={20} />
                 <div className="flex-1 min-w-0">
                   <h3 className="text-sm font-bold text-content-primary truncate">
                     {migrationStatus?.currentStep || 'Initialisation...'}
@@ -857,7 +857,7 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
                         ) : isPhaseError ? (
                           <AlertCircle className="text-status-danger shrink-0" size={16} />
                         ) : isPhaseActive ? (
-                          <Loader2 className="animate-spin text-status-info shrink-0" size={16} />
+                          <Loader2 className="animate-spin text-accent shrink-0" size={16} />
                         ) : (
                           <PhaseIcon className="text-content-muted shrink-0" size={16} />
                         )}
@@ -1184,7 +1184,7 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
                 <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
                   {isAnalyzing ? (
                     <div className="flex flex-col items-center justify-center p-8">
-                      <Loader2 className="animate-spin text-status-info mb-4" size={40} />
+                      <Loader2 className="animate-spin text-accent mb-4" size={40} />
                       <p className="text-content-secondary">Analyse en cours...</p>
                     </div>
                   ) : dryRunFailed ? (

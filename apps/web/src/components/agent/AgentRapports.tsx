@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { requestListAll, caisseAgentApi } from '../../lib/api-client';
 import { FileText, Download, Users, DollarSign, Activity, BarChart3, Filter, ChevronLeft, ChevronRight, Eye, Loader2 } from 'lucide-react';
 import { addPdfLogoHeader } from '@/lib/pdf-logo';
@@ -283,7 +284,7 @@ export default function AgentRapports({ agentId }: { agentId?: string }) {
         </div>
         
         {loading ? (
-          <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent" /></div>
+          <div className="flex justify-center py-12"><Spinner size="sm" /></div>
         ) : rapports.length === 0 ? (
           <div className="text-center py-12 opacity-50">
             <FileText size={32} className="mx-auto mb-2 text-content-muted" />

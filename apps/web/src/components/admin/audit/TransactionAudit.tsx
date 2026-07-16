@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { DollarSign, TrendingUp, TrendingDown, Filter, Download, Search, FileSpreadsheet, FileText, Shield } from 'lucide-react';
 import { addPdfLogoHeader } from '@/lib/pdf-logo';
 import { useDocumentBranding } from '@/hooks/useDocumentBranding';
@@ -314,7 +315,7 @@ export default function TransactionAudit() {
 
         {loading ? (
           <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-status-success mx-auto"></div>
+            <Spinner size="xl" className="mx-auto" />
             <p className="text-content-muted mt-4">Chargement des transactions...</p>
           </div>
         ) : (

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import {
   Plus, FolderKanban, Users, Calendar, Clock, Banknote,
   Eye, UserPlus, UserMinus, Pencil, CheckCircle2, PauseCircle, XCircle,
@@ -252,7 +253,7 @@ export default function ProjetsTab() {
       {/* Loading */}
       {isLoading && (
         <div className="flex items-center justify-center py-12">
-          <div className="animate-spin w-8 h-8 border-2 border-accent border-t-transparent rounded-full" />
+          <Spinner size="md" />
         </div>
       )}
 
@@ -466,7 +467,7 @@ export default function ProjetsTab() {
       >
         {loadingDetail && (
           <div className="flex items-center justify-center py-8">
-            <div className="animate-spin w-6 h-6 border-2 border-accent border-t-transparent rounded-full" />
+            <Spinner size="sm" />
           </div>
         )}
 

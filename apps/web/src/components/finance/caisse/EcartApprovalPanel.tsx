@@ -106,7 +106,7 @@ export default function EcartApprovalPanel({ agenceId, onApprovalComplete }: Eca
     return (
       <Card className="p-3">
         <div className="flex items-center justify-center gap-2">
-          <RefreshCw className="w-4 h-4 animate-spin text-status-info" />
+          <RefreshCw className="w-4 h-4 animate-spin text-accent" />
           <span className="text-sm text-content-muted">Chargement...</span>
         </div>
       </Card>

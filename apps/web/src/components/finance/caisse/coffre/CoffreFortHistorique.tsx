@@ -181,7 +181,7 @@ export function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
                             >
                                 <Loader2
                                     size={10}
-                                    className={`mr-1 ${isRefetching ? 'animate-spin text-status-info' : 'text-content-muted'}`}
+                                    className={`mr-1 ${isRefetching ? 'animate-spin text-accent' : 'text-content-muted'}`}
                                 />
                                 Act.
                             </Button>

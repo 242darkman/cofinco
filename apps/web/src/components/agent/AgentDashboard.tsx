@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { TrendingUp, Target, Users, Banknote, Clock, MapPin, Star, Award, Calendar, CheckCircle, AlertCircle, Phone, Zap, RefreshCw, BookOpen, LayoutDashboard, UserCircle, ChevronDown, Search, UserPlus } from 'lucide-react';
 import Card from '../ui/Card';
 import StatCard from '../ui/StatCard';
@@ -459,7 +460,7 @@ export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: 
   if (loading) {
     return (
       <Card className="p-8 sm:p-12 flex flex-col items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 sm:h-12 sm:w-12 border-b-2 border-accent mb-4" />
+        <Spinner size="md" className="sm:h-12 sm:w-12 mb-4" />
         <p className="text-sm sm:text-base text-content-muted">Chargement du tableau de bord...</p>
       </Card>
     );
@@ -501,7 +502,7 @@ export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[400px] overflow-y-auto">
             {loadingAgents ? (
               <div className="col-span-full text-center py-8 text-content-muted">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent mx-auto mb-2" />
+                <Spinner size="sm" className="mx-auto mb-2" />
                 Chargement des agents...
               </div>
             ) : filteredAgents.length === 0 ? (

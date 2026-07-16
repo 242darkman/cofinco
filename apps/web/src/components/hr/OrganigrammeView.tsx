@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { OrgChart } from 'd3-org-chart';
 import {
   Building2, Search, RefreshCw, Minus, Plus, Download, ZoomIn, ZoomOut,
@@ -946,7 +947,7 @@ export default function OrganigrammeView({ employes }: OrganigrammeViewProps) {
       <div className="flex-1 relative min-h-0 bg-surface-base/50 rounded-lg border border-edge overflow-hidden">
         {loading && data.length === 0 ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
-            <div className="w-10 h-10 border-3 border-accent/30 border-t-indigo-500 rounded-full animate-spin" />
+            <Spinner size="lg" />
             <p className="text-xs text-content-muted">Chargement de la structure...</p>
           </div>
         ) : data.length === 0 ? (

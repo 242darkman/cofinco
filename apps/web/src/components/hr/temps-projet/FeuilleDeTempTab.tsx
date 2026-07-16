@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import {
   useTimesheets,
   useTimesheet,
@@ -289,7 +290,7 @@ export default function FeuilleDeTempTab() {
     if (loadingDetail) {
       return (
         <div className="flex items-center justify-center py-20">
-          <div className="animate-spin h-8 w-8 border-4 border-accent border-t-transparent rounded-full" />
+          <Spinner size="md" />
         </div>
       );
     }
@@ -615,7 +616,7 @@ export default function FeuilleDeTempTab() {
             type="week"
             value={selectedWeek}
             onChange={(e) => setSelectedWeek(e.target.value)}
-            className="h-[40px] px-3 rounded-lg border border-[#E5E7EB] bg-white text-[#111827] text-[13px] focus:outline-none focus:ring-[3px] focus:border-[#059669] focus:ring-[#059669]/30 hover:border-gray-400 transition-colors"
+            className="h-[40px] px-3 rounded-lg border border-[#E5E7EB] bg-white text-[#111827] text-[13px] focus:outline-none focus:ring-[3px] focus:border-accent focus:ring-accent/30 hover:border-gray-400 transition-colors"
           />
           <Button
             variant="ghost"
@@ -679,7 +680,7 @@ export default function FeuilleDeTempTab() {
       {/* List */}
       {loadingList ? (
         <div className="flex items-center justify-center py-20">
-          <div className="animate-spin h-8 w-8 border-4 border-accent border-t-transparent rounded-full" />
+          <Spinner size="md" />
         </div>
       ) : timesheets.length === 0 ? (
         <EmptyState

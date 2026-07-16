@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import {
   GraduationCap, Award, TrendingUp, CheckCircle, Clock,
   ExternalLink, Download, Star, ChevronLeft, ChevronRight,
@@ -193,7 +194,7 @@ export default function AgentFormations({ agentId }: { agentId?: string }) {
   if (loading) {
     return (
       <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent" />
+        <Spinner size="sm" />
       </div>
     );
   }

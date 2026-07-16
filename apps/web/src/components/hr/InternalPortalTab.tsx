@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { Briefcase, MapPin, Calendar, Users, Send, CheckCircle, Clock, Loader2 } from 'lucide-react';
 import { Card, Button, Modal, Badge, TextareaField } from '../ui';
 import { useInternalOffers } from '../../hooks/hr/useJobOffers';
@@ -30,7 +31,7 @@ export default function InternalPortalTab() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
+        <Spinner size="md" />
       </div>
     );
   }

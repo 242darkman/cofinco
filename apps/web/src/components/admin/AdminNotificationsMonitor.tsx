@@ -161,7 +161,7 @@ export default function AdminNotificationsMonitor() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-6 h-6 animate-spin text-status-info" />
+        <Loader2 className="w-6 h-6 animate-spin text-accent" />
         <span className="ml-2 text-sm text-content-muted">Chargement...</span>
       </div>
     );

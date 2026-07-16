@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { requestAllPages } from '../../lib/api-client';
 import { FileText, Download, Calendar, Filter, TrendingUp, Users, Banknote, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { StatutVisiteTerrain, StatutValidationDepense } from '@shared/enum/status-constants';
@@ -262,7 +263,7 @@ export default function AgentReportsGenerator({ agentId: propAgentId }: { agentI
         >
           {loading ? (
             <>
-              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+              <Spinner size="xs" tone="onAccent" />
               <span>Génération...</span>
             </>
           ) : (

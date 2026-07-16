@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import {
   Search, Filter, MoreVertical,
   Briefcase, Building2, Phone, Eye, EyeOff,
@@ -252,7 +253,7 @@ export default function EmployesList({
               <tr>
                 <td colSpan={5} className="px-4 py-12 text-center">
                   <div className="flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
+                    <Spinner size="md" />
                   </div>
                 </td>
               </tr>
@@ -350,7 +351,7 @@ export default function EmployesList({
       <div className="md:hidden space-y-3 pb-20 px-2">
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div>
+            <Spinner size="xl" />
           </div>
         ) : paginatedEmployes.length === 0 ? (
           <div className="text-center py-12 text-content-muted">

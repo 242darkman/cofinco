@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { useQuery } from '@tanstack/react-query';
 import { useMyEvaluations, MyEvaluation } from '../../hooks/hr/useMonEspace';
 import { Card, Badge, EmptyState } from '../ui';
@@ -44,7 +45,7 @@ export default function MesEvaluationsTab() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
+        <Spinner size="md" />
       </div>
     );
   }
@@ -188,7 +189,7 @@ function EvaluationCard({
             </p>
           ) : (
             <div className="flex items-center justify-center py-4">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-accent" />
+              <Spinner size="sm" />
             </div>
           )}
         </div>

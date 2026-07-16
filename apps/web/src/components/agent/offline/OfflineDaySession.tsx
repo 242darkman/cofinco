@@ -182,7 +182,7 @@ export default function OfflineDaySession({ agentId, agenceId }: OfflineDaySessi
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <Loader2 className="animate-spin text-status-info" size={24} />
+        <Loader2 className="animate-spin text-accent" size={24} />
       </div>
     );
   }

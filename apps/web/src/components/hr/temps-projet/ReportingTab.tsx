@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { useQuery } from '@tanstack/react-query';
 import { FolderOpen, Users, Clock, DollarSign, Hash, Percent, BarChart3 } from 'lucide-react';
 import { Card, StatCard, SelectField, EmptyState, ProgressBar, TabGroup } from '../../ui';
@@ -62,7 +63,7 @@ function CostByProject({ projects }: { projects: Project[] }) {
 
       {selectedProjectId && isLoading && (
         <div className="flex items-center justify-center py-12">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+          <Spinner size="sm" />
         </div>
       )}
 
@@ -236,7 +237,7 @@ function AllocationByEmployee() {
 
       {selectedEmployeId && isLoading && (
         <div className="flex items-center justify-center py-12">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+          <Spinner size="sm" />
         </div>
       )}
 

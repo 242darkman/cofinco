@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { ArrowUpRight, ArrowDownLeft, Wallet, Clock, User, CreditCard, Filter, UserCircle, ChevronDown, ChevronRight, Users } from 'lucide-react';
 import { Card, ResponsiveTable } from '@/components/ui';
 import { CaisseTransaction, SessionCaisse } from '@/types/finance';
@@ -342,7 +343,7 @@ export function CashJournal({
     return (
       <Card className="bg-surface-base/80 border-edge p-8">
         <div className="flex items-center justify-center gap-3">
-          <div className="animate-spin w-5 h-5 border-2 border-accent border-t-transparent rounded-full" />
+          <Spinner size="sm" />
           <span className="text-content-muted">Chargement du journal...</span>
         </div>
       </Card>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { Calendar, Clock, MapPin, Plus, Check, X, List, Grid3X3, ChevronLeft, ChevronRight, AlertTriangle, Repeat, Eye, Trash2, Edit, ClipboardCheck, Play, Loader2, Banknote } from 'lucide-react';
 import { toast } from 'sonner';
 import { StatutPlanning, STATUT_PLANNING_LABELS } from '@shared/enum/status-constants';
@@ -479,7 +480,7 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
           </div>
           <div className="p-3 space-y-3">
             {loading ? (
-              <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent" /></div>
+              <div className="flex justify-center py-12"><Spinner size="sm" /></div>
             ) : allListItems.length === 0 ? (
               <div className="text-center py-12 opacity-50">
                 <Calendar size={32} className="mx-auto mb-2 text-content-muted" />
@@ -561,7 +562,7 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
       {viewMode === 'calendar' && (
         <div className="bg-surface rounded-xl border border-edge overflow-hidden">
           {loading ? (
-            <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
+            <div className="flex justify-center py-12"><Spinner size="md" /></div>
           ) : calendarCompact ? (
             /* ── COMPACT: vertical day list (POS / mobile) ── */
             <div className="divide-y divide-edge/50">

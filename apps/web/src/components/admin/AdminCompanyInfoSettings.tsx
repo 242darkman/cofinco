@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Building2, Check, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
@@ -71,7 +72,7 @@ export default function AdminCompanyInfoSettings() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
+        <Spinner size="md" />
       </div>
     );
   }

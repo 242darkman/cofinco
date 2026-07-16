@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { ChevronDown, ChevronUp, RefreshCw, Shield, Lock } from 'lucide-react';
 import { Card } from '../../ui';
 import { formatDate } from '../../../lib/format';
@@ -214,7 +215,7 @@ export default function CaisseAuditLog() {
       <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5">
         {loading && logs.length === 0 ? (
           <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
+            <Spinner size="md" />
           </div>
         ) : logs.length === 0 ? (
           <div className="text-center py-12 text-content-muted text-sm">

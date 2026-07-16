@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import {
   AlertTriangle,
   CheckCircle,
@@ -131,7 +132,7 @@ export function DiscrepancyReport({
     return (
       <Card className="bg-surface-base/80 border-edge p-8">
         <div className="flex items-center justify-center gap-3">
-          <div className="animate-spin w-5 h-5 border-2 border-accent border-t-transparent rounded-full" />
+          <Spinner size="sm" />
           <span className="text-content-muted">Analyse des écarts en cours...</span>
         </div>
       </Card>

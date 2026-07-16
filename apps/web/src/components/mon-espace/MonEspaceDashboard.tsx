@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { useMyDashboard } from '../../hooks/hr/useMonEspace';
 import { Card, Badge, StatCard } from '../ui';
 import { Calendar, CheckCircle, Clock, FileText, Star, Briefcase, Download, Eye } from 'lucide-react';
@@ -57,7 +58,7 @@ export default function MonEspaceDashboard() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
+        <Spinner size="md" />
       </div>
     );
   }

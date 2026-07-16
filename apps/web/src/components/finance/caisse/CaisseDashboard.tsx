@@ -915,7 +915,7 @@ export default function CaisseDashboard({
                 <>
                   <div className="p-6 rounded-full bg-status-info-bg ring-1 ring-status-info/30 shadow-2xl relative overflow-hidden">
                     <div className="absolute inset-0 animate-pulse bg-gradient-to-tr from-status-info/10 to-status-info/5" />
-                    <RefreshCw className="w-16 h-16 text-status-info relative z-10 animate-spin" style={{ animationDuration: '3s' }} />
+                    <RefreshCw className="w-16 h-16 text-accent relative z-10 animate-spin" style={{ animationDuration: '3s' }} />
                   </div>
                   <div className="space-y-2">
                     <h2 className="text-2xl font-bold text-content-primary">Session en Fermeture</h2>

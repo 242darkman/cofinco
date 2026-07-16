@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { formatPhoneNumber } from '../../lib/format';
 import { DollarSign, CheckCircle, AlertCircle, Search, CreditCard, Banknote, ArrowDownCircle, ArrowUpCircle, WifiOff } from 'lucide-react';
 import AppShell from '../layout/AppShell';
@@ -397,7 +398,7 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
                 >
                   {loading ? (
                     <div className="flex items-center justify-center gap-2">
-                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                      <Spinner size="sm" tone="onAccent" />
                       Traitement...
                     </div>
                   ) : (

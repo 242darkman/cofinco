@@ -403,7 +403,7 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
           <div className="py-4 min-h-[220px]">
             {checkingSession ? (
               <div className="flex flex-col items-center justify-center py-8 gap-2">
-                <Loader2 size={24} className="text-status-success animate-spin" />
+                <Loader2 size={24} className="text-accent animate-spin" />
                 <p className="text-sm text-content-muted">Vérification de la caisse...</p>
               </div>
             ) : step === 'caisse' ? (

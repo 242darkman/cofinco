@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   BookOpen, FileText, BarChart3, TrendingUp, Download, Building2,
@@ -699,7 +700,7 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
               className="h-8 text-xs bg-white/15 border border-white/20 rounded-lg px-2 text-white"
             />
             {bilanLoading && (
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <Spinner size="xs" tone="onAccent" />
             )}
             <button onClick={handleExportBilanExcel} className="bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors">
               <Download className="w-4 h-4" />

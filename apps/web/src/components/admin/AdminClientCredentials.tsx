@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { formatPhoneNumber } from '../../lib/format';
 import {
   Users,
@@ -266,7 +267,7 @@ export default function AdminClientCredentials() {
         {/* Content */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <Spinner size="md" />
             <p className="text-content-muted text-sm mt-3">Chargement des clients...</p>
           </div>
         ) : clients.length === 0 ? (

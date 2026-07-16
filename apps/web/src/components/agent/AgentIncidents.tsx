@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { AlertTriangle, Plus, CheckCircle, Clock, X, Upload, ArrowUpCircle, FileText, Image as ImageIcon, ChevronLeft, ChevronRight, Eye, Shield, AlertCircle } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usePermissions } from '../auth/ProtectedFeature';
@@ -362,7 +363,7 @@ export default function AgentIncidents({ agentId }: { agentId?: string }) {
         </div>
 
         {loading ? (
-          <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent" /></div>
+          <div className="flex justify-center py-12"><Spinner size="sm" /></div>
         ) : incidents.length === 0 ? (
           <div className="text-center py-12 opacity-50">
             <CheckCircle size={32} className="mx-auto mb-2 text-content-muted" />

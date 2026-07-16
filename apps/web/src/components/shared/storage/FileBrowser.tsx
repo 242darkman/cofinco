@@ -86,7 +86,7 @@ export default function FileBrowser({
       <div className="p-4 flex-1">
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <RefreshCw className="w-8 h-8 text-status-info animate-spin" />
+            <RefreshCw className="w-8 h-8 text-accent animate-spin" />
           </div>
         ) : documents.length === 0 ? (
           <EmptyState

@@ -231,7 +231,7 @@ export default function NotificationTemplatesAdmin() {
       {/* Templates list */}
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-status-info" />
+          <Loader2 className="w-8 h-8 animate-spin text-accent" />
         </div>
       ) : filteredTemplates.length === 0 ? (
         <div className="text-center py-12 bg-surface-base/50 rounded-lg border border-edge">

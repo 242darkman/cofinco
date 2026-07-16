@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { Plus, AlertTriangle, Calendar, ArrowRight, MessageSquare, Check, Gavel, Pencil, Trash2, X, User, Paperclip, Upload, FileText, ExternalLink, Settings, Zap, TrendingUp } from 'lucide-react';
 import { Card, Button, Modal, FormField, SelectField, TextareaField, Badge, ResponsiveTable, TabGroup } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
@@ -773,7 +774,7 @@ export default function SanctionsManager({
 
                 {loadingDocs ? (
                   <div className="flex items-center justify-center py-3">
-                    <div className="w-4 h-4 border-2 border-status-info border-t-transparent rounded-full animate-spin"></div>
+                    <Spinner size="xs" />
                   </div>
                 ) : sanctionDocs.length > 0 ? (
                   <div className="space-y-1.5">

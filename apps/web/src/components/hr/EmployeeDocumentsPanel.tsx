@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   FileText, Upload, Download, Trash2, CheckCircle, XCircle, Clock,
@@ -227,7 +228,7 @@ export default function EmployeeDocumentsPanel({
       {/* Documents list */}
       {isLoading ? (
         <div className="flex items-center justify-center py-8">
-          <div className="w-6 h-6 border-2 border-status-info border-t-transparent rounded-full animate-spin" />
+          <Spinner size="sm" />
         </div>
       ) : documents.length === 0 ? (
         <div className="text-center py-8 bg-surface-base/50 rounded-lg border border-edge">

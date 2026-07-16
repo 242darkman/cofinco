@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { MapPin, Navigation, Clock, ChevronLeft, ChevronRight, Eye, Gauge } from 'lucide-react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -227,7 +228,7 @@ export default function AgentGeolocalisation({ agentId, embedded }: { agentId?: 
         <div className="w-full lg:flex-1 rounded-xl overflow-hidden border border-edge bg-surface" style={{ minHeight: 280 }}>
           {loading ? (
             <div className="h-full flex items-center justify-center">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent" />
+              <Spinner size="sm" />
             </div>
           ) : routePositions.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center opacity-50 p-6">
@@ -284,7 +285,7 @@ export default function AgentGeolocalisation({ agentId, embedded }: { agentId?: 
           <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-edge/50">
             {loading ? (
               <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-accent" />
+                <Spinner size="sm" />
               </div>
             ) : locations.length === 0 ? (
               <div className="text-center py-8 opacity-50">

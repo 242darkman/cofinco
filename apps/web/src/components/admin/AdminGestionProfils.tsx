@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { Users, Plus, Edit2, Trash2, Lock, Unlock, Eye, EyeOff, Shield, CheckCircle, XCircle, Search, Filter, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Upload, Image as ImageIcon, Loader2, User, Briefcase, Check, Save, CreditCard, KeyRound, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, Button, IconButton, ResponsiveTable } from '../ui';
@@ -645,7 +646,7 @@ export default function AdminGestionProfils() {
         {/* Content */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <Spinner size="md" />
             <p className="text-content-muted text-sm mt-3">Chargement du personnel...</p>
           </div>
         ) : filteredUsers.length === 0 ? (

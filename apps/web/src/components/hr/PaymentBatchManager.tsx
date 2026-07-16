@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { Building2, Send, CheckCircle, XCircle, Clock, Loader2, ChevronDown, ChevronUp, FileSpreadsheet, AlertTriangle } from 'lucide-react';
 import { Card, Button, Modal, Badge, FormField } from '../ui';
 import { usePaymentBatches, usePaymentBatchDetail, type PaymentBatch } from '../../hooks/hr/usePaymentBatches';
@@ -48,7 +49,7 @@ export default function PaymentBatchManager({ runId, onGenerateXlsx }: PaymentBa
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent" />
+        <Spinner size="sm" />
       </div>
     );
   }

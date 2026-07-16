@@ -1155,7 +1155,7 @@ export default function CompteAccountForm({ onClose, onSuccess, clientId }: Comp
                        />
                      </div>
                      <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-surface-base border-2 border-status-info flex items-center justify-center">
-                       <Loader2 size={14} className="animate-spin text-status-info" />
+                       <Loader2 size={14} className="animate-spin text-accent" />
                      </div>
                    </div>
                    <div>

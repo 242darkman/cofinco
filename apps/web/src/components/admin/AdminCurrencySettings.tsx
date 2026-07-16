@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { toast } from 'sonner';
 import { Coins, AlertTriangle, Check, Globe, Plus, Pencil, Trash2, X, Save } from 'lucide-react';
 import type { CurrencyConfig } from '@shared/config/currency';
@@ -163,7 +164,7 @@ export default function AdminCurrencySettings() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
+        <Spinner size="md" />
       </div>
     );
   }

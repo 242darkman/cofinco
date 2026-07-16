@@ -172,7 +172,7 @@ export default function OpeningApprovals({ agenceId, searchTerm = '' }: OpeningA
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-4">
-        <Loader2 className="w-10 h-10 text-status-success animate-spin" />
+        <Loader2 className="w-10 h-10 text-accent animate-spin" />
         <p className="text-sm font-medium text-content-muted">Chargement des ouvertures...</p>
       </div>
     );

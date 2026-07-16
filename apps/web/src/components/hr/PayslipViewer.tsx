@@ -123,7 +123,7 @@ export const PayslipViewer: React.FC<PayslipViewerProps> = ({
     >
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="animate-spin text-status-success" size={32} />
+          <Loader2 className="animate-spin text-accent" size={32} />
           <span className="ml-2 text-content-muted">Chargement du bulletin...</span>
         </div>
       ) : error ? (

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { Ban, Calendar, ShieldAlert } from 'lucide-react';
 import Modal from '../ui/Modal';
 import { toast, handleApiError } from '../../lib/toast';
@@ -104,7 +105,7 @@ export default function SuspendAccountModal({
             className="px-4 py-2.5 bg-status-warning hover:bg-status-warning disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition flex items-center gap-2 text-sm font-bold"
           >
             {loading ? (
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+              <Spinner size="xs" tone="onAccent" />
             ) : (
               <Ban size={16} />
             )}

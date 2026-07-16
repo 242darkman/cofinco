@@ -1,4 +1,5 @@
 import React from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { User, Upload, Link, Building2, AlertTriangle, Globe, MapPin, Heart } from 'lucide-react';
 import FormField from '../../ui/FormField';
 import SelectField from '../../ui/SelectField';
@@ -260,7 +261,7 @@ export default function StepIdentite({
               )}
               {isUploading && (
                 <div className="absolute inset-0 flex items-center justify-center bg-surface/80 rounded-xl">
-                  <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+                  <Spinner size="sm" />
                 </div>
               )}
               <label className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/30 rounded-xl cursor-pointer transition-colors group">

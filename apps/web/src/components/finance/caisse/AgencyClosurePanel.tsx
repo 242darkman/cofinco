@@ -118,7 +118,7 @@ export default function AgencyClosurePanel({ agenceId, agenceNom, onClosureCompl
     return (
       <Card className="p-6">
         <div className="flex items-center justify-center gap-3">
-          <RefreshCw className="w-5 h-5 animate-spin text-status-info" />
+          <RefreshCw className="w-5 h-5 animate-spin text-accent" />
           <span className="text-content-muted">Chargement du statut...</span>
         </div>
       </Card>

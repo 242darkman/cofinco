@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { DollarSign, Phone, FileText, CheckCircle, Users, CheckCircle2, AlertCircle, AlertTriangle, X, ChevronDown, Banknote, Smartphone, Loader2 } from 'lucide-react';
 import { SelectField, SearchableSelect } from '../ui';
 import { toast } from 'sonner';
@@ -911,7 +912,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                       </div>
                       {loadingTontines ? (
                         <div className="py-4 flex items-center justify-center">
-                          <div className="w-5 h-5 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
+                          <Spinner size="sm" />
                         </div>
                       ) : clientTontines.length === 0 ? (
                         <p className="text-[13px] text-status-warning flex items-center gap-2">
@@ -1268,7 +1269,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                   className="w-full py-4 rounded-xl font-semibold text-white bg-gradient-to-r from-status-success to-accent hover:from-status-success/90 hover:to-accent/90 shadow-lg shadow-status-success/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
                 >
                   {loading ? (
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <Spinner size="sm" tone="onAccent" />
                   ) : (
                     <>
                       <CheckCircle size={20} />

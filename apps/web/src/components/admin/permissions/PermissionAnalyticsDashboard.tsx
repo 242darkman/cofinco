@@ -141,7 +141,7 @@ export default function PermissionAnalyticsDashboard() {
   if (isLoading && !config) {
     return (
       <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-8 h-8 animate-spin text-status-info" />
+        <Loader2 className="w-8 h-8 animate-spin text-accent" />
       </div>
     );
   }
