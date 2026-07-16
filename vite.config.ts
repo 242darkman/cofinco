@@ -192,7 +192,9 @@ export default defineConfig({
       },
       // Development options
       devOptions: {
-        enabled: process.env.NODE_ENV === 'development',
+        // Avoid stale Workbox registrations in local dev: Vite serves source files
+        // directly, while the generated SW expects a production precache.
+        enabled: false,
         type: 'module'
       }
     }),
