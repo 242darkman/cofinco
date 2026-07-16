@@ -21,8 +21,8 @@
     "enableVirementsProgrammes": true,
     "enableComptabilite": true,
     "enableRapports": true,
-    "enableKpi": true,
+    "enableKpi": false,
     "enableRH": true,
-    "enableCartesPointage": true
+    "enableCartesPointage": false
   }
 }
