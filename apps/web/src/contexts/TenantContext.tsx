@@ -7,6 +7,7 @@ import {
   type TenantFeatureKey,
 } from '@shared/tenant-config';
 import { applyTenantTheme } from '@/lib/tenant-theme';
+import { Spinner } from '@/components/ui/Spinner';
 
 interface TenantContextType {
   config: TenantConfig;
@@ -101,14 +102,13 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
 /**
  * Écran d'amorçage neutre affiché tant que l'identité du tenant n'est pas
- * chargée. Volontairement sans logo, sans nom et sans couleur de marque :
- * un simple indicateur de chargement sur fond neutre, pour ne révéler aucune
- * marque avant que la bonne soit connue.
+ * chargée. Volontairement sans logo, sans nom et sans couleur de marque, mais
+ * utilisant le MÊME `Spinner` premium que le reste de l'application (en ton
+ * blanc neutre) pour une expérience de chargement cohérente partout.
  */
 function TenantBootstrapScreen() {
   return (
-    <output
-      aria-label="Chargement"
+    <div
       style={{
         position: 'fixed',
         inset: 0,
@@ -118,18 +118,8 @@ function TenantBootstrapScreen() {
         background: '#0B0F19',
       }}
     >
-      <span
-        className="animate-spin"
-        style={{
-          width: 40,
-          height: 40,
-          borderRadius: '50%',
-          border: '3px solid rgba(255, 255, 255, 0.14)',
-          borderTopColor: 'rgba(255, 255, 255, 0.75)',
-          display: 'inline-block',
-        }}
-      />
-    </output>
+      <Spinner size="xl" tone="onAccent" />
+    </div>
   );
 }
 
