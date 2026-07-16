@@ -1,15 +1,15 @@
 import { z } from "zod";
 
 export const tenantFeatureFlagsSchema = z.object({
-  enableSms: z.boolean(),
-  enableTontine: z.boolean(),
-  enableMobileMoney: z.boolean(),
-  enableFieldAgents: z.boolean(),
-  // Modules fonctionnels activables par tenant. Défaut `true` = actif partout
-  // (opt-out par tenant) : une config existante sans la clé conserve le
-  // comportement standard (AGENTS.md §5). Chaque flag est consommé côté nav
+  // Toutes les features sont ACTIVES PAR DÉFAUT (`default(true)`) : une config
+  // qui omet une clé conserve donc le comportement standard « tout actif »
+  // (opt-out par tenant, AGENTS.md §5). Chaque flag est consommé côté nav
   // (routes-config), onglets admin (admin-constants) et garde serveur
   // (middleware/tenant-features) — voir la recette dans tenant-config.ts.
+  enableSms: z.boolean().default(true),
+  enableTontine: z.boolean().default(true),
+  enableMobileMoney: z.boolean().default(true),
+  enableFieldAgents: z.boolean().default(true),
   enableCredits: z.boolean().default(true),
   enableComptes: z.boolean().default(true),
   enableCaisse: z.boolean().default(true),

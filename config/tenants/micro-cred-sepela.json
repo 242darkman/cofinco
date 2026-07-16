@@ -22,6 +22,7 @@
     "enableComptabilite": true,
     "enableRapports": true,
     "enableKpi": true,
-    "enableRH": true
+    "enableRH": true,
+    "enableCartesPointage": true
   }
 }
