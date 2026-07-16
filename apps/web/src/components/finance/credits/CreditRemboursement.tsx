@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { DollarSign, Search, Calendar, User, CreditCard, Check, X, Smartphone, Banknote, FileCheck, Building, ReceiptText, AlertTriangle, Loader2, Printer, WifiOff } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { DollarSign, Search, Calendar, User, CreditCard, Check, X, Smartphone, Banknote, FileCheck, Building, ReceiptText, AlertTriangle, Printer, WifiOff } from 'lucide-react';
 import PaymentValidationModal from '../operations/PaymentValidationModal';
 import { useFeatureFlags, useEnabledPaymentMethods } from '../../../contexts/FeatureFlagsContext';
 import { usePermissions } from '../../auth/ProtectedFeature';
@@ -596,7 +597,7 @@ export default function CreditRemboursement() {
           <div className="mt-4 max-h-60 overflow-y-auto space-y-2" role="listbox" aria-label="Résultats de recherche">
             {loadingCredits ? (
               <div className="flex items-center justify-center py-4">
-                <Loader2 className="animate-spin text-accent" size={24} />
+                <Spinner size="sm" tone="accent" />
                 <span className="ml-2 text-content-muted">Chargement...</span>
               </div>
             ) : filteredCredits.length > 0 ? (
@@ -849,7 +850,7 @@ export default function CreditRemboursement() {
               >
                 {loading ? (
                   <>
-                    <Loader2 size={20} className="animate-spin" aria-hidden="true" />
+                    <Spinner size="sm" tone="current" />
                     Enregistrement...
                   </>
                 ) : (

@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { CheckCircle, XCircle, Search, Clock, DollarSign, User, AlertCircle, RefreshCw, MapPin, Smartphone, CreditCard, Hash, Calendar, Building2, CheckSquare, Square, MinusSquare, Loader2, FileImage, Eye } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { CheckCircle, XCircle, Search, Clock, DollarSign, User, AlertCircle, RefreshCw, MapPin, Smartphone, CreditCard, Hash, Calendar, Building2, CheckSquare, Square, MinusSquare, FileImage, Eye } from 'lucide-react';
 import { Button, Modal, FormField, ResponsiveTable, Badge, Card, FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -505,7 +506,7 @@ export default function AdminValidationTerrain() {
 
            {bulkProcessing && bulkProgress && (
              <div className="flex items-center gap-3 px-4 py-2 bg-accent/10 rounded-lg border border-accent/30">
-               <Loader2 className="animate-spin text-accent" size={16} />
+               <Spinner size="xs" tone="accent" />
                <div className="text-sm">
                  <span className="text-content-primary font-medium">{bulkProgress.current}</span>
                  <span className="text-content-muted"> / {bulkProgress.total}</span>

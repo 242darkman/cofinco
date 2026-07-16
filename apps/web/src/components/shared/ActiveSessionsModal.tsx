@@ -8,21 +8,10 @@
  */
 
 import { useState } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Modal, Button, Badge, ConfirmDialog } from '@/components/ui';
-import {
-  Monitor,
-  Smartphone,
-  Tablet,
-  Globe,
-  Clock,
-  MapPin,
-  Trash2,
-  LogOut,
-  Shield,
-  CheckCircle,
-  Loader2,
-} from 'lucide-react';
+import { Monitor, Smartphone, Tablet, Globe, Clock, MapPin, Trash2, LogOut, Shield, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -167,7 +156,7 @@ export function ActiveSessionsModal({ isOpen, onClose }: ActiveSessionsModalProp
       >
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-content-muted" />
+            <Spinner size="md" tone="current" className="text-content-muted" />
           </div>
         ) : error ? (
           <div className="text-center py-8 text-status-danger">

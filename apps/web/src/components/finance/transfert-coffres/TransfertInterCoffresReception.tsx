@@ -1,23 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import {
-  X,
-  Package,
-  ArrowRight,
-  AlertTriangle,
-  CheckCircle,
-  XCircle,
-  Loader2,
-  Building2,
-  Vault,
-  Clock,
-  Scale,
-  Hash,
-  User,
-  Camera,
-  MessageSquare,
-  Shield,
-  Truck,
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { X, Package, ArrowRight, AlertTriangle, CheckCircle, XCircle, Building2, Vault, Clock, Scale, Hash, User, Camera, MessageSquare, Shield, Truck } from 'lucide-react';
 import { Button, Badge, Modal } from '@/components/ui';
 import { toast } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
@@ -480,7 +463,7 @@ export default function TransfertInterCoffresReception({
             >
               {loading ? (
                 <>
-                  <Loader2 size={16} className="mr-2 animate-spin" />
+                  <Spinner size="xs" tone="current" className="mr-2" />
                   Traitement...
                 </>
               ) : (

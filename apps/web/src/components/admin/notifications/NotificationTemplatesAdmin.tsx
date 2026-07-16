@@ -1,10 +1,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  MessageSquare, Mail, Edit2, Eye, Save, X, Check, AlertTriangle,
-  Loader2, Search, ToggleLeft, ToggleRight, Code, FileText,
-  ChevronLeft, ChevronRight
-} from 'lucide-react';
+import { MessageSquare, Mail, Edit2, Eye, Save, X, Check, AlertTriangle, Search, ToggleLeft, ToggleRight, Code, FileText, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button, Badge, FormField, Modal, TextareaField } from '../../ui';
 import { notificationTemplatesApi, SmsTemplate, EmailTemplate } from '../../../lib/api-client';
 import { toast } from '../../../lib/toast';
@@ -231,7 +228,7 @@ export default function NotificationTemplatesAdmin() {
       {/* Templates list */}
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-accent" />
+          <Spinner size="md" tone="accent" />
         </div>
       ) : filteredTemplates.length === 0 ? (
         <div className="text-center py-12 bg-surface-base/50 rounded-lg border border-edge">
@@ -505,7 +502,7 @@ export default function NotificationTemplatesAdmin() {
                 Annuler
               </Button>
               <Button variant="primary" onClick={handleSave} disabled={saving}>
-                {saving ? <Loader2 size={14} className="animate-spin mr-2" /> : <Save size={14} className="mr-2" />}
+                {saving ? <Spinner size="xs" tone="current" className="mr-2" /> : <Save size={14} className="mr-2" />}
                 Enregistrer
               </Button>
             </div>

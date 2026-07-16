@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Spinner } from '@/components/ui/Spinner';
-import { Calendar, Clock, MapPin, Plus, Check, X, List, Grid3X3, ChevronLeft, ChevronRight, AlertTriangle, Repeat, Eye, Trash2, Edit, ClipboardCheck, Play, Loader2, Banknote } from 'lucide-react';
+import { Calendar, Clock, MapPin, Plus, Check, X, List, Grid3X3, ChevronLeft, ChevronRight, AlertTriangle, Repeat, Eye, Trash2, Edit, ClipboardCheck, Play, Banknote } from 'lucide-react';
 import { toast } from 'sonner';
 import { StatutPlanning, STATUT_PLANNING_LABELS } from '@shared/enum/status-constants';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
@@ -946,7 +946,7 @@ function EnqueteCard({ enquete, onStart, starting }: { enquete: any; onStart?: (
           disabled={starting}
           className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 bg-accent-secondary hover:bg-accent-secondary-hover disabled:bg-surface-elevated text-content-primary text-xs font-bold rounded-lg transition-colors"
         >
-          {starting ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
+          {starting ? <Spinner size="xs" tone="current" /> : <Play size={12} />}
           Démarrer l'enquête
         </button>
       ) : (

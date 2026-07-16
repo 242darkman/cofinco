@@ -1,4 +1,5 @@
 import type { ClientWithIdentity } from '@shared/schema';
+import { Spinner } from '@/components/ui/Spinner';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Save, User, Mail, Phone, MapPin, FileText, Video, Lock, KeyRound, Trash2, Camera, CreditCard, BookUser, FileQuestion, Briefcase, Calendar, DollarSign } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -794,7 +795,7 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
         <div className="flex justify-end gap-2 pt-4 border-t border-edge mt-4">
           <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting} size="sm">Annuler</Button>
           <Button type="submit" variant="primary" icon={isSubmitting ? undefined : Save} disabled={isSubmitting} size="sm">
-            {isSubmitting ? <span className="flex items-center gap-1.5"><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Traitement...</span> : client ? 'Mettre à jour' : 'Enregistrer'}
+            {isSubmitting ? <span className="flex items-center gap-1.5"><Spinner size="xs" tone="onAccent" />Traitement...</span> : client ? 'Mettre à jour' : 'Enregistrer'}
           </Button>
         </div>
       </form>

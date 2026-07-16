@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  RefreshCw, FileText, CheckCircle2, AlertTriangle, Clock,
-  ChevronDown, Eye, Check, XCircle, Loader2, Calendar, TrendingUp
-} from 'lucide-react';
+import { RefreshCw, FileText, CheckCircle2, AlertTriangle, Clock, ChevronDown, Eye, Check, XCircle, Calendar, TrendingUp } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -308,7 +306,7 @@ export default function ReconciliationPage() {
         <div className="flex-1 overflow-y-auto">
           {isLoading ? (
             <div className="flex items-center justify-center h-full min-h-[200px]">
-              <Loader2 size={24} className="text-accent animate-spin" />
+              <Spinner size="sm" tone="accent" />
             </div>
           ) : reports.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-content-muted gap-2">
@@ -542,7 +540,7 @@ export default function ReconciliationPage() {
                   disabled={actionLoading}
                   className="flex-1 py-2.5 rounded-xl font-semibold text-status-warning bg-status-warning-bg hover:bg-status-warning-bg border border-status-warning/30 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  {actionLoading ? <Loader2 size={16} className="animate-spin" /> : <Eye size={16} />}
+                  {actionLoading ? <Spinner size="xs" tone="current" /> : <Eye size={16} />}
                   Marquer reviewé
                 </button>
               )}
@@ -552,7 +550,7 @@ export default function ReconciliationPage() {
                   disabled={actionLoading}
                   className="flex-1 py-2.5 rounded-xl font-semibold text-status-success bg-status-success-bg hover:bg-status-success-bg border border-status-success/30 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  {actionLoading ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+                  {actionLoading ? <Spinner size="xs" tone="current" /> : <Check size={16} />}
                   Marquer résolu
                 </button>
               )}

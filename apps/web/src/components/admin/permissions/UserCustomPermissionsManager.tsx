@@ -1,9 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import {
-  Users, Shield, Search, CheckCircle,
-  RotateCcw, Filter, Wifi, ArrowLeft, Award, Loader2, Sparkles, Ban,
-  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, AlertTriangle, Info
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Users, Shield, Search, CheckCircle, RotateCcw, Filter, Wifi, ArrowLeft, Award, Sparkles, Ban, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, AlertTriangle, Info } from 'lucide-react';
 import { Permission } from '../../../hooks/admin/usePermissions';
 import { UserPermission } from '../../../hooks/admin/useUserPermissions';
 import { Button } from '../../ui';
@@ -510,7 +507,7 @@ export default function UserCustomPermissionsManager({
             className="px-1.5 py-1 border border-edge rounded text-[10px] text-content-secondary hover:bg-surface transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isResetting ? (
-              <Loader2 size={10} className="animate-spin" />
+              <Spinner size="xs" tone="current" />
             ) : (
               <RotateCcw size={10} />
             )}
@@ -726,7 +723,7 @@ export default function UserCustomPermissionsManager({
                       <div className="flex items-center gap-1 shrink-0">
                         {isLoading ? (
                           <div className="w-7 h-4 flex items-center justify-center">
-                            <Loader2 size={10} className="animate-spin text-accent" />
+                            <Spinner size="xs" tone="accent" />
                           </div>
                         ) : (
                           <div

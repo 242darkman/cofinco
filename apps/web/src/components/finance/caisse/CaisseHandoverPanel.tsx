@@ -9,20 +9,7 @@
 
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  UserPlus,
-  UserMinus,
-  ArrowRightLeft,
-  Check,
-  X,
-  Clock,
-  AlertTriangle,
-  RefreshCw,
-  Calculator,
-  MessageSquare,
-  ChevronRight,
-  Loader2,
-} from 'lucide-react';
+import { UserPlus, UserMinus, ArrowRightLeft, Check, X, Clock, AlertTriangle, RefreshCw, Calculator, MessageSquare, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Button from '../../ui/Button';
 import Card from '../../ui/Card';

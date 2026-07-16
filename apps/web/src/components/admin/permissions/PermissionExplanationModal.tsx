@@ -7,7 +7,8 @@
  */
 
 import React from 'react';
-import { HelpCircle, Shield, Clock, Globe, Building2, AlertCircle, Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { HelpCircle, Shield, Clock, Globe, Building2, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { Modal, Button, Badge } from '@/components/ui';
 import { usePermissionExplanation } from '@/hooks/admin/useRbacAudit';
 import PermissionSourceBadge, { type PermissionSource } from './PermissionSourceBadge';
@@ -68,7 +69,7 @@ export default function PermissionExplanationModal({
         {/* Loading State */}
         {loading && (
           <div className="flex flex-col items-center justify-center py-8 text-content-muted">
-            <Loader2 className="animate-spin mb-2" size={24} />
+            <Spinner size="sm" tone="current" className="mb-2" />
             <span className="text-sm">Analyse en cours...</span>
           </div>
         )}

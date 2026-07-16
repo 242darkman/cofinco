@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
+import { Spinner } from '@/components/ui/Spinner';
 import type { StepComponentProps } from "../types";
 import type { SchedulePreview } from "../hooks/useSchedulePreview";
-import { Loader2, CalendarDays } from "lucide-react";
+import { CalendarDays } from 'lucide-react';
 import { currencySymbol } from "@shared/config/currency";
 import {
   FREQUENCE_OPTIONS,
@@ -164,7 +165,7 @@ export default function StepSummary({
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-accent text-white hover:bg-accent/90 disabled:opacity-50 transition-colors"
           >
             {previewLoading ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              <Spinner size="xs" tone="current" />
             ) : (
               <CalendarDays className="w-3.5 h-3.5" />
             )}

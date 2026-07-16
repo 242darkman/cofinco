@@ -7,25 +7,8 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import {
-  History,
-  Search,
-  Filter,
-  ChevronLeft,
-  ChevronRight,
-  User,
-  Shield,
-  Clock,
-  ArrowRight,
-  CheckCircle,
-  XCircle,
-  RefreshCw,
-  Calendar,
-  Loader2,
-  AlertCircle,
-  Download,
-  Undo2,
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { History, Search, Filter, ChevronLeft, ChevronRight, User, Shield, Clock, ArrowRight, CheckCircle, XCircle, RefreshCw, Calendar, AlertCircle, Download, Undo2 } from 'lucide-react';
 import { Button, Badge, SearchInput, SelectField, Modal } from '@/components/ui';
 import {
   useRbacAuditHistory,
@@ -376,7 +359,7 @@ export default function RbacAuditHistoryViewer({
       <div className="flex-1 overflow-y-auto">
         {loading && history.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-10 text-content-muted">
-            <Loader2 className="animate-spin mb-2" size={24} />
+            <Spinner size="sm" tone="current" className="mb-2" />
             <span className="text-xs">Chargement...</span>
           </div>
         ) : error ? (
@@ -464,7 +447,7 @@ export default function RbacAuditHistoryViewer({
                 Fermer
               </Button>
               <Button size="sm" variant="danger" onClick={handleRevert} disabled={revertLoading}>
-                {revertLoading && <Loader2 size={14} className="animate-spin mr-1" />}
+                {revertLoading && <Spinner size="xs" tone="current" className="mr-1" />}
                 Confirmer l'annulation
               </Button>
             </div>

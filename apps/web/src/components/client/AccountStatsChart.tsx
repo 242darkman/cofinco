@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useId } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { currencyCode } from '@shared/config/currency';
@@ -171,7 +172,7 @@ export default function AccountStatsChart({ compteId, filter = 'ALL' }: AccountS
       <div className="h-[220px] w-full relative group">
         {loading && (
           <div className="absolute inset-0 z-10 bg-surface-base/50 backdrop-blur-[1px] flex items-center justify-center rounded-xl">
-            <Loader2 className="animate-spin text-accent" />
+            <Spinner size="sm" tone="accent" />
           </div>
         )}
         

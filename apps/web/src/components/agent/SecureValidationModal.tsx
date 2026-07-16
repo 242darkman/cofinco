@@ -5,7 +5,8 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { ShieldCheck, Eye, EyeOff, AlertTriangle, Loader2, Lock } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { ShieldCheck, Eye, EyeOff, AlertTriangle, Lock } from 'lucide-react';
 import Button from '@/components/ui/Button';
 
 interface SecureValidationModalProps {
@@ -178,7 +179,7 @@ export default function SecureValidationModal({
               >
                 {loading ? (
                   <>
-                    <Loader2 size={18} className="animate-spin mr-2" />
+                    <Spinner size="sm" tone="current" className="mr-2" />
                     Vérification...
                   </>
                 ) : (

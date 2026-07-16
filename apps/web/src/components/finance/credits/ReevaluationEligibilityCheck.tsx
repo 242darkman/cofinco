@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Check, X, Loader2 } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Check, X } from 'lucide-react';
 
 interface EligibilityResult {
   estEligible: boolean;
@@ -62,7 +63,7 @@ export function ReevaluationEligibilityCheck({ demandeId, onEligibilityChange }:
   if (loading) {
     return (
       <div className="animate-pulse h-20 bg-surface-elevated/50 rounded-lg mt-3 flex items-center justify-center">
-        <Loader2 className="animate-spin text-content-muted" size={20} />
+        <Spinner size="sm" tone="current" className="text-content-muted" />
       </div>
     );
   }
@@ -147,7 +148,7 @@ export function ReevaluationEligibilityCheck({ demandeId, onEligibilityChange }:
       {eligibility.reevaluationEnCours && (
         <div className="p-2 bg-status-info-bg border border-status-info/30 rounded-lg">
           <p className="text-xs text-status-info flex items-center gap-2">
-            <Loader2 size={12} className="animate-spin" />
+            <Spinner size="xs" tone="current" />
             Une réévaluation est déjà en cours
           </p>
         </div>

@@ -1,16 +1,7 @@
 import React from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { 
-    Activity, 
-    CreditCard, 
-    PiggyBank, 
-    Users, 
-    ArrowUpRight, 
-    ArrowDownLeft, 
-    RefreshCw, 
-    Banknote,
-    Loader2
-} from 'lucide-react';
+import { Activity, CreditCard, PiggyBank, Users, ArrowUpRight, ArrowDownLeft, RefreshCw, Banknote } from 'lucide-react';
 import { Card } from '../ui';
 import { ALL_STATUS_LABELS } from '../../lib/status-labels';
 import { typeCreditLabel } from '../../lib/credit-labels';
@@ -161,7 +152,7 @@ export default function ClientGlobalHistory({ clientId }: ClientGlobalHistoryPro
     if (isLoading) {
         return (
             <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-6 h-6 animate-spin text-accent" />
+                <Spinner size="sm" tone="accent" />
             </div>
         );
     }
@@ -257,7 +248,7 @@ export default function ClientGlobalHistory({ clientId }: ClientGlobalHistoryPro
                 >
                     {isFetchingNextPage ? (
                         <span className="flex items-center justify-center gap-2">
-                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <Spinner size="xs" tone="current" />
                             Chargement...
                         </span>
                     ) : (

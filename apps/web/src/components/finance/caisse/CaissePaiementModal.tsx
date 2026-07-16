@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { X, User, FileText, Users, CreditCard, ArrowDownLeft, ArrowUpRight, Loader2, Banknote, CheckCircle, Building2, Wallet } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { X, User, FileText, Users, CreditCard, ArrowDownLeft, ArrowUpRight, Banknote, CheckCircle, Building2, Wallet } from 'lucide-react';
 import mtnMomoLogo from '../../../assets/logos/mtn-logo.png';
 import airtelMoneyLogo from '../../../assets/logos/airtel-logo.png';
 import SearchableSelect from '../../ui/SearchableSelect';
@@ -802,7 +803,7 @@ export default function CaissePaiementModal({
                       <div className="flex justify-between pt-1 border-t border-edge">
                         <span className="text-content-muted">Montant retirable</span>
                         {loadingRetirable ? (
-                          <Loader2 size={12} className="animate-spin text-accent" />
+                          <Spinner size="xs" tone="accent" />
                         ) : (
                           <span className={`font-bold ${retirableAmount && retirableAmount > 0 ? 'text-status-success' : 'text-status-warning'}`}>
                             {retirableAmount != null ? (retirableAmount > 0 ? formatMoney(retirableAmount) : 'Aucun') : '—'}
@@ -857,7 +858,7 @@ export default function CaissePaiementModal({
               )}
               {loadingEcheance && (
                 <div className="mt-2 flex items-center gap-2 text-xs text-content-muted">
-                  <Loader2 size={12} className="animate-spin" /> Chargement échéance...
+                  <Spinner size="xs" tone="current" /> Chargement échéance...
                 </div>
               )}
             </div>
@@ -1077,7 +1078,7 @@ export default function CaissePaiementModal({
               )}
               {feeOption && loadingFeeEstimate && (
                 <div className="flex items-center gap-2 text-xs text-content-muted">
-                  <Loader2 size={12} className="animate-spin" />
+                  <Spinner size="xs" tone="current" />
                   Calcul des frais...
                 </div>
               )}
@@ -1109,7 +1110,7 @@ export default function CaissePaiementModal({
              className="w-full h-11 sm:h-12 bg-accent hover:bg-accent-primary-hover disabled:opacity-50 text-white rounded-xl sm:rounded-2xl font-bold text-sm sm:text-base flex items-center justify-center gap-2 transition-all"
            >
               {loading ? (
-                <Loader2 size={20} className="animate-spin" />
+                <Spinner size="sm" tone="current" />
               ) : (
                 <>
                   <CheckCircle size={18} />

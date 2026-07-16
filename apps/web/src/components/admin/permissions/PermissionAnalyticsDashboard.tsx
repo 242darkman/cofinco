@@ -1,14 +1,11 @@
 import React, { useState, useCallback } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, LineChart, Line
 } from 'recharts';
-import {
-  Shield, AlertTriangle, CheckCircle, XCircle, RefreshCw, Settings,
-  TrendingUp, Users, Activity, Trash2, Loader2, ToggleLeft, ToggleRight,
-  Eye, Clock, Archive
-} from 'lucide-react';
+import { Shield, AlertTriangle, CheckCircle, XCircle, RefreshCw, Settings, TrendingUp, Users, Activity, Trash2, ToggleLeft, ToggleRight, Eye, Clock, Archive } from 'lucide-react';
 import { Button, Badge, FormField, Modal } from '../../ui';
 import {
   permissionAnalyticsApi,
@@ -141,7 +138,7 @@ export default function PermissionAnalyticsDashboard() {
   if (isLoading && !config) {
     return (
       <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-8 h-8 animate-spin text-accent" />
+        <Spinner size="md" tone="accent" />
       </div>
     );
   }
@@ -309,7 +306,7 @@ export default function PermissionAnalyticsDashboard() {
           <div className="flex-1 overflow-y-auto min-h-0">
             {loadingDenials ? (
               <div className="flex items-center justify-center py-4">
-                <Loader2 className="w-4 h-4 animate-spin text-content-muted" />
+                <Spinner size="xs" tone="current" className="text-content-muted" />
               </div>
             ) : denials.length === 0 ? (
               <div className="text-center py-4 text-content-muted text-[10px]">
@@ -358,7 +355,7 @@ export default function PermissionAnalyticsDashboard() {
           <div className="flex-1 overflow-y-auto min-h-0">
             {loadingUnused ? (
               <div className="flex items-center justify-center py-4">
-                <Loader2 className="w-4 h-4 animate-spin text-content-muted" />
+                <Spinner size="xs" tone="current" className="text-content-muted" />
               </div>
             ) : unused.length === 0 ? (
               <div className="text-center py-4 text-content-muted text-[10px]">
@@ -502,7 +499,7 @@ export default function PermissionAnalyticsDashboard() {
               Annuler
             </Button>
             <Button variant="danger" onClick={handlePurge} disabled={purging}>
-              {purging ? <Loader2 size={14} className="animate-spin mr-2" /> : <Trash2 size={14} className="mr-2" />}
+              {purging ? <Spinner size="xs" tone="current" className="mr-2" /> : <Trash2 size={14} className="mr-2" />}
               Purger
             </Button>
           </div>

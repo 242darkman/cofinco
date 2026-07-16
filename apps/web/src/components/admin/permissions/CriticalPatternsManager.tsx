@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { AlertTriangle, Plus, Edit2, Trash2, Save, X, RefreshCw, Loader2, AlertCircle } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { AlertTriangle, Plus, Edit2, Trash2, Save, X, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button, Badge, Modal, ConfirmDialog } from '@/components/ui';
 import Switch from '@/components/ui/Switch';
 import { useCriticalPatterns, type CriticalPattern } from '@/hooks/admin/useCriticalPatterns';
@@ -64,7 +65,7 @@ function PatternRow({
         <td className="px-3 py-2 text-right">
           <div className="flex items-center gap-1 justify-end">
             <Button variant="ghost" size="sm" onClick={handleSave} disabled={saving}>
-              {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+              {saving ? <Spinner size="xs" tone="current" /> : <Save size={12} />}
             </Button>
             <Button variant="ghost" size="sm" onClick={onCancelEdit} disabled={saving}>
               <X size={12} />
@@ -220,7 +221,7 @@ function CreatePatternModal({
             Annuler
           </Button>
           <Button variant="primary" size="sm" type="submit" disabled={!pattern.trim() || submitting}>
-            {submitting ? <Loader2 size={12} className="animate-spin mr-1" /> : <Plus size={12} className="mr-1" />}
+            {submitting ? <Spinner size="xs" tone="current" className="mr-1" /> : <Plus size={12} className="mr-1" />}
             Créer
           </Button>
         </div>
@@ -253,7 +254,7 @@ export default function CriticalPatternsManager() {
   if (loading && patterns.length === 0) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="animate-spin text-content-muted" size={24} />
+        <Spinner size="sm" tone="current" className="text-content-muted" />
         <span className="ml-2 text-sm text-content-muted">Chargement...</span>
       </div>
     );

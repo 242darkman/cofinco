@@ -1,14 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  ShieldCheck,
-  X,
-  Building2,
-  ChevronDown,
-  AlertTriangle,
-  Loader2,
-  Banknote,
-  CheckCircle,
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { ShieldCheck, X, Building2, ChevronDown, AlertTriangle, Banknote, CheckCircle } from 'lucide-react';
 import { caisseAgentApi, caisseApi } from '@/lib/api-client';
 import { toast } from 'sonner';
 import { formatMoney } from '@/lib/format';
@@ -244,7 +236,7 @@ export default function CloseSessionModal({
             className="flex-[2] py-2.5 bg-status-warning hover:bg-status-warning/90 text-white rounded-lg font-semibold transition disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {submitting ? (
-              <Loader2 size={16} className="animate-spin" />
+              <Spinner size="xs" tone="current" />
             ) : (
               <>
                 <ShieldCheck size={16} />

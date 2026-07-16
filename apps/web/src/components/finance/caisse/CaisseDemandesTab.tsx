@@ -10,14 +10,8 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import {
-  CheckCircle, XCircle, Loader2, Search, RefreshCw,
-  ChevronLeft, ChevronRight, ChevronDown,
-  User, FileText, Shield, Send,
-  ArrowDownRight, ArrowUpRight,
-  ClipboardList, Wallet, Users, CreditCard,
-  AlertCircle,
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { CheckCircle, XCircle, Search, RefreshCw, ChevronLeft, ChevronRight, ChevronDown, User, FileText, Shield, Send, ArrowDownRight, ArrowUpRight, ClipboardList, Wallet, Users, CreditCard, AlertCircle } from 'lucide-react';
 import { ConfirmDialog } from '../../ui';
 import { toast } from 'sonner';
 import { formatMoney, formatClientName, resolveStorageUrl } from '../../../lib/format';
@@ -661,7 +655,7 @@ export default function CaisseDemandesTab({
       {/* ── List ───────────────────────────────────────── */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 size={24} className="animate-spin text-accent" />
+          <Spinner size="sm" tone="accent" />
         </div>
       ) : paged.length === 0 ? (
         <div className="text-center py-12">
@@ -793,7 +787,7 @@ export default function CaisseDemandesTab({
                               }`}
                             >
                               {actionLoading === item.id ? (
-                                <Loader2 size={12} className="animate-spin" />
+                                <Spinner size="xs" tone="current" />
                               ) : (
                                 <><CheckCircle size={12} className="inline mr-1" />Traiter</>
                               )}
@@ -869,7 +863,7 @@ export default function CaisseDemandesTab({
                         className="flex-[2] py-2.5 px-3 text-xs font-bold text-white bg-gradient-to-r from-status-warning to-status-warning rounded-lg hover:from-status-warning hover:to-status-warning transition flex items-center justify-center gap-1.5 shadow-lg shadow-status-warning/20"
                       >
                         {actionLoading === item.id ? (
-                          <Loader2 size={14} className="animate-spin" />
+                          <Spinner size="xs" tone="current" />
                         ) : (
                           <><CheckCircle size={14} /> Confirmer</>
                         )}

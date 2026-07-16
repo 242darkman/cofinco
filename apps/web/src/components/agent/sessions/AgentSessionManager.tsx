@@ -9,21 +9,8 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import {
-  Activity,
-  Banknote,
-  CheckCircle,
-  Clock,
-  AlertTriangle,
-  Send,
-  Loader2,
-  RefreshCw,
-  ArrowDownRight,
-  ArrowUpRight,
-  Wallet,
-  ShieldCheck,
-  XCircle,
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Activity, Banknote, CheckCircle, Clock, AlertTriangle, Send, RefreshCw, ArrowDownRight, ArrowUpRight, Wallet, ShieldCheck, XCircle } from 'lucide-react';
 import { toast } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
 import { caisseAgentApi, caisseApi } from '../../../lib/api-client';
@@ -90,7 +77,7 @@ export default function AgentSessionManager({ agentId, agenceId, mode }: AgentSe
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-12">
-        <Loader2 className="animate-spin text-accent" size={24} />
+        <Spinner size="sm" tone="accent" />
         <span className="ml-2 text-content-muted text-sm">Chargement de la session...</span>
       </div>
     );
@@ -412,7 +399,7 @@ function NoSessionView({ agentId, agenceId, mode, onCreated }: {
             >
               {loading ? (
                 <>
-                  <Loader2 size={16} className="animate-spin" />
+                  <Spinner size="xs" tone="current" />
                   <span className="text-xs">{loadingStep || 'En cours...'}</span>
                 </>
               ) : (
@@ -621,7 +608,7 @@ function ActiveSessionView({ session, agentId, agenceId, mode, onUpdated }: {
               disabled={loading || billetageTotal <= 0 || !destinationCaisseId}
               className="flex-1 py-2.5 bg-status-warning hover:bg-status-warning/90 text-white rounded-lg font-semibold transition disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {loading && <Loader2 size={14} className="animate-spin" />}
+              {loading && <Spinner size="xs" tone="current" />}
               Initier la clôture ({formatMoney(billetageTotal)})
             </button>
           </div>
@@ -730,7 +717,7 @@ function ClosingView({ session, mode, onUpdated }: {
             disabled={loading || (hasSignificantEcart && !ecartJustification.trim())}
             className="w-full py-3 bg-status-success hover:bg-status-success/90 text-white rounded-lg font-semibold transition disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            {loading ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
+            {loading ? <Spinner size="xs" tone="current" /> : <CheckCircle size={16} />}
             Finaliser la clôture
           </button>
         </div>

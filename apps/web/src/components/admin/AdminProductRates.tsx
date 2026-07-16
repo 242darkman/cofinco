@@ -5,24 +5,8 @@
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
-import {
-  Percent,
-  Save,
-  Edit2,
-  X,
-  Plus,
-  RefreshCw,
-  Loader2,
-  Info,
-  Shield,
-  Wallet,
-  PiggyBank,
-  Lock,
-  Search,
-  HelpCircle,
-  ChevronLeft,
-  ChevronRight,
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Percent, Save, Edit2, X, Plus, RefreshCw, Info, Shield, Wallet, PiggyBank, Lock, Search, HelpCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
@@ -408,7 +392,7 @@ export default function AdminProductRates() {
       <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="animate-spin text-accent" size={32} />
+            <Spinner size="md" tone="accent" />
           </div>
         ) : filteredProducts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-content-muted">
@@ -639,7 +623,7 @@ export default function AdminProductRates() {
                           className="flex items-center gap-1 px-2.5 py-1 bg-accent hover:bg-accent/90 text-white rounded text-[11px] font-medium transition disabled:opacity-50"
                         >
                           {updateMutation.isPending ? (
-                            <Loader2 size={12} className="animate-spin" />
+                            <Spinner size="xs" tone="current" />
                           ) : (
                             <Save size={12} />
                           )}
@@ -818,7 +802,7 @@ export default function AdminProductRates() {
                   className="flex items-center gap-1.5 px-4 py-2 bg-accent hover:bg-accent/90 text-white rounded-lg text-xs font-semibold transition disabled:opacity-50"
                 >
                   {createMutation.isPending ? (
-                    <Loader2 size={12} className="animate-spin" />
+                    <Spinner size="xs" tone="current" />
                   ) : (
                     <Plus size={12} />
                   )}

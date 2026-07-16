@@ -13,30 +13,7 @@ import React, { useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import {
-  CheckCircle2,
-  XCircle,
-  Loader2,
-  ArrowRightLeft,
-  Wallet,
-  Clock,
-  ArrowUpRight,
-  ArrowDownRight,
-  Shield,
-  AlertTriangle,
-  AlertCircle,
-  Settings,
-  Download,
-  MoreHorizontal,
-  Play,
-  Ban,
-  Eye,
-  Vault,
-  User,
-  KeyRound,
-  Info,
-  X
-} from "lucide-react";
+import { CheckCircle2, XCircle, ArrowRightLeft, Wallet, Clock, ArrowUpRight, ArrowDownRight, Shield, AlertTriangle, AlertCircle, Settings, Download, MoreHorizontal, Play, Ban, Eye, Vault, User, KeyRound, Info, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Card, Button, Badge, StatCard, ResponsiveTable, TabGroup, ConfirmDialog, IconButton } from "@/components/ui";

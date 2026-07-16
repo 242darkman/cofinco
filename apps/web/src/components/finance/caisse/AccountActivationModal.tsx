@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { createPortal } from 'react-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { X, Wallet, AlertTriangle, Loader2, UserCheck, Banknote, Building2, Phone, XCircle } from 'lucide-react';
+import { X, Wallet, AlertTriangle, UserCheck, Banknote, Building2, Phone, XCircle } from 'lucide-react';
 import { compteEpargneApi, paymentsApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney, formatPhoneInput, stripPhoneFormat } from '../../../lib/format';
@@ -509,7 +510,7 @@ export function AccountActivationModal({
                 />
               </div>
               <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-surface-base border-2 border-status-info flex items-center justify-center">
-                <Loader2 size={14} className="animate-spin text-accent" />
+                <Spinner size="xs" tone="accent" />
               </div>
             </div>
             <div>
@@ -522,7 +523,7 @@ export function AccountActivationModal({
               </p>
             </div>
             <div className="flex items-center gap-2 text-xs text-content-muted animate-pulse">
-              <Loader2 size={12} className="animate-spin" />
+              <Spinner size="xs" tone="current" />
               En attente de confirmation...
             </div>
           </div>
@@ -654,7 +655,7 @@ export function AccountActivationModal({
                     <div className="bg-surface-subtle border border-edge-subtle rounded-xl p-3 space-y-2">
                       {feeLoading ? (
                         <div className="flex items-center gap-2 text-xs text-content-muted">
-                          <Loader2 size={12} className="animate-spin" />
+                          <Spinner size="xs" tone="current" />
                           Calcul des frais...
                         </div>
                       ) : feeEstimate ? (
@@ -782,7 +783,7 @@ export function AccountActivationModal({
               >
                 {loading ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    <Spinner size="xs" tone="current" className="mr-2" />
                     {isMM ? 'Envoi...' : 'Activation...'}
                   </>
                 ) : (

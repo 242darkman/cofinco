@@ -1,11 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import {
-  Users, Wallet, ArrowRightLeft, UserPlus, RefreshCw,
-  Wifi, Search, MapPin, ChevronDown, Clock, CheckCircle,
-  Target, Banknote, Calendar, AlertTriangle,
-  ClipboardCheck, ChevronLeft, ChevronRight, Loader2,
-  ShieldCheck, Printer, ArrowDownLeft, ArrowUpRight, Filter, X
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Users, Wallet, ArrowRightLeft, UserPlus, RefreshCw, Wifi, Search, MapPin, ChevronDown, Clock, CheckCircle, Target, Banknote, Calendar, AlertTriangle, ClipboardCheck, ChevronLeft, ChevronRight, ShieldCheck, Printer, ArrowDownLeft, ArrowUpRight, Filter, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { agentTerrainApi, caisseAgentApi } from '../../lib/api-client';
 import { authService } from '../../lib/auth';
@@ -748,7 +743,7 @@ export default function AgentTerrain({ activeView, agentId: propAgentId, embedde
                     disabled={txLoading}
                     className="px-4 py-2 rounded-lg bg-surface border border-edge text-xs font-bold text-content-secondary hover:bg-surface-elevated transition-colors disabled:opacity-50 flex items-center gap-2"
                   >
-                    {txLoading ? <Loader2 size={12} className="animate-spin" /> : null}
+                    {txLoading ? <Spinner size="xs" tone="current" /> : null}
                     Charger plus
                   </button>
                 </div>
@@ -756,7 +751,7 @@ export default function AgentTerrain({ activeView, agentId: propAgentId, embedde
 
               {txLoading && transactions.length === 0 && (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 size={20} className="animate-spin text-accent" />
+                  <Spinner size="sm" tone="accent" />
                 </div>
               )}
             </>

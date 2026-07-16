@@ -1,8 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
-import {
-  Package, Plus, Pencil, Trash2, Code2, Search, ChevronRight,
-  Loader2, Shield, AlertCircle,
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Package, Plus, Pencil, Trash2, Code2, Search, ChevronRight, Shield, AlertCircle } from 'lucide-react';
 import { Button, Badge, Modal, ConfirmDialog } from '@/components/ui';
 import { useModulePermissionCrud } from '@/hooks/admin/useModulePermissionCrud';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
@@ -117,7 +115,7 @@ function ModuleFormModal({
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="ghost" size="sm" onClick={onClose} type="button">Annuler</Button>
           <Button size="sm" type="submit" disabled={!name || loading}>
-            {loading && <Loader2 size={14} className="animate-spin mr-1" />}
+            {loading && <Spinner size="xs" tone="current" className="mr-1" />}
             {initialData ? 'Modifier' : 'Créer'}
           </Button>
         </div>
@@ -194,7 +192,7 @@ function PermissionFormModal({
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="ghost" size="sm" onClick={onClose} type="button">Annuler</Button>
           <Button size="sm" type="submit" disabled={!name || !code || loading}>
-            {loading && <Loader2 size={14} className="animate-spin mr-1" />}
+            {loading && <Spinner size="xs" tone="current" className="mr-1" />}
             {initialData ? 'Modifier' : 'Créer'}
           </Button>
         </div>

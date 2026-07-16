@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import {
-  Calendar, ChevronLeft, ChevronRight, MapPin, AlertTriangle,
-  ClipboardCheck, Play, Loader2, Banknote, Clock
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Calendar, ChevronLeft, ChevronRight, MapPin, AlertTriangle, ClipboardCheck, Play, Banknote, Clock } from 'lucide-react';
 
 interface PlanningEntry {
   id: string;
@@ -209,7 +207,7 @@ function EnqueteItem({ enq, startingEnquete, onStart, onFill }: {
             disabled={isStarting}
             className="flex items-center gap-1 px-2 py-1 bg-accent-secondary hover:bg-accent-secondary-hover disabled:bg-surface-elevated text-content-primary text-[9px] font-bold rounded-lg transition-colors"
           >
-            {isStarting ? <Loader2 size={10} className="animate-spin" /> : <Play size={10} />}
+            {isStarting ? <Spinner size="xs" tone="current" /> : <Play size={10} />}
             Démarrer
           </button>
         ) : enq.statut === 'IN_PROGRESS' ? (

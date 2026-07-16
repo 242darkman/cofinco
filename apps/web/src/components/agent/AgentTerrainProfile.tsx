@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, User, Phone, Mail, MapPin, Calendar, Target, TrendingUp, Users, DollarSign, CheckCircle, Clock, Camera, Loader2 } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { X, User, Phone, Mail, MapPin, Calendar, Target, TrendingUp, Users, DollarSign, CheckCircle, Clock, Camera } from 'lucide-react';
 import { Button, Card, Badge, TabGroup } from '../ui';
 import { resolveStorageUrl } from '../../lib/format';
 
@@ -195,7 +196,7 @@ export default function AgentTerrainProfile({ agentId, onClose, onEdit }: AgentT
                 className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer"
               >
                 {uploadingPhoto ? (
-                  <Loader2 size={16} className="text-content-primary animate-spin" />
+                  <Spinner size="xs" tone="current" className="text-content-primary" />
                 ) : (
                   <Camera size={16} className="text-content-primary" />
                 )}

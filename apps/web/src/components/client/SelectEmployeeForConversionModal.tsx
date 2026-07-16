@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Search, Loader2, UserPlus, Building2 } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { X, Search, UserPlus, Building2 } from 'lucide-react';
 import { employeApi } from '../../lib/api-client';
 import { resolveStorageUrl } from '@/lib/format';
 import type { EmployeeConversionData } from './CreateClientModal';
@@ -110,7 +111,7 @@ export default function SelectEmployeeForConversionModal({ isOpen, onClose, onSe
         <div className="flex-1 overflow-y-auto min-h-0">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 size={24} className="animate-spin text-accent" />
+              <Spinner size="sm" tone="accent" />
             </div>
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-content-muted">

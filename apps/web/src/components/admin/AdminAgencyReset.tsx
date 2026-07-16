@@ -1,10 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  RotateCcw, AlertTriangle, Users, Wallet, CreditCard, Calculator,
-  Award, Activity, Smartphone, UserCheck, PiggyBank, TrendingUp,
-  Bell, Truck, MessageSquare, WifiOff, ShieldAlert, Settings,
-  CheckCircle2, Loader2, ShieldX, Info, Trash2
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { RotateCcw, AlertTriangle, Users, Wallet, CreditCard, Calculator, Award, Activity, Smartphone, UserCheck, PiggyBank, TrendingUp, Bell, Truck, MessageSquare, WifiOff, ShieldAlert, Settings, CheckCircle2, ShieldX, Info, Trash2 } from 'lucide-react';
 import { Button, ConfirmDialog, LoadingSpinner, SelectField } from '../ui';
 import { agenceApi, adminApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
@@ -164,7 +160,7 @@ export default function AdminAgencyReset() {
       {loadingPreview && (
         <div className="flex items-center justify-center py-12">
           <div className="text-center space-y-3">
-            <Loader2 className="w-8 h-8 text-accent animate-spin mx-auto" />
+            <Spinner size="md" tone="accent" className="mx-auto" />
             <p className="text-sm text-content-muted">Analyse des données en cours...</p>
           </div>
         </div>
@@ -322,7 +318,7 @@ export default function AdminAgencyReset() {
                   >
                     {resetting ? (
                       <span className="flex items-center gap-2">
-                        <Loader2 className="animate-spin" size={16} />
+                        <Spinner size="xs" tone="current" />
                         Réinitialisation en cours...
                       </span>
                     ) : (

@@ -3,33 +3,11 @@
  * compensation intégrée.
  */
 import React, { useCallback, useState } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import {
-  CheckCircle2,
-  XCircle,
-  Loader2,
-  ArrowRightLeft,
-  Wallet,
-  Clock,
-  ArrowUpRight,
-  ArrowDownRight,
-  Shield,
-  AlertTriangle,
-  AlertCircle,
-  Settings,
-  Download,
-  MoreHorizontal,
-  Play,
-  Ban,
-  Eye,
-  Vault,
-  User,
-  KeyRound,
-  Info,
-  X
-} from "lucide-react";
+import { CheckCircle2, XCircle, ArrowRightLeft, Wallet, Clock, ArrowUpRight, ArrowDownRight, Shield, AlertTriangle, AlertCircle, Settings, Download, MoreHorizontal, Play, Ban, Eye, Vault, User, KeyRound, Info, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Card, Button, Badge, StatCard, ResponsiveTable, TabGroup, ConfirmDialog, IconButton } from "@/components/ui";
@@ -307,7 +285,7 @@ export function TransfertDetailPanel({ transfert, onClose }: { transfert: Transf
                             >
                                 {isLoading ? (
                                     <>
-                                        <Loader2 size={14} className="mr-1.5 animate-spin" />
+                                        <Spinner size="xs" tone="current" className="mr-1.5" />
                                         Annulation...
                                     </>
                                 ) : (

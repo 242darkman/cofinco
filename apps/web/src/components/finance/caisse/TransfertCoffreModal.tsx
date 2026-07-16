@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { ArrowDownLeft, ArrowUpRight, Loader2 } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Modal, Button, FormField, TextareaField, SelectField } from '../../ui';

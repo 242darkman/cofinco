@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Braces, Plus, Edit2, Trash2, RefreshCw, Loader2, AlertCircle, ChevronDown, ChevronRight, Lock, Variable } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Braces, Plus, Edit2, Trash2, RefreshCw, AlertCircle, ChevronDown, ChevronRight, Lock, Variable } from 'lucide-react';
 import { Button, Badge, Modal, ConfirmDialog } from '@/components/ui';
 import { useConditionTemplates, type ConditionTemplate } from '@/hooks/admin/useConditionTemplates';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
@@ -311,7 +312,7 @@ function TemplateFormModal({
             Annuler
           </Button>
           <Button variant="primary" size="sm" type="submit" disabled={!name.trim() || submitting}>
-            {submitting ? <Loader2 size={12} className="animate-spin mr-1" /> : <Plus size={12} className="mr-1" />}
+            {submitting ? <Spinner size="xs" tone="current" className="mr-1" /> : <Plus size={12} className="mr-1" />}
             {isEditing ? 'Enregistrer' : 'Créer'}
           </Button>
         </div>
@@ -354,7 +355,7 @@ export default function ConditionTemplatesManager() {
   if (loading && templates.length === 0) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="animate-spin text-content-muted" size={24} />
+        <Spinner size="sm" tone="current" className="text-content-muted" />
         <span className="ml-2 text-sm text-content-muted">Chargement...</span>
       </div>
     );

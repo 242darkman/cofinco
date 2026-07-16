@@ -4,17 +4,8 @@
  */
 
 import React, { useState } from 'react';
-import {
-  History,
-  RotateCcw,
-  Clock,
-  User,
-  ChevronDown,
-  ChevronUp,
-  Check,
-  Loader2,
-  AlertTriangle,
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { History, RotateCcw, Clock, User, ChevronDown, ChevronUp, Check, AlertTriangle } from 'lucide-react';
 import { SettingsVersion } from '../../../hooks/admin/useAuditTrail';
 
 export interface VersionHistoryPanelProps {
@@ -72,7 +63,7 @@ export default function VersionHistoryPanel({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="animate-spin text-accent" size={32} />
+        <Spinner size="md" tone="accent" />
       </div>
     );
   }
@@ -166,7 +157,7 @@ export default function VersionHistoryPanel({
                               className="px-3 py-1.5 bg-status-warning hover:bg-status-warning text-white rounded-lg text-xs transition disabled:opacity-50"
                             >
                               {restoringVersion === version.version ? (
-                                <Loader2 className="animate-spin" size={14} />
+                                <Spinner size="xs" tone="current" />
                               ) : (
                                 'Confirmer'
                               )}

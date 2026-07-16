@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Search, User, CheckCircle, X, Loader2, Users } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Search, User, CheckCircle, X, Users } from 'lucide-react';
 import { resolveStorageUrl } from '../../lib/format';
 import { getRoleLabel } from '@shared/types/roles';
 
@@ -119,7 +120,7 @@ export default function AssignCashierModal({
         <div className="flex-1 overflow-y-auto p-4 space-y-2 max-h-[60vh]">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-12 text-content-muted">
-              <Loader2 className="w-8 h-8 animate-spin mb-3 opacity-50" />
+              <Spinner size="md" tone="current" className="mb-3 opacity-50" />
               <p className="text-sm">Chargement des agents...</p>
             </div>
           ) : filteredUsers.length > 0 ? (
@@ -245,7 +246,7 @@ export default function AssignCashierModal({
             >
               {isSaving ? (
                 <>
-                  <Loader2 size={16} className="animate-spin" /> Sauvegarde...
+                  <Spinner size="xs" tone="current" /> Sauvegarde...
                 </>
               ) : (
                 <>

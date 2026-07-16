@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
-import { MessageSquarePlus, Check, X, Clock, Filter, Loader2, User, Shield, AlertCircle, Ban } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { MessageSquarePlus, Check, X, Clock, Filter, User, Shield, AlertCircle, Ban } from 'lucide-react';
 import { Button, Badge, Modal } from '@/components/ui';
 import { usePermissionRequests, type PermissionRequestData } from '@/hooks/admin/usePermissionRequests';
 import { useToast } from '@/hooks/use-toast';
@@ -78,7 +79,7 @@ function ReviewModal({
             onClick={() => onSubmit(reason)}
             disabled={loading || (isReject && !reason.trim())}
           >
-            {loading && <Loader2 size={14} className="animate-spin mr-1" />}
+            {loading && <Spinner size="xs" tone="current" className="mr-1" />}
             {isReject ? 'Rejeter' : 'Approuver'}
           </Button>
         </div>
@@ -160,7 +161,7 @@ export default function PermissionRequestsManager() {
       <div className="flex-1 overflow-y-auto">
         {loading && (
           <div className="flex items-center justify-center py-16">
-            <Loader2 size={24} className="animate-spin text-accent" />
+            <Spinner size="sm" tone="accent" />
           </div>
         )}
 

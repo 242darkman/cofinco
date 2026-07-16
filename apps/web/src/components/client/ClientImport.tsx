@@ -1,6 +1,7 @@
 import type { InsertClient } from '@shared/schema';
+import { Spinner } from '@/components/ui/Spinner';
 import React, { useState } from 'react';
-import { Upload, FileText, CheckCircle, XCircle, AlertCircle, Download, Loader2, ArrowRight } from 'lucide-react';
+import { Upload, FileText, CheckCircle, XCircle, AlertCircle, Download, ArrowRight } from 'lucide-react';
 import Papa from 'papaparse';
 
 interface ClientImportProps {
@@ -209,7 +210,7 @@ Marie Sengele,marie@example.com,+242 06 234 5678,Brazzaville,ACTIVE,Standard,92,
           {/* Phase 2: PARSING / UPLOADING */}
           {(phase === 'PARSING' || phase === 'UPLOADING') && (
              <div className="flex flex-col items-center justify-center py-12 space-y-4">
-                <Loader2 className="h-12 w-12 text-accent animate-spin" />
+                <Spinner size="xl" tone="accent" />
                 <p className="text-content-secondary text-lg">
                   {phase === 'PARSING' ? 'Analyse du fichier...' : 'Importation des données en cours...'}
                 </p>

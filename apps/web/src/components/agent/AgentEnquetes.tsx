@@ -4,24 +4,9 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { formatPhoneNumber } from '../../lib/format';
-import {
-  ClipboardCheck,
-  Clock,
-  History,
-  MapPin,
-  User,
-  Banknote,
-  AlertTriangle,
-  CheckCircle,
-  XCircle,
-  ChevronRight,
-  RefreshCw,
-  Calendar,
-  Search,
-  Loader2,
-  FileSearch,
-} from 'lucide-react';
+import { ClipboardCheck, Clock, History, MapPin, User, Banknote, AlertTriangle, CheckCircle, XCircle, ChevronRight, RefreshCw, Calendar, Search, FileSearch } from 'lucide-react';
 import clsx from 'clsx';
 import { EnqueteWizard } from '../finance/credits/EnqueteWizard';
 
@@ -271,7 +256,7 @@ export default function AgentEnquetes({ agentId }: AgentEnquetesProps) {
       {/* Content */}
       {loading ? (
         <div className="flex items-center justify-center py-16">
-          <Loader2 className="animate-spin text-accent" size={32} />
+          <Spinner size="md" tone="accent" />
         </div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -402,7 +387,7 @@ export default function AgentEnquetes({ agentId }: AgentEnquetesProps) {
                       className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold text-content-primary bg-accent-secondary hover:bg-accent-secondary disabled:bg-surface-elevated disabled:text-content-muted rounded-lg transition-all"
                     >
                       {starting === investigation.id ? (
-                        <Loader2 size={14} className="animate-spin" />
+                        <Spinner size="xs" tone="current" />
                       ) : (
                         <ChevronRight size={14} />
                       )}

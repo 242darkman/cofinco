@@ -1,22 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import {
-  X,
-  Shield,
-  ShieldCheck,
-  ShieldX,
-  ArrowRightLeft,
-  AlertTriangle,
-  CheckCircle,
-  Loader2,
-  Building2,
-  Vault,
-  User,
-  MessageSquare,
-  Calendar,
-  Tag,
-  Package,
-  Lock,
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { X, Shield, ShieldCheck, ShieldX, ArrowRightLeft, AlertTriangle, CheckCircle, Building2, Vault, User, MessageSquare, Calendar, Tag, Package, Lock } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { toast } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
@@ -530,7 +514,7 @@ export default function TransfertInterCoffresApproval({
               >
                 {loading ? (
                   <>
-                    <Loader2 size={18} className="mr-2 animate-spin" />
+                    <Spinner size="sm" tone="current" className="mr-2" />
                     Traitement...
                   </>
                 ) : action === 'approve' ? (

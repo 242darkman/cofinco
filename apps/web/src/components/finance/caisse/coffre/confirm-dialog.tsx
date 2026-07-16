@@ -3,30 +3,7 @@
  * (validation, rejet, exécution, ouverture de caisse).
  */
 import React, { useCallback, useState } from 'react';
-import {
-  CheckCircle2,
-  XCircle,
-  Loader2,
-  ArrowRightLeft,
-  Wallet,
-  Clock,
-  ArrowUpRight,
-  ArrowDownRight,
-  Shield,
-  AlertTriangle,
-  AlertCircle,
-  Settings,
-  Download,
-  MoreHorizontal,
-  Play,
-  Ban,
-  Eye,
-  Vault,
-  User,
-  KeyRound,
-  Info,
-  X
-} from "lucide-react";
+import { CheckCircle2, XCircle, ArrowRightLeft, Wallet, Clock, ArrowUpRight, ArrowDownRight, Shield, AlertTriangle, AlertCircle, Settings, Download, MoreHorizontal, Play, Ban, Eye, Vault, User, KeyRound, Info, X } from 'lucide-react';
 import { type ConfirmAction } from './types';
 
 // --- Shared detail card for confirm dialogs ---

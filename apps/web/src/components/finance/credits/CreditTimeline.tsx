@@ -1,13 +1,10 @@
 
 import React, { useEffect, useState } from 'react';
-import { 
-  FileText, CheckCircle, XCircle, RefreshCw, 
-  ArrowRight, Clock, AlertCircle, DollarSign,
-  Calendar, Shield
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { FileText, CheckCircle, XCircle, RefreshCw, ArrowRight, Clock, AlertCircle, DollarSign, Calendar, Shield } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { Loader2 } from 'lucide-react';
+
 import { 
   getStatusLabel, 
   ALL_STATUS_LABELS,
@@ -55,7 +52,7 @@ export function CreditTimeline({ demandeId, compact = false }: CreditTimelinePro
   if (loading) {
     return (
       <div className="flex justify-center p-8">
-        <Loader2 className="animate-spin text-content-muted" />
+        <Spinner size="sm" tone="current" className="text-content-muted" />
       </div>
     );
   }

@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  Search, RefreshCw, Filter, ChevronDown, Phone, CheckCircle2,
-  XCircle, Clock, AlertTriangle, Eye, RotateCcw, Loader2
-} from 'lucide-react';
+import { Search, RefreshCw, Filter, ChevronDown, Phone, CheckCircle2, XCircle, Clock, AlertTriangle, Eye, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { formatPhoneNumber } from '../../lib/format';
@@ -326,7 +324,7 @@ export default function MobileMoneyTransactionsPage() {
       <div className="bg-surface-base/50 border border-edge rounded-xl overflow-hidden">
         {isLoading ? (
           <div className="flex items-center justify-center h-64">
-            <Loader2 size={32} className="text-accent animate-spin" />
+            <Spinner size="md" tone="accent" />
           </div>
         ) : filteredPayments.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-content-muted">

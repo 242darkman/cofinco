@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { Plus, Briefcase, Eye, Calendar, Mail, Phone, Upload, FileText, ExternalLink, Clock, MessageSquare, CheckCircle, XCircle, Users, Loader2, ShieldCheck, UserPlus } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Plus, Briefcase, Eye, Calendar, Mail, Phone, Upload, FileText, ExternalLink, Clock, MessageSquare, CheckCircle, XCircle, Users, ShieldCheck, UserPlus } from 'lucide-react';
 import { Card, Button, Modal, FormField, SelectField, TextareaField, Badge, ResponsiveTable } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { StatutCandidature, STATUT_CANDIDATURE_LABELS } from '@shared/enum/status-constants';
@@ -671,7 +672,7 @@ export default function CandidaturesTab({
                     disabled={loadingApproval}
                     className="mb-4"
                   >
-                    {loadingApproval ? <Loader2 size={14} className="animate-spin" /> : <Users size={14} />}
+                    {loadingApproval ? <Spinner size="xs" tone="current" /> : <Users size={14} />}
                     Démarrer le workflow d'approbation
                   </Button>
                 )}
@@ -739,7 +740,7 @@ export default function CandidaturesTab({
                         disabled={loadingApproval}
                         className="flex-1"
                       >
-                        {loadingApproval ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
+                        {loadingApproval ? <Spinner size="xs" tone="current" /> : <CheckCircle size={14} />}
                         Approuver
                       </Button>
                       <Button
@@ -749,7 +750,7 @@ export default function CandidaturesTab({
                         disabled={loadingApproval}
                         className="flex-1"
                       >
-                        {loadingApproval ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />}
+                        {loadingApproval ? <Spinner size="xs" tone="current" /> : <XCircle size={14} />}
                         Rejeter
                       </Button>
                     </div>

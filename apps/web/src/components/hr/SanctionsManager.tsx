@@ -487,7 +487,7 @@ export default function SanctionsManager({
           <div className="flex-1 overflow-auto p-4 space-y-3">
             {loadingRules ? (
               <div className="flex items-center justify-center py-8">
-                <div className="w-6 h-6 border-2 border-status-warning border-t-transparent rounded-full animate-spin" />
+                <Spinner size="sm" tone="current" className="text-status-warning" />
               </div>
             ) : escalationRules.length === 0 ? (
               <div className="text-center py-8">

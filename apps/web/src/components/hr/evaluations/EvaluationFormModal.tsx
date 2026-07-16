@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { Star, Loader2 } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Star } from 'lucide-react';
 import { Modal } from '../../ui';
 import {
   useEvaluationDetail,
@@ -200,7 +201,7 @@ export default function EvaluationFormModal({
               disabled={!allRated || submitting}
               className="px-5 py-2 rounded-lg text-sm font-semibold text-white bg-accent hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
             >
-              {submitting && <Loader2 size={16} className="animate-spin" />}
+              {submitting && <Spinner size="xs" tone="current" />}
               Soumettre
             </button>
           </div>
@@ -209,7 +210,7 @@ export default function EvaluationFormModal({
     >
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
-          <Loader2 size={32} className="animate-spin text-accent" />
+          <Spinner size="md" tone="accent" />
         </div>
       ) : (
         <div className="space-y-6">

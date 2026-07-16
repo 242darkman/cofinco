@@ -1,9 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import {
-  X, AlertCircle, DollarSign, Calendar, Wallet, Clock,
-  AlertTriangle, ArrowRight, Vault, RefreshCw, Phone,
-  Banknote, CreditCard, Smartphone, Info, User, Loader2
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { X, AlertCircle, DollarSign, Calendar, Wallet, Clock, AlertTriangle, ArrowRight, Vault, RefreshCw, Phone, Banknote, CreditCard, Smartphone, Info, User } from 'lucide-react';
 import { creditApi, isInsufficientFundsError, extractInsufficientFundsData, type InsufficientFundsErrorData } from '../../../lib/api-client';
 import { usePermissions } from '../../auth/ProtectedFeature';
 import { toast } from '../../../lib/toast';
@@ -665,7 +662,7 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
                         : 'bg-status-success hover:bg-status-success text-white shadow-status-success/20'
                     }`}
                  >
-                    {loading ? <Loader2 className="animate-spin" size={18} /> :
+                    {loading ? <Spinner size="sm" tone="current" /> :
                      decaissementType === 'programme' ? 'Valider la Programmation' : 'Confirmer le Décaissement'}
                  </Button>
                  </OfflineGuard>

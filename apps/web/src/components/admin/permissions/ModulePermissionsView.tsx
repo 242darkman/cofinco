@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Search, ShieldCheck, Info, Users, Loader2, RefreshCcw, Award } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Search, ShieldCheck, Info, Users, RefreshCcw, Award } from 'lucide-react';
 import { Module } from '../../../hooks/admin/useModules';
 import { Permission } from '../../../hooks/admin/usePermissions';
 import { CATEGORY_LABELS, ADMIN_ROLES } from '../../../constants/admin-constants';
@@ -153,7 +154,7 @@ export default function ModulePermissionsView({
               disabled={isRefreshing}
               className="h-8 w-8 flex items-center justify-center bg-surface hover:bg-surface-elevated disabled:opacity-50 text-content-secondary rounded-lg transition-colors border border-edge"
             >
-              {isRefreshing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCcw className="w-3.5 h-3.5" />}
+              {isRefreshing ? <Spinner size="xs" tone="current" /> : <RefreshCcw className="w-3.5 h-3.5" />}
             </button>
           </div>
         </div>

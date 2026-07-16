@@ -255,7 +255,7 @@ export default function AdminCurrencySettings() {
                     className="p-1 rounded hover:bg-status-danger-bg text-content-muted hover:text-status-danger"
                   >
                     {deletingId === preset.id
-                      ? <div className="animate-spin rounded-full h-3 w-3 border-b border-status-danger" />
+                      ? <Spinner size="xs" tone="current" className="text-status-danger" />
                       : <Trash2 size={12} />
                     }
                   </span>

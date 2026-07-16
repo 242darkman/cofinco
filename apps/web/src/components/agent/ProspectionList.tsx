@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, Filter, UserPlus, Eye, ChevronLeft, ChevronRight, Loader2, RefreshCw, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Search, Filter, UserPlus, Eye, ChevronLeft, ChevronRight, RefreshCw, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { prospectionApi, arrondissementApi } from '../../lib/api-client';
 import { STATUT_PROSPECTION_LABELS, STATUT_PROSPECTION_OPTIONS } from '@shared/enum/status-constants';
 import type { StatutProspectionType } from '@shared/enum/status-constants';
@@ -198,7 +199,7 @@ export default function ProspectionList({ agentId, onCreateNew }: ProspectionLis
       {/* List */}
       {loading ? (
         <div className="flex items-center justify-center py-8">
-          <Loader2 size={20} className="animate-spin text-accent" />
+          <Spinner size="sm" tone="accent" />
         </div>
       ) : prospects.length === 0 ? (
         <div className="text-center py-8 bg-surface/30 rounded-lg border border-edge border-dashed">

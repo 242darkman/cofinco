@@ -7,7 +7,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { AlertTriangle, Shield, Loader2 } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { AlertTriangle, Shield } from 'lucide-react';
 import { Modal, Button } from '@/components/ui';
 import { useCriticalPermissionCheck } from '@/hooks/admin/useRbacAudit';
 
@@ -103,7 +104,7 @@ export default function CriticalPermissionReasonDialog({
         {/* Reason Input */}
         {loading ? (
           <div className="flex items-center justify-center py-4 text-content-muted">
-            <Loader2 className="animate-spin mr-2" size={16} />
+            <Spinner size="xs" tone="current" className="mr-2" />
             <span className="text-sm">Vérification...</span>
           </div>
         ) : (
@@ -156,7 +157,7 @@ export default function CriticalPermissionReasonDialog({
             onClick={handleSubmit}
             disabled={loading || isSubmitting}
           >
-            {isSubmitting && <Loader2 className="animate-spin mr-2" size={14} />}
+            {isSubmitting && <Spinner size="xs" tone="current" className="mr-2" />}
             {currentAction.verb} la permission
           </Button>
         </div>

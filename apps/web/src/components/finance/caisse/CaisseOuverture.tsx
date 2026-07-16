@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Unlock, DollarSign, Lock, Shield, Check, KeyRound, AlertCircle, Monitor, Wallet, Clock, User, CheckCircle2, Loader2, Send, Package, ArrowRight, Ban, Banknote, Plus, Eye, EyeOff } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { X, Unlock, DollarSign, Lock, Shield, Check, KeyRound, AlertCircle, Monitor, Wallet, Clock, User, CheckCircle2, Send, Package, ArrowRight, Ban, Banknote, Plus, Eye, EyeOff } from 'lucide-react';
 import { Card, Button, IconButton, LoadingSpinner, Badge } from '../../ui';
 import SelectField from '../../ui/SelectField';
 import { usePermissions } from '../../auth/ProtectedFeature';
@@ -656,7 +657,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                      disabled={correcting}
                      className="border-status-danger/50 text-status-danger hover:bg-status-danger-bg"
                    >
-                     {correcting ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : <Shield size={14} className="mr-1.5" />}
+                     {correcting ? <Spinner size="xs" tone="current" className="mr-1.5" /> : <Shield size={14} className="mr-1.5" />}
                      {correcting ? 'Correction en cours...' : 'Corriger le solde à 0 FCFA'}
                    </Button>
                  </div>
@@ -702,7 +703,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                           <Wallet className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" size={16} />
                           {loadingCaisses ? (
                             <div className="w-full bg-surface-base border border-edge rounded-xl pl-10 pr-4 py-2.5 text-content-muted flex items-center gap-2">
-                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <Spinner size="xs" tone="current" />
                               <span className="text-sm">Chargement...</span>
                             </div>
                           ) : (
@@ -829,7 +830,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                   {/* 3. AUTHENTIFICATION (PIN ou Code d'accès — mutuellement exclusif) */}
                   {checkingPinStatus ? (
                     <div className="flex items-center justify-center py-3">
-                      <Loader2 className="h-4 w-4 animate-spin text-content-muted" />
+                      <Spinner size="xs" tone="current" className="text-content-muted" />
                       <span className="ml-2 text-xs text-content-muted">Vérification...</span>
                     </div>
                   ) : (
@@ -934,7 +935,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                               className="px-4 py-3 bg-status-warning hover:bg-status-warning disabled:bg-surface disabled:text-content-muted text-white text-sm font-bold rounded-xl transition-all flex items-center gap-1.5"
                             >
                               {accessCodeLoading ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                <Spinner size="xs" tone="current" />
                               ) : accessCodeValidated ? (
                                 <Check size={14} />
                               ) : (
@@ -999,7 +1000,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                     disabled={loading}
                     className="text-content-muted hover:text-status-danger text-xs font-bold transition-colors flex items-center gap-2"
                   >
-                    {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Ban size={14} />}
+                    {loading ? <Spinner size="xs" tone="current" /> : <Ban size={14} />}
                     Annuler la demande
                   </button>
                 </div>
@@ -1081,7 +1082,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                       : 'bg-accent-secondary hover:bg-accent-secondary shadow-accent/20 text-content-primary'
                   }`}
                 >
-                   {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : (
+                   {loading ? <Spinner size="sm" tone="current" /> : (
                      <>
                        <span>
                          {openingMode === 'direct'
@@ -1104,7 +1105,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                     disabled={loading || calculerTotal() <= 0}
                     className="w-full bg-status-success hover:bg-status-success disabled:opacity-50 text-white py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-3 transition-all"
                   >
-                     {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : (
+                     {loading ? <Spinner size="sm" tone="current" /> : (
                        <>
                          <span>Confirmer & Ouvrir</span>
                          <Check size={20} />
@@ -1116,7 +1117,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                     disabled={loading}
                     className="w-full text-content-muted hover:text-status-danger text-xs font-bold transition-colors flex items-center justify-center gap-2 py-2"
                   >
-                    {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Ban size={14} />}
+                    {loading ? <Spinner size="xs" tone="current" /> : <Ban size={14} />}
                     Annuler l'ouverture et restituer les fonds au coffre
                   </button>
                 </div>

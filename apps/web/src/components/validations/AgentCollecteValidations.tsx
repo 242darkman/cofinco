@@ -1,15 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import {
-  CheckCircle,
-  XCircle,
-  Clock,
-  AlertCircle,
-  Building2,
-  CheckCheck,
-  Loader2,
-  TrendingUp,
-  ShieldAlert
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { CheckCircle, XCircle, Clock, AlertCircle, Building2, CheckCheck, TrendingUp, ShieldAlert } from 'lucide-react';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -166,7 +157,7 @@ export default function AgentCollecteValidations({
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-4">
-        <Loader2 className="w-10 h-10 text-primary animate-spin" />
+        <Spinner size="lg" tone="current" className="text-primary" />
         <p className="text-sm font-medium text-content-muted">Chargement des collectes...</p>
       </div>
     );

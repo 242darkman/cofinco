@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Loader2, Send } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Send } from 'lucide-react';
 import { Button, Modal, SearchableSelect } from '@/components/ui';
 
 interface PermissionOption {
@@ -99,7 +100,7 @@ export default function PermissionRequestForm({ isOpen, onClose, onSubmit }: Per
           </label>
           {loadingPerms ? (
             <div className="flex items-center gap-2 text-sm text-content-muted py-2">
-              <Loader2 size={14} className="animate-spin" />
+              <Spinner size="xs" tone="current" />
               Chargement des permissions manquantes...
             </div>
           ) : permissions.length === 0 ? (
@@ -182,7 +183,7 @@ export default function PermissionRequestForm({ isOpen, onClose, onSubmit }: Per
             type="submit"
             disabled={!selectedPermId || reason.length < 10 || submitting || (requestType === 'TEMPORARY' && !expiresAt)}
           >
-            {submitting ? <Loader2 size={14} className="animate-spin mr-1" /> : <Send size={14} className="mr-1" />}
+            {submitting ? <Spinner size="xs" tone="current" className="mr-1" /> : <Send size={14} className="mr-1" />}
             Soumettre
           </Button>
         </div>

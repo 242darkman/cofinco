@@ -1,11 +1,7 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react'; // v2.1 redesign
+import { Spinner } from '@/components/ui/Spinner';
 
-import { 
-  X, CheckCircle, XCircle, AlertCircle, FileText, DollarSign, User, TrendingUp, 
-  Loader2, Shield, AlertTriangle, ChevronDown, ChevronUp, Briefcase, MessageSquare, 
-  UserCheck, RefreshCw, Clock, Trash2, Calendar, CreditCard, MapPin, Phone, Mail, 
-  LayoutDashboard, ArrowRight, Wallet, Percent, PiggyBank 
-} from 'lucide-react';
+import { X, CheckCircle, XCircle, AlertCircle, FileText, DollarSign, User, TrendingUp, Shield, AlertTriangle, ChevronDown, ChevronUp, Briefcase, MessageSquare, UserCheck, RefreshCw, Clock, Trash2, Calendar, CreditCard, MapPin, Phone, Mail, LayoutDashboard, ArrowRight, Wallet, Percent, PiggyBank } from 'lucide-react';
 import { demandeCreditApi } from '../../../lib/api-client';
 import { usePermissions } from '../../auth/ProtectedFeature';
 import { toast, handleApiError } from '../../../lib/toast';
@@ -1167,7 +1163,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                                 action === 'approve' ? 'bg-status-success hover:bg-status-success' : 'bg-status-danger hover:bg-status-danger'
                             } text-content-primary rounded-lg font-bold transition flex items-center justify-center gap-2`}
                         >
-                            {loading && <Loader2 size={16} className="animate-spin" />}
+                            {loading && <Spinner size="xs" tone="current" />}
                             Confirmer {action === 'approve' ? 'Approbation' : 'Rejet'}
                         </button>
                     </>
@@ -1365,7 +1361,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                 disabled={refundLoading || !refundAmount || Number(refundAmount) <= 0}
                 className="px-6 py-2 bg-status-warning hover:bg-status-warning disabled:bg-surface-elevated disabled:text-content-muted text-white font-medium rounded-lg transition flex items-center gap-2"
               >
-                {refundLoading ? <Loader2 className="animate-spin" size={16} /> : <DollarSign size={16} />}
+                {refundLoading ? <Spinner size="xs" tone="current" /> : <DollarSign size={16} />}
                 Créer la demande
               </button>
             </div>

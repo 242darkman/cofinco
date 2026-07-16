@@ -1,5 +1,6 @@
 import React, { Suspense, lazy, ComponentType } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+
 
 // Skeleton placeholder for charts
 export function ChartSkeleton({ height = 250 }: { height?: number }) {
@@ -9,7 +10,7 @@ export function ChartSkeleton({ height = 250 }: { height?: number }) {
       style={{ height }}
     >
       <div className="flex flex-col items-center gap-2 text-content-muted">
-        <Loader2 className="h-6 w-6 animate-spin" />
+        <Spinner size="sm" tone="current" />
         <span className="text-xs">Chargement du graphique...</span>
       </div>
     </div>

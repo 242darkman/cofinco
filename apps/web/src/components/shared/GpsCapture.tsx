@@ -1,21 +1,6 @@
 import React, { useEffect, useMemo } from 'react';
-import {
-  MapPin,
-  Loader2,
-  CheckCircle,
-  AlertCircle,
-  Signal,
-  SignalLow,
-  SignalMedium,
-  SignalHigh,
-  RefreshCw,
-  X,
-  Navigation,
-  Clock,
-  Target,
-  Zap,
-  TrendingUp,
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { MapPin, CheckCircle, AlertCircle, Signal, SignalLow, SignalMedium, SignalHigh, RefreshCw, X, Navigation, Clock, Target, Zap, TrendingUp } from 'lucide-react';
 import { useGeolocation, GpsSignalQuality, getSignalQualityInfo } from '../../hooks/useGeolocation';
 
 interface GpsCaptureProps {
@@ -478,7 +463,7 @@ export default function GpsCapture({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="relative">
-                  <Loader2 size={20} className="text-accent animate-spin" />
+                  <Spinner size="sm" tone="accent" />
                 </div>
                 <span className="text-sm font-medium text-status-success">
                   {accuracy !== null ? 'Raffinement en cours...' : 'Acquisition GPS...'}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Loader2, UserPlus, Phone, Briefcase, WifiOff, MapPin, User, TrendingUp, Clock, ArrowRight, ArrowLeft, Check, FileText, Building2, Store } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { X, UserPlus, Phone, Briefcase, WifiOff, MapPin, User, TrendingUp, Clock, ArrowRight, ArrowLeft, Check, FileText, Building2, Store } from 'lucide-react';
 import { prospectionApi, arrondissementApi, marcheApi, villeApi } from '../../lib/api-client';
 import { useToast } from '@/hooks/use-toast';
 import SearchableSelect, { type SearchableSelectOption } from '../ui/SearchableSelect';
@@ -535,7 +536,7 @@ export default function ProspectionFormModal({ isOpen, agentId, onClose, onSucce
           ) : (
             <button type="button" onClick={handleSubmit} disabled={loading}
               className="flex-1 py-3 bg-accent hover:bg-accent active:bg-accent rounded-xl text-white font-bold text-sm shadow-lg shadow-accent/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-              {loading ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
+              {loading ? <Spinner size="xs" tone="current" /> : <UserPlus size={16} />}
               Valider la prospection
             </button>
           )}

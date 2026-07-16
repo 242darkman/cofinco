@@ -1,10 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import {
-  Search, Send, Paperclip, MoreVertical,
-  ChevronLeft, Smile, Check, CheckCheck, Loader2,
-  Edit2, Trash2, X, UsersRound, Plus,
-  FileText, Image as ImageIcon, Download
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Search, Send, Paperclip, MoreVertical, ChevronLeft, Smile, Check, CheckCheck, Edit2, Trash2, X, UsersRound, Plus, FileText, Image as ImageIcon, Download } from 'lucide-react';
 import {
   useConversationsV2,
   useConversationMessages,
@@ -395,7 +391,7 @@ export default function MessagesModule({ initialConversationId, initialChatUserI
         <div className="flex-1 overflow-y-auto sidebar-scrollbar">
           {loadingConversations && !searchQuery ? (
             <div className="flex justify-center p-8 text-content-muted">
-              <Loader2 className="animate-spin" />
+              <Spinner size="sm" tone="current" />
             </div>
           ) : displayItems.length === 0 ? (
             <div className="text-center p-8 text-content-muted text-sm">
@@ -548,11 +544,11 @@ export default function MessagesModule({ initialConversationId, initialChatUserI
             >
               {isFetchingNextPage && (
                 <div className="flex justify-center py-2">
-                  <Loader2 size={16} className="animate-spin text-content-muted" />
+                  <Spinner size="xs" tone="current" className="text-content-muted" />
                 </div>
               )}
               {loadingMessages ? (
-                <div className="flex justify-center py-10"><Loader2 className="animate-spin text-accent" /></div>
+                <div className="flex justify-center py-10"><Spinner size="sm" tone="accent" /></div>
               ) : (
                 allMessages.map((msg, index) => {
                   const isMe = msg.senderId === currentUserId;
@@ -825,7 +821,7 @@ export default function MessagesModule({ initialConversationId, initialChatUserI
                   disabled={uploadingFile}
                   className="h-11 w-11 sm:h-12 sm:w-12 flex items-center justify-center text-content-muted hover:text-content-primary bg-surface hover:bg-surface-elevated rounded-xl transition-colors disabled:opacity-50 shrink-0"
                 >
-                  {uploadingFile ? <Loader2 size={20} className="animate-spin" /> : <Paperclip size={20} />}
+                  {uploadingFile ? <Spinner size="sm" tone="current" /> : <Paperclip size={20} />}
                 </button>
 
                 <div className="flex-1 relative">
@@ -888,7 +884,7 @@ export default function MessagesModule({ initialConversationId, initialChatUserI
                   disabled={!message.trim() || sending}
                   className="h-11 w-11 sm:h-12 sm:w-12 flex items-center justify-center bg-accent hover:bg-accent-primary-hover disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl shadow-lg shadow-accent/20 transition-transform active:scale-95 shrink-0"
                 >
-                  {sending ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
+                  {sending ? <Spinner size="sm" tone="current" /> : <Send size={20} />}
                 </button>
               </div>
             </div>

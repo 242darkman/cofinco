@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Spinner } from '@/components/ui/Spinner';
-import { DollarSign, Phone, FileText, CheckCircle, Users, CheckCircle2, AlertCircle, AlertTriangle, X, ChevronDown, Banknote, Smartphone, Loader2 } from 'lucide-react';
+import { DollarSign, Phone, FileText, CheckCircle, Users, CheckCircle2, AlertCircle, AlertTriangle, X, ChevronDown, Banknote, Smartphone } from 'lucide-react';
 import { SelectField, SearchableSelect } from '../ui';
 import { toast } from 'sonner';
 import AccountHolderPresenceModal, { PresenceConfirmationData } from '../auth/AccountHolderPresenceModal';
@@ -1212,7 +1212,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                       )}
                       {feeOption && loadingFeeEstimate && (
                         <div className="mt-2 flex items-center gap-2 text-[12px] text-content-muted">
-                          <Loader2 size={12} className="animate-spin" />
+                          <Spinner size="xs" tone="current" />
                           Calcul des frais...
                         </div>
                       )}
@@ -1333,7 +1333,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
 
             {/* Spinner */}
             <div className="mb-4">
-              <Loader2 size={32} className={`mx-auto animate-spin ${
+              <Spinner size="md" tone="current" className={`mx-auto ${
                 mmPaymentIntent.provider === 'MTN' ? 'text-status-warning' : 'text-status-danger'
               }`} />
             </div>

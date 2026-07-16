@@ -1,20 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  X,
-  Mail,
-  Phone,
-  KeyRound,
-  Lock,
-  Eye,
-  EyeOff,
-  ArrowRight,
-  ArrowLeft,
-  CheckCircle,
-  AlertCircle,
-  Loader2,
-  ShieldCheck,
-} from 'lucide-react';
+import { X, Mail, Phone, KeyRound, Lock, Eye, EyeOff, ArrowRight, ArrowLeft, CheckCircle, AlertCircle, ShieldCheck } from 'lucide-react';
 import Button from '../ui/Button';
 import FormField from '../ui/FormField';
 import { useLanguage } from '../../contexts/LanguageContext';

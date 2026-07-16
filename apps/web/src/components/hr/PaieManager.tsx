@@ -1,13 +1,9 @@
 import React, { useState, useCallback, useMemo } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { usePaie, type PayrollRun, type BulletinPaie, type PayrollRunIssue, type SalaryPaymentJob } from '../../hooks/hr/usePaie';
 import { Card, Button, ResponsiveTable, Badge, TabGroup } from '../ui';
-import {
-  FileText, Play, Download, Calculator, AlertCircle, Banknote, Settings, Eye,
-  ShieldCheck, CreditCard, ArrowLeft, RefreshCw, AlertTriangle, Clock, RotateCcw,
-  CheckCircle, Loader2, XCircle, RotateCw,
-  Smartphone, CalendarClock
-} from 'lucide-react';
+import { FileText, Play, Download, Calculator, AlertCircle, Banknote, Settings, Eye, ShieldCheck, CreditCard, ArrowLeft, RefreshCw, AlertTriangle, Clock, RotateCcw, CheckCircle, XCircle, RotateCw, Smartphone, CalendarClock } from 'lucide-react';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { toast } from '../../lib/toast';
 import SalaryAdvances from './SalaryAdvances';
@@ -263,7 +259,7 @@ export default function PaieManager() {
     if (loadingDetail) {
       return (
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="animate-spin text-accent" size={24} />
+          <Spinner size="sm" tone="accent" />
           <span className="ml-2 text-content-muted text-sm">Chargement du run...</span>
         </div>
       );
@@ -701,7 +697,7 @@ export default function PaieManager() {
                 <div className="flex-1 overflow-hidden">
                   {loadingRuns ? (
                     <div className="flex items-center justify-center py-10">
-                      <Loader2 className="animate-spin text-content-muted" size={20} />
+                      <Spinner size="sm" tone="current" className="text-content-muted" />
                     </div>
                   ) : runsDuMois.length > 0 ? (
                     <ResponsiveTable

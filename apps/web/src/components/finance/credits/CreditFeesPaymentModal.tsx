@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { DollarSign, AlertCircle, CheckCircle, X, Wallet, Shield, CreditCard, Smartphone, ChevronRight, User, FileText, Banknote, Sparkles, ArrowLeft, Loader2, Lock, CheckCircle2, KeyRound, Phone, Clock } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { DollarSign, AlertCircle, CheckCircle, X, Wallet, Shield, CreditCard, Smartphone, ChevronRight, User, FileText, Banknote, Sparkles, ArrowLeft, Lock, CheckCircle2, KeyRound, Phone, Clock } from 'lucide-react';
 import { Modal, Button, Badge } from '../../ui';
 import { useDemandes } from '../../../hooks/credits/useDemandes';
 import { computeSessionStatus, formatMoney, formatPhoneInput, stripPhoneFormat } from '../../../lib/format';
@@ -403,7 +404,7 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
           <div className="py-4 min-h-[220px]">
             {checkingSession ? (
               <div className="flex flex-col items-center justify-center py-8 gap-2">
-                <Loader2 size={24} className="text-accent animate-spin" />
+                <Spinner size="sm" tone="accent" />
                 <p className="text-sm text-content-muted">Vérification de la caisse...</p>
               </div>
             ) : step === 'caisse' ? (
@@ -419,7 +420,7 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
 
                 {loadingCaisses ? (
                   <div className="flex items-center justify-center py-4">
-                    <Loader2 size={20} className="text-content-muted animate-spin" />
+                    <Spinner size="sm" tone="current" className="text-content-muted" />
                   </div>
                 ) : agencyCaisses.length === 0 ? (
                   <div className="text-center py-4 text-content-muted text-sm">
@@ -496,7 +497,7 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
                 {/* Authentification dynamique */}
                 {checkingPinStatus ? (
                   <div className="flex items-center justify-center py-4">
-                    <Loader2 className="h-5 w-5 animate-spin text-content-muted" />
+                    <Spinner size="sm" tone="current" className="text-content-muted" />
                     <span className="ml-2 text-xs text-content-muted">Vérification...</span>
                   </div>
                 ) : hasPinConfigured ? (
@@ -563,7 +564,7 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
                           className="px-4 py-2 bg-status-warning hover:bg-status-warning disabled:bg-surface disabled:text-content-muted text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5"
                         >
                           {accessCodeLoading ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            <Spinner size="xs" tone="current" />
                           ) : accessCodeValidated ? (
                             <CheckCircle size={14} />
                           ) : (
@@ -626,7 +627,7 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
                           className="px-4 py-2.5 bg-status-warning hover:bg-status-warning disabled:bg-surface disabled:text-content-muted text-white text-sm font-bold rounded-xl transition-all flex items-center gap-2"
                         >
                           {accessCodeLoading ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <Spinner size="xs" tone="current" />
                           ) : accessCodeValidated ? (
                             <>
                               <CheckCircle size={14} />
@@ -822,7 +823,7 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
                 </div>
 
                 <div className="flex items-center justify-center gap-2 text-content-muted text-xs">
-                  <Loader2 size={14} className="animate-spin" />
+                  <Spinner size="xs" tone="current" />
                   <span>Veuillez patienter...</span>
                 </div>
 

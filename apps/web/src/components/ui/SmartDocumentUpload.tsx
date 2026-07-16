@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { Camera, RefreshCw, Check, AlertCircle, X, Loader2, User, FileText } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Camera, RefreshCw, Check, AlertCircle, X, User, FileText } from 'lucide-react';
 import { useEntityUpload } from '../../hooks/useEntityUpload';
 import type { StorageFileType, StorageEntityType } from '@shared/config/storage-paths';
 import { useImageCompression } from '../../hooks/useImageCompression';
@@ -605,7 +606,7 @@ export function SmartDocumentUpload({
             {/* Document thumbnail - Full cover for images, icon for PDFs */}
             {isLoadingDisplay && !isPdfFile ? (
               <div className="flex items-center justify-center h-full min-h-[100px] bg-surface">
-                <Loader2 className="w-6 h-6 text-content-muted animate-spin" />
+                <Spinner size="sm" tone="current" className="text-content-muted" />
               </div>
             ) : isPdfFile ? (
               // PDF placeholder - show icon and filename

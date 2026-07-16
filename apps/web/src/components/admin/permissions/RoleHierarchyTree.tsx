@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Shield, ChevronDown, RefreshCw, Loader2, AlertCircle, GitBranch, Plus, X, Trash2 } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Shield, ChevronDown, RefreshCw, AlertCircle, GitBranch, Plus, X, Trash2 } from 'lucide-react';
 import { useRoleHierarchy, type RoleHierarchyNode } from '@/hooks/admin/useRoleHierarchy';
 import { getRoleBadgeStyle } from '@/lib/role-utils';
 import { Button, Badge, Modal, ConfirmDialog } from '@/components/ui';
@@ -108,7 +109,7 @@ function AddRelationModal({
             Annuler
           </Button>
           <Button variant="primary" size="sm" type="submit" disabled={!parentRole || !childRole || submitting}>
-            {submitting ? <Loader2 size={12} className="animate-spin mr-1" /> : <Plus size={12} className="mr-1" />}
+            {submitting ? <Spinner size="xs" tone="current" className="mr-1" /> : <Plus size={12} className="mr-1" />}
             Créer la relation
           </Button>
         </div>
@@ -130,7 +131,7 @@ export default function RoleHierarchyTree() {
   if (loading && nodes.length === 0) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="animate-spin text-content-muted" size={24} />
+        <Spinner size="sm" tone="current" className="text-content-muted" />
         <span className="ml-2 text-sm text-content-muted">Chargement de la hiérarchie...</span>
       </div>
     );
@@ -249,7 +250,7 @@ export default function RoleHierarchyTree() {
                 className="opacity-0 group-hover:opacity-100 transition-opacity"
               >
                 {removing === relation.id ? (
-                  <Loader2 size={12} className="animate-spin" />
+                  <Spinner size="xs" tone="current" />
                 ) : (
                   <Trash2 size={12} className="text-status-danger" />
                 )}
@@ -327,7 +328,7 @@ export default function RoleHierarchyTree() {
                     title="Supprimer"
                     disabled={removing === rel.id}
                   >
-                    {removing === rel.id ? <Loader2 size={8} className="animate-spin" /> : <X size={8} />}
+                    {removing === rel.id ? <Spinner size="xs" tone="current" /> : <X size={8} />}
                   </button>
                 </span>
               );

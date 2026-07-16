@@ -1,5 +1,6 @@
 import React from 'react';
-import { X, CheckCircle2, XCircle, Loader2, Clock, AlertTriangle } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { X, CheckCircle2, XCircle, Clock, AlertTriangle } from 'lucide-react';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
 import mtnLogo from '@/assets/logos/mtn-logo.png';
 
@@ -52,7 +53,7 @@ const statusConfig: Record<PaymentStatus, {
     animate: true,
   },
   PENDING: {
-    icon: Loader2,
+    icon: Clock,
     title: 'En attente',
     description: 'Confirmez le paiement sur votre téléphone',
     color: 'text-accent',
@@ -153,10 +154,11 @@ export function PaymentStatusModal({
         {/* Status Icon */}
         <div className={`flex justify-center mb-4`}>
           <div className={`p-3 rounded-full ${config.bgColor}`}>
-            <Icon
-              size={28}
-              className={`${config.color} ${config.animate ? 'animate-spin' : ''}`}
-            />
+            {config.animate ? (
+              <Spinner size="md" tone="current" className={config.color} />
+            ) : (
+              <Icon size={28} className={config.color} />
+            )}
           </div>
         </div>
 
@@ -189,7 +191,7 @@ export function PaymentStatusModal({
               >
                 {isCheckingStatus ? (
                   <>
-                    <Loader2 size={12} className="animate-spin" />
+                    <Spinner size="xs" tone="current" />
                     Vérification...
                   </>
                 ) : (

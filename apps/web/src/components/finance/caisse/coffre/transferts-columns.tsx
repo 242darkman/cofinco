@@ -3,31 +3,9 @@
  * (valider, rejeter, exécuter, annuler) selon les permissions.
  */
 import { format } from "date-fns";
+import { Spinner } from '@/components/ui/Spinner';
 import { fr } from "date-fns/locale";
-import {
-  CheckCircle2,
-  XCircle,
-  Loader2,
-  ArrowRightLeft,
-  Wallet,
-  Clock,
-  ArrowUpRight,
-  ArrowDownRight,
-  Shield,
-  AlertTriangle,
-  AlertCircle,
-  Settings,
-  Download,
-  MoreHorizontal,
-  Play,
-  Ban,
-  Eye,
-  Vault,
-  User,
-  KeyRound,
-  Info,
-  X
-} from "lucide-react";
+import { CheckCircle2, XCircle, ArrowRightLeft, Wallet, Clock, ArrowUpRight, ArrowDownRight, Shield, AlertTriangle, AlertCircle, Settings, Download, MoreHorizontal, Play, Ban, Eye, Vault, User, KeyRound, Info, X } from 'lucide-react';
 import { Card, Button, Badge, StatCard, ResponsiveTable, TabGroup, ConfirmDialog, IconButton } from "@/components/ui";
 import { StatutTransfertCoffre, getMouvementCoffreLabel } from "@shared/enum/status-constants";
 import { ALL_STATUS_LABELS } from "@/lib/status-labels";
@@ -164,7 +142,7 @@ export function buildRenderRowActions(ctx: RowActionsContext) {
               disabled={isLoading}
             >
               {isLoading ? (
-                <Loader2 size={12} className="animate-spin" />
+                <Spinner size="xs" tone="current" />
               ) : (
                 <>
                   <CheckCircle2 size={12} className="lg:mr-1" />
@@ -219,7 +197,7 @@ export function buildRenderRowActions(ctx: RowActionsContext) {
             disabled={isLoading}
           >
             {isLoading ? (
-              <Loader2 size={12} className="animate-spin" />
+              <Spinner size="xs" tone="current" />
             ) : (
               <>
                 <Play size={12} className="lg:mr-1" />

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Spinner } from '@/components/ui/Spinner';
-import { Users, Plus, Edit2, Trash2, Lock, Unlock, Eye, EyeOff, Shield, CheckCircle, XCircle, Search, Filter, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Upload, Image as ImageIcon, Loader2, User, Briefcase, Check, Save, CreditCard, KeyRound, Info } from 'lucide-react';
+import { Users, Plus, Edit2, Trash2, Lock, Unlock, Eye, EyeOff, Shield, CheckCircle, XCircle, Search, Filter, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Upload, Image as ImageIcon, User, Briefcase, Check, Save, CreditCard, KeyRound, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, Button, IconButton, ResponsiveTable } from '../ui';
 import ConfirmDialog from '../ui/ConfirmDialog';
@@ -991,7 +991,7 @@ export default function AdminGestionProfils() {
                             <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-surface-muted overflow-hidden shadow-lg bg-surface-muted flex items-center justify-center relative">
                               {uploadingPhoto && (
                                 <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
-                                  <Loader2 className="w-6 h-6 text-accent animate-spin" />
+                                  <Spinner size="sm" tone="accent" />
                                 </div>
                               )}
                               {formData.photoProfile ? (
@@ -1362,7 +1362,7 @@ export default function AdminGestionProfils() {
                       } ${isSubmitting ? 'opacity-60 cursor-wait' : ''}`}
                     >
                       {isSubmitting ? (
-                        <><Loader2 size={16} className="animate-spin" /> Création...</>
+                        <><Spinner size="xs" tone="current" /> Création...</>
                       ) : (
                         <><Save size={16} /> Créer Profil</>
                       )}
@@ -1414,7 +1414,7 @@ export default function AdminGestionProfils() {
             <div className="p-4 overflow-y-auto">
               {loadingRoles ? (
                 <div className="flex items-center justify-center gap-2 py-6">
-                  <Loader2 size={16} className="animate-spin text-accent" />
+                  <Spinner size="xs" tone="accent" />
                   <span className="text-xs text-content-muted">Chargement des rôles...</span>
                 </div>
               ) : (

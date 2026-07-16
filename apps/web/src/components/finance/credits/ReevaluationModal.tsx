@@ -1,9 +1,6 @@
 import React, { useState } from 'react';
-import { 
-  X, Check, RefreshCw, Shield, Users, FileText, 
-  TrendingDown, Clock, TrendingUp, FileCheck, Loader2,
-  ChevronRight, ChevronLeft
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { X, Check, RefreshCw, Shield, Users, FileText, TrendingDown, Clock, TrendingUp, FileCheck, ChevronRight, ChevronLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface ElementNouveau {
@@ -684,7 +681,7 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
               disabled={submitting}
               className="px-4 py-2 bg-status-success hover:bg-status-success text-white text-sm font-bold rounded-lg transition-colors flex items-center gap-1"
             >
-              {submitting ? <Loader2 className="animate-spin" size={16} /> : <Check size={16} />}
+              {submitting ? <Spinner size="xs" tone="current" /> : <Check size={16} />}
               Soumettre
             </button>
           )}

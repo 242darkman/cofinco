@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import {
-  Search, User, CheckCircle, XCircle, Wallet, ArrowUpRight, ArrowDownLeft,
-  Loader, Coins, Phone, AlertCircle, Shield, Loader2
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Search, User, CheckCircle, XCircle, Wallet, ArrowUpRight, ArrowDownLeft, Loader, Coins, Phone, AlertCircle, Shield } from 'lucide-react';
 import { PhysicalConfirmationStep, PhysicalConfirmationData } from '../../auth/PhysicalConfirmationStep';
 import AccountHolderPresenceModal, { PresenceConfirmationData } from '../../auth/AccountHolderPresenceModal';
 import { Card, Button, Badge } from '@/components/ui';
@@ -1046,7 +1044,7 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
                 disabled={searchLoading || !searchTerm.trim()}
                 className="text-[9px] bg-accent-secondary hover:bg-accent-secondary disabled:bg-surface-elevated text-white px-2 py-1 rounded font-bold transition-colors shrink-0"
               >
-                {searchLoading ? <Loader2 size={10} className="animate-spin" /> : 'OK'}
+                {searchLoading ? <Spinner size="xs" tone="current" /> : 'OK'}
               </button>
             </div>
           </Card>
@@ -1255,7 +1253,7 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
                     </label>
                     {loadingClientOps ? (
                       <div className="flex items-center gap-2 text-xs text-content-muted py-1">
-                        <Loader2 size={12} className="animate-spin" /> Chargement...
+                        <Spinner size="xs" tone="current" /> Chargement...
                       </div>
                     ) : (
                       <div className="flex flex-wrap gap-1.5">
@@ -1536,7 +1534,7 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
                     )}
                     {(moyenPaiement === 'MTN' || moyenPaiement === 'AIRTEL') && feeOption && loadingFeeEstimate && (
                       <div className="flex items-center gap-2 text-xs text-content-muted">
-                        <Loader2 size={12} className="animate-spin" />
+                        <Spinner size="xs" tone="current" />
                         Calcul des frais...
                       </div>
                     )}

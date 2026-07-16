@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { X, Percent, Calendar, DollarSign, TrendingUp, AlertCircle, Loader2 } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { X, Percent, Calendar, DollarSign, TrendingUp, AlertCircle } from 'lucide-react';
 import { compteEpargneApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
@@ -266,7 +267,7 @@ export default function CompteInterestCalculator({ compte, onClose, onSuccess }:
             >
               {loading ? (
                 <>
-                  <Loader2 size={18} className="animate-spin" aria-hidden="true" />
+                  <Spinner size="sm" tone="current" />
                   Traitement...
                 </>
               ) : (

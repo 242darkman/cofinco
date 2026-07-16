@@ -4,16 +4,8 @@
  */
 
 import React, { useState } from 'react';
-import {
-  CheckSquare,
-  Square,
-  MinusSquare,
-  ChevronDown,
-  Loader2,
-  AlertTriangle,
-  CheckCircle,
-  XCircle,
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { CheckSquare, Square, MinusSquare, ChevronDown, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
 
 export interface BulkAction {
   id: string;
@@ -163,7 +155,7 @@ export default function BulkOperationsToolbar({
       {/* Progress Display */}
       {isExecuting && progress && (
         <div className="flex items-center gap-3 px-4 py-2 bg-accent/10 rounded-lg border border-accent/30">
-          <Loader2 className="animate-spin text-accent" size={18} />
+          <Spinner size="sm" tone="accent" />
           <div className="text-sm">
             <span className="text-content-primary font-medium">{progress.current}</span>
             <span className="text-content-muted"> / {progress.total}</span>

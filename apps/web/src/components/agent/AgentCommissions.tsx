@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { DollarSign, TrendingUp, Calendar, Check, Download, RefreshCw, Loader2, ChevronLeft, ChevronRight, Eye, AlertTriangle, FileText, Banknote, Smartphone, CreditCard, Clock } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { DollarSign, TrendingUp, Calendar, Check, Download, RefreshCw, ChevronLeft, ChevronRight, Eye, AlertTriangle, FileText, Banknote, Smartphone, CreditCard, Clock } from 'lucide-react';
 import { StatutPaiementCommission, STATUT_PAIEMENT_COMMISSION_LABELS } from '@shared/enum/status-constants';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
 import { formatMoney, currencySymbol } from '@shared/config/currency';
@@ -248,7 +249,7 @@ export default function AgentCommissions({ agentId }: AgentCommissionsProps) {
             disabled={recalculating === 'all' || commissions.length === 0}
             className="px-3 py-1.5 bg-accent hover:bg-accent-primary-hover text-white rounded-lg flex items-center gap-1.5 transition disabled:opacity-50 text-xs font-medium"
           >
-            {recalculating === 'all' ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+            {recalculating === 'all' ? <Spinner size="xs" tone="current" /> : <RefreshCw size={14} />}
             <span className="hidden sm:inline">Recalculer Tout</span>
           </button>
         </div>
@@ -257,7 +258,7 @@ export default function AgentCommissions({ agentId }: AgentCommissionsProps) {
       {/* Table */}
       <div className="bg-surface rounded-xl border border-edge overflow-hidden">
         {loading && commissions.length === 0 ? (
-          <div className="p-8 text-center text-content-muted"><Loader2 className="animate-spin mx-auto mb-2" />Chargement...</div>
+          <div className="p-8 text-center text-content-muted"><Spinner size="sm" tone="current" className="mx-auto mb-2" />Chargement...</div>
         ) : commissions.length === 0 ? (
           <div className="p-8 text-center text-content-muted">Aucune commission — les commissions se créent automatiquement après chaque collecte approuvée</div>
         ) : (
@@ -395,7 +396,7 @@ export default function AgentCommissions({ agentId }: AgentCommissionsProps) {
                     disabled={recalculating === selectedCommission.id}
                     className="w-full py-3 bg-accent/10 hover:bg-accent/20 text-accent border border-accent/20 rounded-xl font-bold text-sm flex justify-center items-center gap-2 transition"
                   >
-                    {recalculating === selectedCommission.id ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+                    {recalculating === selectedCommission.id ? <Spinner size="xs" tone="current" /> : <RefreshCw size={16} />}
                     Recalculer
                   </button>
                 </div>
@@ -503,7 +504,7 @@ export default function AgentCommissions({ agentId }: AgentCommissionsProps) {
                 disabled={paymentLoading || (paymentMethod === 'CASH' && activeSessions.length === 0)}
                 className="flex-1 py-3 bg-status-success hover:bg-status-success/90 text-white rounded-xl font-bold text-sm transition disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {paymentLoading ? <Loader2 size={16} className="animate-spin" /> : null}
+                {paymentLoading ? <Spinner size="xs" tone="current" /> : null}
                 Confirmer
               </button>
             </div>

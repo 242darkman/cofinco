@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { X, DollarSign, FileText, AlertCircle, TrendingUp, TrendingDown, Smartphone, Banknote, FileCheck, Building, Loader2, AlertTriangle, CheckCircle, WifiOff } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { X, DollarSign, FileText, AlertCircle, TrendingUp, TrendingDown, Smartphone, Banknote, FileCheck, Building, AlertTriangle, CheckCircle, WifiOff } from 'lucide-react';
 import { compteEpargneApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
@@ -525,7 +526,7 @@ export default function CompteTransactionForm({ compte, type, onClose, onSuccess
               >
                 {loading ? (
                   <>
-                    <Loader2 size={18} className="animate-spin" aria-hidden="true" />
+                    <Spinner size="sm" tone="current" />
                     Traitement...
                   </>
                 ) : isPendingActivation && type === 'Dépôt' ? (

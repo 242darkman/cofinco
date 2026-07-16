@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart3, TrendingUp, Users, Award, Loader2, RefreshCw, Calendar } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { BarChart3, TrendingUp, Users, Award, RefreshCw, Calendar } from 'lucide-react';
 import { supervisionApi } from '../../lib/api-client';
 
 interface AgentPerformance {
@@ -103,7 +104,7 @@ export default function ProspectionSupervisionPanel() {
       {/* Agent Performance Table */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 size={24} className="animate-spin text-accent" />
+          <Spinner size="sm" tone="accent" />
         </div>
       ) : data.length === 0 ? (
         <div className="text-center py-8 text-content-muted">

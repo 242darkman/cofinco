@@ -1,17 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import {
-  CheckCircle,
-  XCircle,
-  User,
-  Loader2,
-  Banknote,
-  CreditCard,
-  PiggyBank,
-  Lock,
-  Wallet,
-  Calendar,
-  ShieldCheck
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { CheckCircle, XCircle, User, Banknote, CreditCard, PiggyBank, Lock, Wallet, Calendar, ShieldCheck } from 'lucide-react';
 import Card from '../ui/Card';
 import Badge from '../ui/Badge';
 import ConfirmDialog from '../ui/ConfirmDialog';
@@ -172,7 +161,7 @@ export default function OpeningApprovals({ agenceId, searchTerm = '' }: OpeningA
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-4">
-        <Loader2 className="w-10 h-10 text-accent animate-spin" />
+        <Spinner size="lg" tone="accent" />
         <p className="text-sm font-medium text-content-muted">Chargement des ouvertures...</p>
       </div>
     );

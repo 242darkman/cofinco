@@ -1,9 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import {
-  UserPlus, CheckCircle, Circle, Loader2, X, ArrowRight,
-  FileText, Calendar, DollarSign, Building, Briefcase,
-  ClipboardCheck, AlertCircle, User
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { UserPlus, CheckCircle, Circle, X, ArrowRight, FileText, Calendar, DollarSign, Building, Briefcase, ClipboardCheck, AlertCircle, User } from 'lucide-react';
 import { Button, Modal, FormField, SelectField, Badge } from '../ui';
 import { toast } from '../../lib/toast';
 import { hrApi } from '../../lib/api-client';
@@ -210,7 +207,7 @@ export default function OnboardingWizard({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-status-warning" />
+        <Spinner size="md" tone="current" className="text-status-warning" />
       </div>
     );
   }
@@ -230,7 +227,7 @@ export default function OnboardingWizard({
           onClick={handleStartOnboarding}
           disabled={starting}
         >
-          {starting ? <Loader2 size={16} className="animate-spin mr-2" /> : <UserPlus size={16} className="mr-2" />}
+          {starting ? <Spinner size="xs" tone="current" className="mr-2" /> : <UserPlus size={16} className="mr-2" />}
           Démarrer l'onboarding
         </Button>
       </div>
@@ -321,7 +318,7 @@ export default function OnboardingWizard({
                   >
                     <div className={`flex-shrink-0 ${completed ? 'text-status-success' : 'text-content-muted'}`}>
                       {isLoading ? (
-                        <Loader2 size={18} className="animate-spin" />
+                        <Spinner size="sm" tone="current" />
                       ) : completed ? (
                         <CheckCircle size={18} />
                       ) : (
@@ -426,7 +423,7 @@ export default function OnboardingWizard({
               onClick={handleConvertToEmployee}
               disabled={converting || !employeeData.salaireBase || !employeeData.poste}
             >
-              {converting ? <Loader2 size={14} className="animate-spin mr-2" /> : <CheckCircle size={14} className="mr-2" />}
+              {converting ? <Spinner size="xs" tone="current" className="mr-2" /> : <CheckCircle size={14} className="mr-2" />}
               Créer l'employé
             </Button>
           </div>

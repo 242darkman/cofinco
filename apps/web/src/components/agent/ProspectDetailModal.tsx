@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2, UserCheck, ArrowRight, Phone, MapPin, Briefcase, AlertTriangle, Activity, FileText, DollarSign, User } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { UserCheck, ArrowRight, Phone, MapPin, Briefcase, AlertTriangle, Activity, FileText, DollarSign, User } from 'lucide-react';
 import { prospectionApi } from '../../lib/api-client';
 import { formatPhoneNumber } from '../../lib/format';
 import { toast } from 'sonner';
@@ -93,7 +94,7 @@ export default function ProspectDetailSheet({ prospectId, onClose, onUpdate, can
 
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
-            <Loader2 size={32} className="animate-spin text-accent" />
+            <Spinner size="md" tone="accent" />
             <p className="text-sm text-content-muted">Chargement des informations...</p>
           </div>
         ) : !prospect ? (
@@ -271,7 +272,7 @@ export default function ProspectDetailSheet({ prospectId, onClose, onUpdate, can
                         disabled={actionLoading}
                         className="flex-1 py-2 bg-status-info hover:bg-status-info text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition disabled:opacity-50"
                       >
-                        {actionLoading ? <Loader2 size={12} className="animate-spin" /> : null}
+                        {actionLoading ? <Spinner size="xs" tone="current" /> : null}
                         Confirmer
                       </button>
                     </div>

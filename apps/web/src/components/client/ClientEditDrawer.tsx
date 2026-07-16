@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import type { ClientWithIdentity } from '@shared/schema';
 import { Save, User, Mail, Phone, MapPin, Briefcase, Calendar, DollarSign, Camera, Trash2, Video, FileText, Users, Plus, X } from 'lucide-react';
 import {
@@ -588,7 +589,7 @@ export default function ClientEditDrawer({ client, isOpen, onClose, onSave }: Cl
             <Button type="button" variant="primary" icon={isSubmitting ? undefined : Save} disabled={isSubmitting} onClick={handleSubmit}>
               {isSubmitting ? (
                 <span className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <Spinner size="xs" tone="onAccent" />
                   Traitement...
                 </span>
               ) : 'Enregistrer'}

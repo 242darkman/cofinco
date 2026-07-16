@@ -1,6 +1,7 @@
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Building, ChevronDown, Check, Search, Loader2 } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Building, ChevronDown, Check, Search } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 
 export interface Agency {
@@ -139,7 +140,7 @@ export default function AgencySelector({
         `}
       >
         <div className={`p-1 rounded-md ${isOpen ? 'bg-status-info-bg text-status-info' : 'bg-surface-elevated/50 text-status-info'}`}>
-          {loading ? <Loader2 size={16} className="animate-spin" /> : <Building size={16} />}
+          {loading ? <Spinner size="xs" tone="current" /> : <Building size={16} />}
         </div>
         <span className="font-medium text-sm text-content-secondary">
           {loading ? t('chargementAgences') : (selectedAgence?.nom || t('toutesAgences'))}
@@ -185,7 +186,7 @@ export default function AgencySelector({
           >
             {loading ? (
               <div className="flex items-center justify-center gap-2 py-6 text-content-muted text-xs">
-                <Loader2 size={14} className="animate-spin" />
+                <Spinner size="xs" tone="current" />
                 {t('chargementAgences')}
               </div>
             ) : filteredAgences.length === 0 ? (

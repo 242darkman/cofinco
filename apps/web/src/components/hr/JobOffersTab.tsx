@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Spinner } from '@/components/ui/Spinner';
-import { Plus, Briefcase, Eye, Globe, Lock, Users, BarChart3, Calendar, Target, RefreshCw, Loader2, X } from 'lucide-react';
+import { Plus, Briefcase, Eye, Globe, Lock, Users, BarChart3, Calendar, Target, RefreshCw, X } from 'lucide-react';
 import { Card, Button, Modal, FormField, SelectField, TextareaField, Badge, ResponsiveTable } from '../ui';
 import { useJobOffers, useJobOfferCandidatures, type JobOffer } from '../../hooks/hr/useJobOffers';
 import { usePermissions } from '../auth/ProtectedFeature';
@@ -216,7 +216,7 @@ export default function JobOffersTab({ positions, departments }: JobOffersTabPro
           <h4 className="text-sm font-bold text-content-primary">Candidatures</h4>
           {canManage && (
             <Button size="sm" variant="outline" onClick={() => scoreAll(selectedOfferId)} disabled={isScoringAll}>
-              {isScoringAll ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+              {isScoringAll ? <Spinner size="xs" tone="current" /> : <RefreshCw size={14} />}
               <span className="ml-1">Recalculer scores</span>
             </Button>
           )}

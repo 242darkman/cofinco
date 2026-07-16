@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Key, Copy, Check, AlertTriangle, Info, ChevronRight, ChevronLeft,
-  User, Search, Send, Bell, Clock, Hash, Shield, Loader2, X
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Key, Copy, Check, AlertTriangle, Info, ChevronRight, ChevronLeft, User, Search, Send, Bell, Clock, Hash, Shield, X } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import SelectField from '@/components/ui/SelectField';
 import Button from '@/components/ui/Button';
@@ -469,7 +467,7 @@ export default function GenerateCodeModal({ isOpen, onClose, onGenerate, generat
                   className="w-full pl-10 pr-4 py-3 bg-surface border border-edge rounded-xl text-content-primary placeholder:text-content-muted focus:border-status-info focus:outline-none"
                 />
                 {searchLoading && (
-                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 text-content-muted animate-spin" size={18} />
+                  <Spinner size="sm" tone="current" className="text-content-muted absolute right-3 top-1/2 -translate-y-1/2" />
                 )}
               </div>
 
@@ -618,11 +616,12 @@ export default function GenerateCodeModal({ isOpen, onClose, onGenerate, generat
             <Button
               onClick={handleSubmit}
               variant="primary"
-              icon={generating ? Loader2 : Key}
+              icon={Key}
               isLoading={generating}
+              loadingText="Génération..."
               className="w-full py-3"
             >
-              {generating ? 'Génération...' : 'Générer le code'}
+              Générer le code
             </Button>
           ) : (
             <div className="text-center p-4 bg-status-warning-bg rounded-xl text-status-warning">

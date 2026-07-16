@@ -4,17 +4,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import {
-  Eye,
-  MessageSquare,
-  Mail,
-  Bell,
-  Smartphone,
-  Loader2,
-  Copy,
-  Check,
-  AlertTriangle,
-} from 'lucide-react';
+import { Eye, MessageSquare, Mail, Bell, Smartphone, Copy, Check, AlertTriangle } from 'lucide-react';
 import DOMPurify from 'isomorphic-dompurify';
 import { toast } from '../../../lib/toast';
 import { useTenantBranding } from '@/components/branding/TenantLogo';

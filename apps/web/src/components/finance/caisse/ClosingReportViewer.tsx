@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Download, Printer, Loader2 } from 'lucide-react';
+import { Download, Printer } from 'lucide-react';
 import { Modal } from '@/components/ui';
 import Button from '@/components/ui/Button';
 import { ClosingReportTemplate } from '@/components/ui/printable/ClosingReportTemplate';
@@ -84,9 +84,11 @@ export const ClosingReportViewer: React.FC<ClosingReportViewerProps> = ({
             onClick={handleDownload}
             disabled={isDownloading}
             className="flex-1 bg-status-success hover:bg-status-success text-white"
-            icon={isDownloading ? Loader2 : Download}
+            icon={Download}
+            isLoading={isDownloading}
+            loadingText="Generation..."
           >
-            {isDownloading ? 'Generation...' : 'Telecharger PDF'}
+            Telecharger PDF
           </Button>
         </div>
       }

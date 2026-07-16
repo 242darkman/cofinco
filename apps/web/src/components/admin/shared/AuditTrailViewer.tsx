@@ -4,21 +4,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import {
-  History,
-  RotateCcw,
-  ChevronDown,
-  ChevronUp,
-  User,
-  Clock,
-  MapPin,
-  Monitor,
-  AlertTriangle,
-  CheckCircle,
-  XCircle,
-  Shield,
-  Loader2,
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { History, RotateCcw, ChevronDown, ChevronUp, User, Clock, MapPin, Monitor, AlertTriangle, CheckCircle, XCircle, Shield } from 'lucide-react';
 import { useAuditTrail, AuditLogEntry } from '../../../hooks/admin/useAuditTrail';
 import DateRangeFilter from './DateRangeFilter';
 
@@ -224,7 +211,7 @@ export default function AuditTrailViewer({
       <div className="overflow-auto" style={{ maxHeight }}>
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="animate-spin text-accent" size={32} />
+            <Spinner size="md" tone="accent" />
           </div>
         ) : logs.length === 0 ? (
           <div className="text-center py-12 text-content-muted">
@@ -310,7 +297,7 @@ export default function AuditTrailViewer({
                         title="Annuler cette action"
                       >
                         {rollingBack === log.id ? (
-                          <Loader2 className="animate-spin" size={18} />
+                          <Spinner size="sm" tone="current" />
                         ) : (
                           <RotateCcw size={18} />
                         )}

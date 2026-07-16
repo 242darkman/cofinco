@@ -1,9 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Calendar, Plus, Clock, Building2, ArrowRight, Loader2,
-  Play, Pause, Trash2, Edit2, RefreshCw, CheckCircle, XCircle,
-  AlertCircle, Repeat
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Calendar, Plus, Clock, Building2, ArrowRight, Play, Pause, Trash2, Edit2, RefreshCw, CheckCircle, XCircle, AlertCircle, Repeat } from 'lucide-react';
 import { Button, Badge, Modal, FormField, SelectField, TextareaField } from '../../ui';
 import { toast } from '../../../lib/toast';
 import { scheduledCaisseTransfersApi } from '../../../lib/api-client';
@@ -236,7 +233,7 @@ export default function ScheduledCaisseTransfersPanel({
       <div className="space-y-2">
         {loading && transfers.length === 0 ? (
           <div className="flex justify-center py-8">
-            <Loader2 className="w-6 h-6 animate-spin text-accent" />
+            <Spinner size="sm" tone="accent" />
           </div>
         ) : transfers.length === 0 ? (
           <div className="text-center py-8 text-content-muted">
@@ -322,7 +319,7 @@ export default function ScheduledCaisseTransfersPanel({
                           title="Exécuter maintenant"
                         >
                           {executing === transfer.id ? (
-                            <Loader2 size={14} className="animate-spin" />
+                            <Spinner size="xs" tone="current" />
                           ) : (
                             <Play size={14} />
                           )}

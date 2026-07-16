@@ -3,12 +3,13 @@
  * caisse en attente et tableau des transferts avec actions.
  */
 import React, { useCallback, useState } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
   CheckCircle2,
   XCircle,
-  Loader2,
+  RefreshCw,
   ArrowRightLeft,
   Wallet,
   Clock,
@@ -123,17 +124,18 @@ export function CoffreOperationsTab({
                   disabled={isLoadingOpeningRequests}
                   className="h-6 px-2 text-[10px] border-status-warning/30 text-status-warning hover:bg-status-warning-bg shrink-0"
                 >
-                  <Loader2
-                    size={10}
-                    className={isLoadingOpeningRequests ? 'animate-spin' : ''}
-                  />
+                  {isLoadingOpeningRequests ? (
+                    <Spinner size="xs" tone="current" />
+                  ) : (
+                    <RefreshCw size={10} />
+                  )}
                   <span className="hidden sm:inline ml-1">Actualiser</span>
                 </Button>
               </div>
     
               {isLoadingOpeningRequests ? (
                 <div className="p-2 text-center">
-                  <Loader2 className="w-4 h-4 animate-spin text-status-warning mx-auto" />
+                  <Spinner size="xs" tone="current" className="text-status-warning mx-auto" />
                   <p className="text-content-muted mt-1 text-[10px]">Chargement...</p>
                 </div>
               ) : (
@@ -196,7 +198,7 @@ export function CoffreOperationsTab({
                                   disabled={actionLoading === request.transfert?.id}
                                 >
                                   {actionLoading === request.transfert?.id ? (
-                                    <Loader2 size={10} className="animate-spin" />
+                                    <Spinner size="xs" tone="current" />
                                   ) : (
                                     <>
                                       <CheckCircle2 size={10} className="mr-1" />
@@ -313,10 +315,11 @@ export function CoffreOperationsTab({
                       disabled={isRefetchingTransferts}
                       className="h-7 px-2 text-[10px] text-content-muted hover:text-content-primary"
                    >
-                      <Loader2
-                          size={12}
-                          className={`mr-1 ${isRefetchingTransferts ? 'animate-spin text-accent' : 'text-content-muted'}`}
-                      />
+                      {isRefetchingTransferts ? (
+                          <Spinner size="xs" tone="accent" className="mr-1" />
+                      ) : (
+                          <RefreshCw size={12} className="mr-1 text-content-muted" />
+                      )}
                       <span className="hidden xs:inline">Actualiser</span>
                       <span className="xs:hidden">Act.</span>
                    </Button>
