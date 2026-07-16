@@ -65,27 +65,71 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     staleTime: 60 * 1000,
     refetchInterval: 5 * 60 * 1000,
     refetchOnWindowFocus: true,
-    // L'identité du tenant DOIT être récupérée au montage : sans ça, la query
-    // hérite du `refetchOnMount: false` global et resterait figée sur
-    // `initialData` (MicroFlex par défaut), affichant la mauvaise marque/les
-    // mauvais modules jusqu'au prochain focus fenêtre. `initialData` ne sert
-    // donc que de rendu instantané avant l'arrivée de la vraie config.
+    // Toujours re-valider au montage (le QueryClient global est en
+    // refetchOnMount: false). Pas d'`initialData` : on ne veut PAS peindre la
+    // marque MicroFlex par défaut avant l'arrivée de la vraie config — ça
+    // provoquait un flash de branding peu professionnel. Tant que la config
+    // réelle n'est pas là, on affiche un écran de bootstrap neutre (ci-dessous).
     refetchOnMount: 'always',
-    initialData: defaultTenantConfig,
-    initialDataUpdatedAt: 0,
   });
 
-  // Apply CSS variables whenever config changes
+  // Config à appliquer : la vraie config du réseau, ou — uniquement si le
+  // réseau/serveur est injoignable — un repli par défaut pour ne pas rester
+  // bloqué. Dans le cas nominal, on n'applique jamais de marque avant la vraie.
+  const activeConfig: TenantConfig | undefined = config ?? (error ? defaultTenantConfig : undefined);
+
+  // On applique la charte (CSS, titre, favicon, theme-color) seulement quand une
+  // config est réellement disponible — jamais pendant le bootstrap neutre.
   React.useEffect(() => {
-    if (config) {
-      applyTenantBranding(config);
+    if (activeConfig) {
+      applyTenantBranding(activeConfig);
     }
-  }, [config]);
+  }, [activeConfig]);
+
+  // Bootstrap : pas encore de config (et pas d'erreur) → écran neutre, sans
+  // marque, le temps du premier fetch. Évite tout flash d'un branding tiers.
+  if (!activeConfig) {
+    return <TenantBootstrapScreen />;
+  }
 
   return (
-    <TenantContext.Provider value={{ config: config || defaultTenantConfig, isLoading, error }}>
+    <TenantContext.Provider value={{ config: activeConfig, isLoading, error }}>
       {children}
     </TenantContext.Provider>
+  );
+}
+
+/**
+ * Écran d'amorçage neutre affiché tant que l'identité du tenant n'est pas
+ * chargée. Volontairement sans logo, sans nom et sans couleur de marque :
+ * un simple indicateur de chargement sur fond neutre, pour ne révéler aucune
+ * marque avant que la bonne soit connue.
+ */
+function TenantBootstrapScreen() {
+  return (
+    <output
+      aria-label="Chargement"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#0B0F19',
+      }}
+    >
+      <span
+        className="animate-spin"
+        style={{
+          width: 40,
+          height: 40,
+          borderRadius: '50%',
+          border: '3px solid rgba(255, 255, 255, 0.14)',
+          borderTopColor: 'rgba(255, 255, 255, 0.75)',
+          display: 'inline-block',
+        }}
+      />
+    </output>
   );
 }
 
