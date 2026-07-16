@@ -131,7 +131,7 @@ const TabGroup: React.FC<TabGroupProps> = ({
         flex items-center ${sizeConfig.gap} whitespace-nowrap
         ${fullWidth ? 'flex-1 justify-center' : 'shrink-0'}
       `,
-      active: 'bg-status-success text-white shadow-lg shadow-status-success/20',
+      active: 'bg-accent text-white shadow-lg shadow-accent/20',
       inactive: 'text-content-muted hover:bg-surface-elevated hover:text-content-primary',
       disabled: 'opacity-50 cursor-not-allowed',
     },
@@ -157,7 +157,7 @@ const TabGroup: React.FC<TabGroupProps> = ({
         border
         ${fullWidth ? 'flex-1 justify-center' : 'shrink-0'}
       `,
-      active: 'bg-gradient-to-r from-accent/20 to-status-info/20 text-accent border-accent/50',
+      active: 'bg-gradient-to-r from-accent/20 to-accent-secondary/20 text-accent border-accent/50',
       inactive: 'bg-surface/50 text-content-muted border-edge hover:bg-surface-elevated hover:text-content-primary hover:border-edge-strong',
       disabled: 'opacity-50 cursor-not-allowed',
     },

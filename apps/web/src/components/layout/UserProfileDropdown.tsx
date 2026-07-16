@@ -99,7 +99,7 @@ const Avatar: React.FC<AvatarProps> = ({ photoUrl, fullName, initials, size, cla
 
   // Initiales (fallback seulement)
   const initialsElement = (
-    <div className={`${sizeClasses} rounded-full bg-gradient-to-br from-accent to-status-info flex items-center justify-center text-white font-semibold ${borderClasses} ${className}`}>
+    <div className={`${sizeClasses} rounded-full bg-gradient-to-br from-accent to-accent-secondary flex items-center justify-center text-white font-semibold ${borderClasses} ${className}`}>
       {initials}
     </div>
   );

@@ -24,7 +24,7 @@ export default function PageHeader({
     <div className={`flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 ${className}`}>
       <div className="flex items-center gap-3">
         {Icon && (
-          <div className="p-3 bg-gradient-to-br from-status-info to-accent rounded-xl shadow-lg shadow-status-info/20">
+          <div className="p-3 bg-gradient-to-br from-accent to-accent-secondary rounded-xl shadow-lg shadow-accent/20">
             <Icon className="w-8 h-8 text-white" />
           </div>
         )}

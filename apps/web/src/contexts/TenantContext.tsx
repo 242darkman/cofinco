@@ -39,6 +39,17 @@ function applyTenantBranding(config: TenantConfig) {
     }
     link.href = config.theme.faviconUrl;
   }
+
+  // Couleur de thème (barre navigateur / splash mobile) alignée sur la marque.
+  if (config.theme.primaryColor) {
+    let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.name = 'theme-color';
+      document.head.appendChild(meta);
+    }
+    meta.content = config.theme.primaryColor;
+  }
 }
 
 export function TenantProvider({ children }: { children: ReactNode }) {

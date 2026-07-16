@@ -99,6 +99,13 @@
   --brand-amber: #E8A33D;
   --brand-teal: #3AAA8C;
 
+  /* Tons du loader applicatif : dérivés de l'accent par défaut, surchargés par
+     tenant-theme.ts avec les teintes de la marque. Évite tout flash vert/jaune
+     avant l'application du thème tenant. */
+  --loader-ring-1: var(--accent-primary);
+  --loader-ring-2: var(--accent-secondary);
+  --loader-ring-3: var(--accent-primary-hover);
+
   /* Login page - theme-aware */
   --login-bg-from: #f0f4f8;
   --login-bg-via: #e8eef5;
@@ -206,6 +213,11 @@
   --brand-green: #2D8B57;
   --brand-amber: #E8A33D;
   --brand-teal: #3AAA8C;
+
+  /* Tons du loader (thème sombre) : accent par défaut, surchargé par tenant. */
+  --loader-ring-1: var(--accent-primary);
+  --loader-ring-2: var(--accent-secondary);
+  --loader-ring-3: var(--accent-primary-hover);
 
   /* Login page - dark variant */
   --login-bg-from: #0a1628;

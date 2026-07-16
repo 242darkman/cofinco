@@ -24,8 +24,8 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
           focus:outline-none focus:ring-[3px]
           disabled:opacity-50 disabled:cursor-not-allowed
           ${error
-            ? 'border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]/30'
-            : 'border-[#E5E7EB] hover:border-gray-400 focus:border-[#059669] focus:ring-[#059669]/30'
+            ? 'border-status-danger focus:border-status-danger focus:ring-status-danger/30'
+            : 'border-[#E5E7EB] hover:border-gray-400 focus:border-accent focus:ring-accent/30'
           }
           ${className}
         `}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { ChevronDown, Search, X, Check, AlertCircle } from 'lucide-react';
 import { resolveStorageUrl } from '../../lib/format';
 import * as Popover from '@radix-ui/react-popover';
@@ -302,7 +303,7 @@ export default function SearchableSelect({
                 : 'bg-white text-[#111827]'
               }
               ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-gray-400'}
-              ${isOpen ? 'border-[#059669] ring-[3px] ring-[#059669]/30' : (variant === 'dark' ? '' : 'border-[#E5E7EB]')}
+              ${isOpen ? 'border-accent ring-[3px] ring-accent/30' : (variant === 'dark' ? '' : 'border-[#E5E7EB]')}
               ${error ? '!border-[#EF4444] !ring-[3px] !ring-[#EF4444]/30' : ''}
             `}
           >
@@ -397,7 +398,7 @@ export default function SearchableSelect({
                  {/* Initial full loading state */}
                  {isLoading && visibleOptions.length === 0 ? (
                    <div className="p-8 flex flex-col items-center justify-center gap-3 text-content-muted">
-                     <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin"></div>
+                     <Spinner size="sm" />
                      <span className="text-xs font-medium uppercase tracking-wider">Chargement...</span>
                    </div>
                  ) : visibleOptions.length > 0 ? (
@@ -447,7 +448,7 @@ export default function SearchableSelect({
                       {hasMore && (
                         isLoadingMore ? (
                           <div className="py-3 flex justify-center">
-                            <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+                            <Spinner size="sm" />
                           </div>
                         ) : (
                           <>

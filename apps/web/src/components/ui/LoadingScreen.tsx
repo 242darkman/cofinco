@@ -11,46 +11,47 @@ interface LoadingScreenProps {
 function ModernSpinner({ size = 80 }: { size?: number }) {
   return (
     <div className="relative" style={{ width: size, height: size }}>
-      {/* Outer ring - Navy blue (slow rotation) */}
+      {/* Anneau externe — ton de marque 1 (repli MicroFlex navy). */}
       <div
         className="absolute inset-0 rounded-full border-4 border-transparent"
         style={{
-          borderTopColor: 'var(--brand-navy)',
-          borderRightColor: 'var(--brand-navy)',
+          borderTopColor: 'var(--loader-ring-1, var(--brand-navy))',
+          borderRightColor: 'var(--loader-ring-1, var(--brand-navy))',
           animation: 'spin 2s linear infinite',
         }}
       />
 
-      {/* Middle ring - Green (medium speed, opposite direction) */}
+      {/* Anneau médian — ton de marque 2 (repli MicroFlex green), sens inverse. */}
       <div
         className="absolute rounded-full border-4 border-transparent"
         style={{
           inset: '8px',
-          borderTopColor: 'var(--brand-green)',
-          borderLeftColor: 'var(--brand-green)',
+          borderTopColor: 'var(--loader-ring-2, var(--brand-green))',
+          borderLeftColor: 'var(--loader-ring-2, var(--brand-green))',
           animation: 'spin 1.5s linear infinite reverse',
         }}
       />
 
-      {/* Inner ring - Amber (fast rotation) */}
+      {/* Anneau interne — contre-ton de marque (repli MicroFlex amber). */}
       <div
         className="absolute rounded-full border-4 border-transparent"
         style={{
           inset: '16px',
-          borderTopColor: 'var(--brand-amber)',
-          borderRightColor: 'var(--brand-amber)',
+          borderTopColor: 'var(--loader-ring-3, var(--brand-amber))',
+          borderRightColor: 'var(--loader-ring-3, var(--brand-amber))',
           animation: 'spin 1s linear infinite',
         }}
       />
 
-      {/* Center pulsing dot - Teal */}
+      {/* Point central pulsé — dégradé de marque (repli teal/green MicroFlex). */}
       <div
         className="absolute rounded-full"
         style={{
           inset: '28px',
-          background: 'linear-gradient(135deg, var(--brand-teal), var(--brand-green))',
+          background:
+            'linear-gradient(135deg, var(--loader-ring-1, var(--brand-teal)), var(--loader-ring-2, var(--brand-green)))',
           animation: 'pulse 1.5s ease-in-out infinite',
-          boxShadow: '0 0 20px rgba(58, 170, 140, 0.6)',
+          boxShadow: '0 0 20px var(--login-accent-glow, rgba(58, 170, 140, 0.6))',
         }}
       />
 

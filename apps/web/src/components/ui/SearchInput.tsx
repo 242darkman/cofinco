@@ -67,7 +67,7 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
             placeholder:text-[#9CA3AF] placeholder:font-normal
             transition-colors duration-200
             hover:border-gray-400
-            focus:outline-none focus:ring-[3px] focus:border-[#059669] focus:ring-[#059669]/30
+            focus:outline-none focus:ring-[3px] focus:border-accent focus:ring-accent/30
             disabled:opacity-50 disabled:cursor-not-allowed
             ${className}
           `}

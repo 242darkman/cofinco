@@ -101,14 +101,30 @@ export function computeTenantThemeVariables(config: TenantConfig): ThemeVariable
     '--login-accent-glow': hsla(darkPrimary, 0.2),
   };
 
-  const secondary = config.theme.secondaryColor ? parseColor(config.theme.secondaryColor) : undefined;
-  if (secondary) {
-    root['--accent-secondary'] = hsl(secondary);
-    root['--accent-secondary-hover'] = hsl(shiftLightness(secondary, -8));
-    const darkSecondary = withLightness(secondary, Math.max(secondary.l, 60));
-    dark['--accent-secondary'] = hsl(darkSecondary);
-    dark['--accent-secondary-hover'] = hsl(shiftLightness(darkSecondary, 8));
-  }
+  // Secondaire : explicite si fourni, sinon dérivé de la primaire (ton plus
+  // clair du même hue) afin que les dégradés de marque (avatar, onglets)
+  // restent cohérents sur tous les tenants.
+  const explicitSecondary = config.theme.secondaryColor ? parseColor(config.theme.secondaryColor) : undefined;
+  const secondary = explicitSecondary ?? withLightness(primary, clamp(primary.l + 14));
+  root['--accent-secondary'] = hsl(secondary);
+  root['--accent-secondary-hover'] = hsl(shiftLightness(secondary, -8));
+  const darkSecondary = withLightness(secondary, Math.max(secondary.l, 60));
+  dark['--accent-secondary'] = hsl(darkSecondary);
+  dark['--accent-secondary-hover'] = hsl(shiftLightness(darkSecondary, 8));
+
+  // Tons du loader applicatif : trois teintes harmonieuses dérivées de la
+  // marque (base, secondaire, contre-ton). Le contre-ton s'éclaircit ou
+  // s'assombrit à l'opposé de la primaire pour rester distinct quel que soit
+  // le branding, tout en conservant un rendu premium.
+  // Base claire → contre-ton plus sombre ; base sombre → contre-ton plus clair.
+  const counterTone = shiftLightness(primary, primary.l >= 50 ? -22 : 22);
+  root['--loader-ring-1'] = hsl(primary);
+  root['--loader-ring-2'] = hsl(secondary);
+  root['--loader-ring-3'] = hsl(counterTone);
+  const darkCounter = withLightness(darkPrimary, clamp(darkPrimary.l - 18));
+  dark['--loader-ring-1'] = hsl(darkPrimary);
+  dark['--loader-ring-2'] = hsl(darkSecondary);
+  dark['--loader-ring-3'] = hsl(darkCounter);
 
   return { root, dark };
 }
