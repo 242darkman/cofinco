@@ -65,6 +65,12 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     staleTime: 60 * 1000,
     refetchInterval: 5 * 60 * 1000,
     refetchOnWindowFocus: true,
+    // L'identité du tenant DOIT être récupérée au montage : sans ça, la query
+    // hérite du `refetchOnMount: false` global et resterait figée sur
+    // `initialData` (MicroFlex par défaut), affichant la mauvaise marque/les
+    // mauvais modules jusqu'au prochain focus fenêtre. `initialData` ne sert
+    // donc que de rendu instantané avant l'arrivée de la vraie config.
+    refetchOnMount: 'always',
     initialData: defaultTenantConfig,
     initialDataUpdatedAt: 0,
   });
