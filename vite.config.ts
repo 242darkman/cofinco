@@ -29,6 +29,14 @@ export default defineConfig({
         globIgnores: ['**/node_modules/**/*', 'sw.js', 'workbox-*.js'],
         // Runtime caching strategies
         runtimeCaching: [
+          // Identité du tenant (branding + feature flags) : JAMAIS servie depuis
+          // le cache. Une config périmée changerait la marque et les modules
+          // visibles à l'écran. NetworkOnly, placée en tête pour être prioritaire
+          // sur le catch-all NetworkFirst plus bas.
+          {
+            urlPattern: /^\/api\/tenant\/config/i,
+            handler: 'NetworkOnly',
+          },
           // P2.5: Lightweight stats - StaleWhileRevalidate for instant display on 3G
           {
             urlPattern: /^\/api\/dashboard\/stats-light/i,
