@@ -1,20 +1,18 @@
 import React from 'react';
+import { Spinner, type SpinnerSize } from './Spinner';
 
 interface LoadingSpinnerProps {
   size?: 'sm' | 'md' | 'lg';
   text?: string;
 }
 
+/** Chargement de section : le `Spinner` unique, centré et accompagné d'un libellé. */
 export default function LoadingSpinner({ size = 'md', text }: LoadingSpinnerProps) {
-  const sizeClasses = {
-    sm: 'w-6 h-6',
-    md: 'w-12 h-12',
-    lg: 'w-16 h-16'
-  };
+  const spinnerSize: SpinnerSize = size === 'sm' ? 'sm' : size === 'lg' ? 'xl' : 'lg';
 
   return (
     <div className="flex flex-col items-center justify-center gap-4 p-8">
-      <div className={`${sizeClasses[size]} border-4 border-status-info/20 border-t-status-info rounded-full animate-spin`}></div>
+      <Spinner size={spinnerSize} />
       {text && <p className="text-content-muted text-sm">{text}</p>}
     </div>
   );
