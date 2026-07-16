@@ -90,6 +90,8 @@ export const MODULE_TO_SUBJECT: Record<string, Subject> = {
   'Epargnes': Subjects.EPARGNES,
   'Épargnes': Subjects.EPARGNES,
   'Tontines': Subjects.TONTINES,
+  'Cartes de Pointage': Subjects.CARTES_POINTAGE,
+  'CartesPointage': Subjects.CARTES_POINTAGE,
   'Comptabilité': Subjects.COMPTABILITE,
   'Comptabilite': Subjects.COMPTABILITE,
   'Caisse': Subjects.CAISSE,

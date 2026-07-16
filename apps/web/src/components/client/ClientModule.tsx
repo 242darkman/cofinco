@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useClientAlerts } from '../../hooks/useClientAlerts';
-import { Plus, Search, Filter, Download, Upload, Users, MapPin, RefreshCw, List, Eye, Edit2, Trash2, ChevronRight, FileText, CreditCard, Shield, BarChart3, AlertCircle, Building2, Send, DollarSign, UserPlus, LayoutDashboard, User, Phone, Scale, Network, TrendingUp, FileSearch } from 'lucide-react';
-import { Button, IconButton, Card, ResponsiveTable, Badge, ConfirmDialog, FeatureHeader, FEATURE_DESCRIPTIONS, TabGroup } from '../ui';
+import { Plus, Search, Download, Upload, Users, MapPin, RefreshCw, List, Eye, Edit2, ChevronRight, BarChart3, Send, UserPlus } from 'lucide-react';
+import { Button, IconButton, Card, ResponsiveTable, Badge, ConfirmDialog, FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui';
 import { usePermissions, ProtectedFeature } from '../auth/ProtectedFeature';
 import ClientForm from './ClientForm';
 import CreateClientModal from './CreateClientModal';
@@ -12,18 +12,7 @@ import ClientImport from './ClientImport';
 import ClientsMap from './ClientsMap';
 import ClientProfileLayout from './ClientProfileLayout';
 import ClientEditDrawer from './ClientEditDrawer';
-import ClientOverviewTab from './tabs/ClientOverviewTab';
-import ClientProfileTab from './tabs/ClientProfileTab';
-import ClientContactTab from './tabs/ClientContactTab';
-import ClientKycLegalTab from './tabs/ClientKycLegalTab';
-import ClientReferencesTab from './tabs/ClientReferencesTab';
-import ClientAccounts from './ClientAccounts';
-import ClientKYC from './ClientKYC';
-import ClientNotes from './ClientNotes';
-import ClientGlobalHistory from './ClientGlobalHistory';
-import ClientAlerts from './ClientAlerts';
-import ClientScoreTab from './tabs/ClientScoreTab';
-import ClientEnquetesTab from './tabs/ClientEnquetesTab';
+import ClientProfileTabsPanel, { CLIENT_TAB_IDS } from './tabs/ClientProfileTabsPanel';
 import ClientBulkCommunication from './ClientBulkCommunication';
 import ClientSearch from './ClientSearch';
 import SelectEmployeeForConversionModal from './SelectEmployeeForConversionModal';
@@ -49,7 +38,7 @@ interface ClientModuleProps {
   activeSubModule?: string;
 }
 
-const CLIENT_TAB_IDS = ['overview', 'profil', 'coordonnees', 'kyc-legal', 'references', 'comptes', 'kyc', 'notes', 'transactions', 'enquetes', 'alertes', 'score'] as const;
+// CLIENT_TAB_IDS vit désormais dans ./tabs/ClientProfileTabsPanel (source de vérité).
 
 export default function ClientModule({ onModuleChange, activeSubModule }: ClientModuleProps) {
   // RBAC permissions
@@ -243,43 +232,14 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
           onEdit={() => setShowEditDrawer(true)}
           onDelete={() => handleDeleteClick(viewingClient.id)}
         >
-          {/* Tabs */}
-          <TabGroup
+          {/* Onglets + contenu (extraits — voir ClientProfileTabsPanel) */}
+          <ClientProfileTabsPanel
+            client={viewingClient}
             activeTab={activeTab}
-            onTabChange={(key) => navigateToPath(`/clients/${viewingClient.id}/${key}`)}
-            variant="underline"
-            size="sm"
-            tabs={[
-              { key: 'overview', label: 'Vue d\'ensemble', icon: LayoutDashboard },
-              { key: 'profil', label: 'Profil', icon: User },
-              { key: 'coordonnees', label: 'Coordonnées', icon: Phone },
-              { key: 'kyc-legal', label: 'Dossier KYC', icon: Scale },
-              { key: 'references', label: 'Références', icon: Network },
-              { key: 'comptes', label: 'Comptes', icon: CreditCard },
-              { key: 'kyc', label: 'Documents KYC', icon: Shield },
-              { key: 'notes', label: 'Notes', icon: Edit2 },
-              { key: 'transactions', label: 'Transactions', icon: DollarSign },
-              { key: 'enquetes', label: 'Enquêtes', icon: FileSearch },
-              { key: 'alertes', label: 'Alertes', icon: AlertCircle, badge: alertCount > 0 ? alertCount : undefined, badgeClassName: alertCount > 0 ? 'bg-status-danger text-white' : undefined },
-              { key: 'score', label: 'Score', icon: TrendingUp },
-            ]}
+            alertCount={alertCount}
+            onNavigateToTab={(tab) => navigateToPath(`/clients/${viewingClient.id}/${tab}`)}
+            onClientsReload={loadClients}
           />
-
-          {/* Tab Content */}
-          <div className="min-h-[400px] mt-4">
-            {activeTab === 'overview' && <ClientOverviewTab client={viewingClient} onNavigateToTab={(tab) => navigateToPath(`/clients/${viewingClient.id}/${tab}`)} />}
-            {activeTab === 'profil' && <ClientProfileTab client={viewingClient} />}
-            {activeTab === 'coordonnees' && <ClientContactTab client={viewingClient} />}
-            {activeTab === 'kyc-legal' && <ClientKycLegalTab client={viewingClient} />}
-            {activeTab === 'references' && <ClientReferencesTab client={viewingClient} />}
-            {activeTab === 'comptes' && <ClientAccounts clientId={viewingClient.id} />}
-            {activeTab === 'kyc' && <ClientKYC clientId={viewingClient.id} onUpdate={loadClients} />}
-            {activeTab === 'notes' && <ClientNotes clientId={viewingClient.id} />}
-            {activeTab === 'transactions' && <ClientGlobalHistory clientId={viewingClient.id} />}
-            {activeTab === 'enquetes' && <ClientEnquetesTab client={viewingClient} />}
-            {activeTab === 'alertes' && <ClientAlerts client={viewingClient} onUpdate={loadClients} onNavigateToTab={(tab) => navigateToPath(`/clients/${viewingClient.id}/${tab}`)} />}
-            {activeTab === 'score' && <ClientScoreTab client={viewingClient} />}
-          </div>
         </ClientProfileLayout>
 
         {/* Delete Confirmation */}

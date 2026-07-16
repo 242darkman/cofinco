@@ -15,6 +15,7 @@ import {
   FileText,
   LineChart,
   Briefcase,
+  LayoutGrid,
 } from 'lucide-react';
 import type { TenantBrandingKey, TenantFeatureKey } from '@shared/tenant-config';
 
@@ -39,6 +40,7 @@ export const FEATURE_LABELS: Record<TenantFeatureKey, { label: string; descripti
   enableRapports: { label: 'Rapports', description: 'Génération de rapports', icon: FileText },
   enableKpi: { label: 'KPI & Pilotage', description: 'Indicateurs et tableaux de pilotage', icon: LineChart },
   enableRH: { label: 'Ressources humaines', description: 'Personnel, congés, présence, paie et Mon Espace', icon: Briefcase },
+  enableCartesPointage: { label: 'Cartes de Pointage', description: 'Épargne libre par cartes à 31 cases', icon: LayoutGrid },
 };
 
 export const BRANDING_LABELS: Record<TenantBrandingKey, { label: string; placeholder: string }> = {

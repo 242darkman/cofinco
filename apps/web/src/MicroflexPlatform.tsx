@@ -11,6 +11,7 @@ import { clientService } from './services/clientService';
 
 // Finance modules (heaviest - load on demand)
 const Tontines = lazy(() => import('./components/finance/tontine/Tontines'));
+const CartesPointage = lazy(() => import('./components/finance/carte-pointage/CartesPointage'));
 const Credits = lazy(() => import('./components/finance/credits/Credits'));
 const TransfertArgent = lazy(() => import('./components/finance/transfert/TransfertArgent'));
 const CreditRequestForm = lazy(() => import('./components/finance/credits/CreditRequestForm'));
@@ -320,6 +321,12 @@ export default function MicroflexPlatform({ currentUser, onLogout, onUserUpdate 
         return (
           <Suspense fallback={<ModuleLoadingFallback moduleName="Tontines" />}>
             <Tontines />
+          </Suspense>
+        );
+      case 'cartes-pointage':
+        return (
+          <Suspense fallback={<ModuleLoadingFallback moduleName="Cartes de Pointage" />}>
+            <CartesPointage />
           </Suspense>
         );
       case 'credits':

@@ -17,6 +17,7 @@ import { registerAdminDashboardRoutes } from "./routes/admin-dashboard";
 import { registerClientRoutes } from "./routes/clients";
 import { registerFinanceRoutes } from "./routes/finance";
 import { registerTontineRoutes } from "./routes/tontines";
+import { registerCartesPointageRoutes } from "./routes/cartes-pointage";
 import { registerOperationsRoutes } from "./routes/operations";
 import { registerTrackingRoutes } from "./routes/tracking";
 import { registerAgentModulesRoutes } from "./routes/agent-modules";
@@ -145,6 +146,7 @@ export function registerRoutes(app: Express): Server {
   registerFinanceRoutes(app);
   registerComptesRoutes(app); // Comptes microfinance (dépôt, retrait, blocage, transfert)
   registerTontineRoutes(app);
+  registerCartesPointageRoutes(app); // Cartes de pointage (épargne libre par cases)
   registerOperationsRoutes(app); // Agents, prospection
   registerTrackingRoutes(app); // GPS tracking batch sync + sessions
   registerArrondissementsRoutes(app); // Arrondissements CRUD

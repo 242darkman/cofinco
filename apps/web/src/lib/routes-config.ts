@@ -11,6 +11,7 @@ const Dashboard = lazy(() => import('@/components/dashboard/Dashboard'));
 const Credits = lazy(() => import('@/components/finance/credits/Credits'));
 const Comptes = lazy(() => import('@/components/finance/compte/Comptes'));
 const Tontines = lazy(() => import('@/components/finance/tontine/Tontines'));
+const CartesPointage = lazy(() => import('@/components/finance/carte-pointage/CartesPointage'));
 const Comptabilite = lazy(() => import('@/components/finance/accounting/ComptabiliteSageOHADA'));
 const RessourcesHumaines = lazy(() => import('@/components/hr/RessourcesHumaines'));
 const AgentTerrainPortail = lazy(() => import('@/components/agent/AgentTerrainPortail'));
@@ -157,6 +158,16 @@ export const ROUTES: RouteConfig[] = [
     labelKey: 'menuTontines',
     group: 'Services Clients',
     tenantFeature: 'enableTontine',
+  },
+  {
+    key: 'cartes-pointage',
+    path: '/cartes-pointage',
+    component: CartesPointage,
+    requiredModule: 'Cartes de Pointage',
+    label: 'Cartes de Pointage',
+    labelKey: 'menuCartesPointage',
+    group: 'Services Clients',
+    tenantFeature: 'enableCartesPointage',
   },
 
   // --- Opérations ---

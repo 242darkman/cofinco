@@ -21,6 +21,8 @@ export const tenantFeatureFlagsSchema = z.object({
   enableRapports: z.boolean().default(true),
   enableKpi: z.boolean().default(true),
   enableRH: z.boolean().default(true),
+  /** Cartes de pointage (épargne libre par cases, 31 slots). */
+  enableCartesPointage: z.boolean().default(true),
 }).strict();
 
 export const tenantThemeConfigSchema = z.object({
@@ -116,6 +118,7 @@ export const defaultTenantConfig: TenantConfig = {
     enableRapports: true,
     enableKpi: true,
     enableRH: true,
+    enableCartesPointage: true,
   },
 };
 
@@ -154,6 +157,7 @@ export const TENANT_FEATURE_KIND: Record<TenantFeatureKey, TenantFeatureKind> = 
   enableRapports: "module",
   enableKpi: "module",
   enableRH: "module",
+  enableCartesPointage: "module",
 };
 
 export function isModuleFeature(feature: TenantFeatureKey): boolean {

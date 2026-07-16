@@ -153,7 +153,34 @@ export const PERMISSION_DESCRIPTIONS: Record<string, PermissionDescription> = {
     interface: 'Onglet "Gestion" sur une tontine',
     details: ['Ajouter/retirer des membres', 'Enregistrer les cotisations', 'Effectuer les distributions']
   },
-  
+
+  // Module Cartes de Pointage
+  'cartespointage.view': {
+    action: 'Voir les cartes de pointage',
+    interface: 'Accès au module Cartes de Pointage dans le menu principal',
+    details: ['Consulter les cartes actives et clôturées', 'Voir la progression des 31 cases', 'Imprimer une carte']
+  },
+  'cartespointage.create': {
+    action: 'Ouvrir une carte',
+    interface: 'Bouton "Nouvelle carte" dans le module Cartes de Pointage',
+    details: ['Choisir le client', 'Fixer le montant unitaire par case (figé à l\'ouverture)']
+  },
+  'cartespointage.deposit': {
+    action: 'Enregistrer un versement',
+    interface: 'Bouton "Effectuer un versement" sur une carte active',
+    details: ['Pointer la case suivante (max 31)', 'Encaisser en espèces (caisse ouverte requise) ou Mobile Money']
+  },
+  'cartespointage.withdraw': {
+    action: 'Valider un retrait',
+    interface: 'Bouton "Demander un retrait" sur une carte active',
+    details: ['Restituer M×N − M au client', 'Retenue d\'une échéance en commission', 'Clôture définitive de la carte']
+  },
+  'cartespointage.manage': {
+    action: 'Gérer les cartes',
+    interface: 'Gestion complète du module Cartes de Pointage',
+    details: ['Toutes les opérations du module']
+  },
+
   // Module Comptabilité
   'comptabilite.view': {
     action: 'Voir la comptabilité',

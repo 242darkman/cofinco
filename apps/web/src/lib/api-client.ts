@@ -3978,3 +3978,73 @@ export const permissionAnalyticsApi = {
     }),
 };
 
+// ============================================================================
+// CARTES DE POINTAGE (épargne libre par cases, 31 slots)
+// ============================================================================
+
+/** Carte de pointage telle que renvoyée par l'API (montants en chaînes décimales). */
+export interface CartePointageDto {
+  id: string;
+  reference: string;
+  clientId: string;
+  agenceId: string;
+  unitAmount: string;
+  devise: string;
+  completedSlots: number;
+  status: 'ACTIVE' | 'WITHDRAWN';
+  withdrawnAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  clientNom?: string | null;
+  clientPrenom?: string | null;
+}
+
+/** Transaction d'une carte (versement ou retrait). */
+export interface TransactionPointageDto {
+  id: string;
+  cardId: string;
+  type: 'DEPOSIT' | 'WITHDRAWAL';
+  amount: string;
+  commissionAmount: string;
+  slotNumber: number | null;
+  paymentMethod: 'CASH' | 'MOBILE_MONEY';
+  createdAt: string;
+}
+
+/** Résultat d'un retrait : répartition M×N − M (client) / M (commission). */
+export interface RetraitCartePointageDto {
+  transaction: TransactionPointageDto;
+  montantClient: string;
+  commission: string;
+  totalCollecte: string;
+}
+
+export const cartePointageApi = {
+  getAll: (params?: { clientId?: string; status?: 'ACTIVE' | 'WITHDRAWN' }) => {
+    const queryParams = new URLSearchParams();
+    if (params?.clientId) queryParams.append('clientId', params.clientId);
+    if (params?.status) queryParams.append('status', params.status);
+    const query = queryParams.toString();
+    return request<CartePointageDto[]>(`/cartes-pointage${query ? `?${query}` : ''}`);
+  },
+  getById: (id: string) =>
+    request<{ carte: CartePointageDto; transactions: TransactionPointageDto[] }>(`/cartes-pointage/${id}`),
+  getByReference: (reference: string) =>
+    request<CartePointageDto>(`/cartes-pointage/reference/${encodeURIComponent(reference)}`),
+  create: (data: { clientId: string; unitAmount: string }) =>
+    request<CartePointageDto>('/cartes-pointage', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  deposer: (id: string, data: { paymentMethod: 'CASH' | 'MOBILE_MONEY'; idempotencyKey: string }) =>
+    request<TransactionPointageDto>(`/cartes-pointage/${id}/versements`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  retirer: (id: string, data: { paymentMethod: 'CASH' | 'MOBILE_MONEY'; idempotencyKey: string }) =>
+    request<RetraitCartePointageDto>(`/cartes-pointage/${id}/retrait`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+};
+

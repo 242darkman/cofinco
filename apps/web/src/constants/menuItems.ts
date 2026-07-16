@@ -1,6 +1,7 @@
 import {
   CalendarClock,
   LayoutDashboard,
+  LayoutGrid,
   Users,
   Wallet,
   PiggyBank,
@@ -35,6 +36,7 @@ export const PLATFORM_MENU_ITEMS: MenuItem[] = [
   { labelKey: 'menuRemboursements', icon: Undo2, key: 'remboursements', section: 'services' },
   { labelKey: 'menuCompte', icon: PiggyBank, key: 'comptes', section: 'services' },
   { labelKey: 'menuTontines', icon: CircleDollarSign, key: 'tontines', section: 'services' },
+  { labelKey: 'menuCartesPointage', icon: LayoutGrid, key: 'cartes-pointage', section: 'services' },
 
   // Opérations
   { labelKey: 'menuCaisse', icon: Wallet, key: 'caisse', section: 'operations' },

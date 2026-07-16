@@ -23,6 +23,7 @@ export const APP_MODULES = [
   'Clients',
   'Comptes',
   'Tontines',
+  'Cartes de Pointage',
   'Comptabilité',
   'Agent Terrain',
   'CaisseAgent',
@@ -103,6 +104,7 @@ export const MODULES_DATA: ModuleSeed[] = [
   { name: 'Employés', description: 'Gestion des employés', icon: 'Users', category: 'admin', orderIndex: 32 },
   { name: 'Agences', description: 'Gestion des agences', icon: 'Building', category: 'admin', orderIndex: 33 },
   { name: 'KPI', description: 'Indicateurs clés de performance et pilotage', icon: 'BarChart3', category: 'general', orderIndex: 34 },
+  { name: 'Cartes de Pointage', description: 'Épargne libre par cartes à 31 cases', icon: 'LayoutGrid', category: 'finance', orderIndex: 35 },
 ];
 
 /**
@@ -167,6 +169,13 @@ export const PERMISSIONS_DATA: Partial<Record<AppModule, PermissionSeed[]>> = {
     { name: 'Créer une tontine', code: 'tontines.create', description: 'Créer une nouvelle tontine' },
     { name: 'Gérer une tontine', code: 'tontines.manage', description: 'Gérer les membres et cotisations' },
     { name: 'Modifier une tontine', code: 'tontines.edit', description: 'Modifier une tontine' },
+  ],
+  'Cartes de Pointage': [
+    { name: 'Voir les cartes de pointage', code: 'cartespointage.view', description: 'Accès au module Cartes de Pointage' },
+    { name: 'Ouvrir une carte', code: 'cartespointage.create', description: 'Ouvrir une nouvelle carte de pointage pour un client' },
+    { name: 'Enregistrer un versement', code: 'cartespointage.deposit', description: 'Pointer une case (versement du montant unitaire)' },
+    { name: 'Valider un retrait', code: 'cartespointage.withdraw', description: 'Retrait avec retenue d\'une échéance en commission et clôture de la carte' },
+    { name: 'Gérer les cartes', code: 'cartespointage.manage', description: 'Gestion complète des cartes de pointage' },
   ],
   'Comptabilité': [
     { name: 'Voir la comptabilité', code: 'comptabilite.view', description: 'Accès au module Comptabilité' },
@@ -394,6 +403,8 @@ export const SEED_ROLE_PERMISSIONS: Record<SystemRole, string[]> = {
     'comptes.close_initiate', 'comptes.close_approve', 'comptes.close_cancel',
     // Tontines
     'tontines.view', 'tontines.create', 'tontines.edit', 'tontines.manage',
+    // Cartes de Pointage
+    'cartespointage.view', 'cartespointage.create', 'cartespointage.deposit', 'cartespointage.withdraw', 'cartespointage.manage',
     // Comptabilité
     'comptabilite.view',
     // Remboursements
@@ -465,6 +476,7 @@ export const SEED_ROLE_PERMISSIONS: Record<SystemRole, string[]> = {
     'clients.view',
     'agent.view', 'agent.manage',
     'tontines.view', 'tontines.manage',
+    'cartespointage.view',
     'caisseagent.view', 'caisseagent.approve', 'caisseagent.reject',
     'comptes.close_approve',
     'prospection.view', 'prospection.edit',
@@ -481,6 +493,7 @@ export const SEED_ROLE_PERMISSIONS: Record<SystemRole, string[]> = {
     'clients.view', 'clients.create',
     'epargnes.view', 'epargnes.create', 'epargnes.edit',
     'caisse.view', 'caisse.create', 'caisse.edit', 'caisse.paiement',
+    'cartespointage.view', 'cartespointage.create', 'cartespointage.deposit', 'cartespointage.withdraw',
     'remboursements.view', 'remboursements.create',
     'virements_programmes.view', 'virements_programmes.edit',
     'communications.view',
@@ -512,6 +525,8 @@ export const SEED_ROLE_PERMISSIONS: Record<SystemRole, string[]> = {
     'epargnes.view',
     // Tontines
     'tontines.view',
+    // Cartes de Pointage
+    'cartespointage.view',
     // Comptabilité
     'comptabilite.view', 'comptabilite.export',
     // Caisse

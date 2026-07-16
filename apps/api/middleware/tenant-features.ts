@@ -19,6 +19,10 @@ const FEATURE_ROUTE_RULES: FeatureRouteRule[] = [
     ],
   },
   {
+    feature: "enableCartesPointage",
+    paths: [/^\/api\/cartes-pointage(?:\/|$)/],
+  },
+  {
     feature: "enableMobileMoney",
     paths: [
       /^\/api\/mobile-money(?:\/|$)/,
