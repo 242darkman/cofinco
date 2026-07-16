@@ -41,20 +41,36 @@ describe("politique de réassignation d'identité", () => {
   it("développement : réassignation automatique (bascule de tenant en local)", () => {
     expect(resolveRebindPolicy({ NODE_ENV: "development" } as NodeJS.ProcessEnv)).toEqual({
       allowed: true,
-      reason: "non-production",
+      reason: "auto-dev",
     });
   });
 
   it("test : réassignation automatique (base éphémère)", () => {
     expect(resolveRebindPolicy({ NODE_ENV: "test" } as NodeJS.ProcessEnv)).toEqual({
       allowed: true,
-      reason: "non-production",
+      reason: "auto-dev",
     });
   });
 
-  it("le flag explicite prime même hors production", () => {
+  it("preprod / staging : reste strict (pas d'auto-réassignation)", () => {
+    for (const nodeEnv of ["staging", "preprod", "uat"]) {
+      expect(resolveRebindPolicy({ NODE_ENV: nodeEnv } as NodeJS.ProcessEnv)).toEqual({
+        allowed: false,
+        reason: "none",
+      });
+    }
+  });
+
+  it("NODE_ENV absent : reste strict par sécurité", () => {
+    expect(resolveRebindPolicy({} as NodeJS.ProcessEnv)).toEqual({ allowed: false, reason: "none" });
+  });
+
+  it("le flag explicite prime dans tous les environnements", () => {
     expect(
       resolveRebindPolicy({ NODE_ENV: "development", TENANT_IDENTITY_REBIND: "true" } as NodeJS.ProcessEnv),
+    ).toEqual({ allowed: true, reason: "explicit" });
+    expect(
+      resolveRebindPolicy({ NODE_ENV: "preprod", TENANT_IDENTITY_REBIND: "true" } as NodeJS.ProcessEnv),
     ).toEqual({ allowed: true, reason: "explicit" });
   });
 });

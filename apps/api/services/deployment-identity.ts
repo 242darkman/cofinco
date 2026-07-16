@@ -33,15 +33,25 @@ export class DeploymentIdentityError extends Error {
 }
 
 /** Origine de l'autorisation de réassignation, pour la journalisation. */
-export type RebindReason = "explicit" | "non-production" | "none";
+export type RebindReason = "explicit" | "auto-dev" | "none";
+
+/**
+ * Environnements où la réassignation automatique est autorisée : uniquement le
+ * développement local et les tests. Toute valeur inconnue ou prod-like
+ * (`production`, `staging`, `preprod`, `uat`, ou `NODE_ENV` absent) reste
+ * strictement protégée — un environnement prod-like ne doit JAMAIS se
+ * réassigner silencieusement.
+ */
+const AUTO_REBIND_ENVS = new Set(["development", "test"]);
 
 /**
  * Politique de réassignation d'identité (enterprise-grade + ergonomie dev).
  *
- * - **Production** : réassignation refusée par défaut ; uniquement via
- *   `TENANT_IDENTITY_REBIND=true` (opération exceptionnelle, tracée).
- * - **Hors production** (dev, test) : réassignation automatique, pour basculer
- *   de tenant sur une base locale sans manipulation ni renommage d'objets.
+ * - **Prod / preprod / staging / inconnu** : réassignation refusée par défaut ;
+ *   uniquement via `TENANT_IDENTITY_REBIND=true` (opération exceptionnelle,
+ *   tracée en warn — à retirer après le démarrage).
+ * - **Développement / test** : réassignation automatique, pour basculer de
+ *   tenant sur une base locale sans manipulation ni renommage d'objets.
  *
  * Le tampon d'identité est une simple ligne (`deployment_identity`) : aucune
  * table ni base n'est jamais renommée.
@@ -50,7 +60,7 @@ export function resolveRebindPolicy(
   env: NodeJS.ProcessEnv,
 ): { allowed: boolean; reason: RebindReason } {
   if (env.TENANT_IDENTITY_REBIND === "true") return { allowed: true, reason: "explicit" };
-  if (env.NODE_ENV !== "production") return { allowed: true, reason: "non-production" };
+  if (AUTO_REBIND_ENVS.has(env.NODE_ENV ?? "")) return { allowed: true, reason: "auto-dev" };
   return { allowed: false, reason: "none" };
 }
 
@@ -113,7 +123,7 @@ export async function verifyDeploymentIdentity(
         .update(deploymentIdentity)
         .set({ tenantId: configuredTenantId, claimedAt: sql`now()`, lastVerifiedAt: sql`now()` })
         .where(eq(deploymentIdentity.id, 1));
-      if (rebindPolicy.reason === "non-production") {
+      if (rebindPolicy.reason === "auto-dev") {
         // Bascule de tenant sur une base locale : ergonomie dev, jamais en prod.
         logger.info(
           { previousTenantId: rows[0]?.tenantId, tenantId: configuredTenantId },
