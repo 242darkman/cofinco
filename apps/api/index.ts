@@ -194,7 +194,7 @@ app.get("/api/health", async (_req, res) => {
   });
 });
 
-(async () => {
+
   // Ensure custom SQL functions exist
   // In Docker, db-init handles this via direct PostgreSQL connection (db:5432).
   // Only run here for local dev (npm run dev) where DATABASE_URL points to PostgreSQL directly.
@@ -276,7 +276,16 @@ app.get("/api/health", async (_req, res) => {
   try {
     await StorageService.initializeBuckets();
   } catch (error) {
-    logger.warn('MinIO bucket initialization failed - file uploads may not work');
+    logger.warn({ err: error }, 'MinIO bucket initialization failed - file uploads may not work');
+  }
+
+  // Register Mobile Money providers (pawaPay) — sinon /api/payments/* et la
+  // Trésorerie renvoient 500 (« Provider PAWAPAY not found in registry »).
+  try {
+    const { initializeProviders } = await import("./services/mobile-money/provider-registry");
+    await initializeProviders();
+  } catch (error) {
+    logger.error({ err: error }, 'Mobile Money provider initialization failed');
   }
 
   // Session activity tracking middleware (must be after auth setup)
@@ -544,4 +553,3 @@ app.get("/api/health", async (_req, res) => {
 
   process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
   process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-})();
