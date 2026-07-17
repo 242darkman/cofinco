@@ -244,7 +244,7 @@ export default function AgentTerrainPortail({ agentId, activeView, onModuleChang
                   className={`
                     relative flex items-center gap-2 px-3 py-2 rounded-lg whitespace-nowrap transition-all border shrink-0
                     ${isActive
-                      ? 'bg-accent-secondary border-accent text-white shadow-md shadow-accent/20'
+                      ? 'bg-accent/10 border-accent/20 text-accent shadow-sm'
                       : 'bg-transparent border-transparent text-content-muted hover:bg-surface-elevated/50 hover:text-content-primary'
                     }
                   `}
@@ -253,7 +253,7 @@ export default function AgentTerrainPortail({ agentId, activeView, onModuleChang
                   <span className="text-xs font-semibold">{module.name}</span>
                   {module.badge != null && module.badge > 0 && (
                     <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center ${
-                      isActive ? 'bg-white/20 text-white' : 'bg-accent text-white'
+                      isActive ? 'bg-accent text-white shadow-sm' : 'bg-surface-elevated border border-edge text-content-primary'
                     }`}>
                       {module.badge > 99 ? '99+' : module.badge}
                     </span>

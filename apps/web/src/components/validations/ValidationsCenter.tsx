@@ -12,6 +12,7 @@ import {
 import { useValidationsBadge } from '@/hooks/useValidationsBadge';
 import { useAppNavigation } from '@/hooks/useAppNavigation';
 import { usePermissions } from '@/components/auth/ProtectedFeature';
+import SearchableSelect, { SearchableSelectOption } from '@/components/ui/SearchableSelect';
 import AgentCollecteValidations from './AgentCollecteValidations';
 import ClosureApprovals from './ClosureApprovals';
 import OpeningApprovals from './OpeningApprovals';
@@ -141,28 +142,35 @@ export default function ValidationsCenter({ activeView }: ValidationsCenterProps
         {/* Search & Global Filter Layer */}
         <div className="flex items-center flex-1 max-w-2xl gap-2">
           <div className="relative flex-1 group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted group-focus-within:text-primary transition-colors" size={16} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted group-focus-within:text-accent transition-colors" size={16} />
             <input
               type="text"
               placeholder="Recherche globale..."
               value={searchTerm}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
-              className="w-full h-10 pl-10 pr-4 text-sm bg-surface-muted/50 border border-edge rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all placeholder:text-content-muted/60"
+              className="w-full h-10 pl-10 pr-4 text-[13px] bg-input-bg border border-input-border rounded-xl focus:ring-[3px] focus:ring-accent/30 focus:border-accent hover:border-content-muted shadow-sm outline-none transition-all placeholder:text-input-placeholder"
             />
           </div>
           
           {showAgencySelector && (
-            <div className="relative min-w-[160px] hidden sm:block">
-              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" size={14} />
-              <select
+            <div className="relative min-w-[200px] hidden sm:block">
+              <SearchableSelect
+                name="agenceSelector"
                 value={selectedAgenceId}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedAgenceId(e.target.value)}
-                className="w-full h-10 pl-9 pr-8 text-xs bg-surface-muted/50 border border-edge rounded-xl focus:ring-2 focus:ring-primary/20 outline-none appearance-none cursor-pointer font-medium text-content-primary"
-              >
-                <option value="all">Toutes agences</option>
-                {activeAgencies.map((a: Agence) => <option key={a.id} value={a.id}>{a.nom}</option>)}
-              </select>
-              <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 text-content-muted rotate-90 pointer-events-none" size={14} />
+                onChange={(val) => setSelectedAgenceId(String(val))}
+                options={[
+                  { value: 'all', label: 'Toutes agences', hideAvatar: true },
+                  ...activeAgencies.map(a => ({
+                    value: a.id,
+                    label: a.nom,
+                    hideAvatar: true
+                  }))
+                ]}
+                placeholder="Sélectionner une agence..."
+                variant="dark"
+                icon={Filter}
+                className="[&>button]:!h-10 [&>button]:!rounded-xl [&>button]:!bg-input-bg [&>button]:!border-input-border [&>button]:hover:!border-content-muted [&>button]:focus:!border-accent [&>button]:focus:!ring-accent/30 [&>button]:!text-[13px]"
+              />
             </div>
           )}
 
@@ -188,13 +196,13 @@ export default function ValidationsCenter({ activeView }: ValidationsCenterProps
               onClick={() => handleTabChange(tab.key)}
               className={cn(
                 "relative px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2.5 outline-none group",
-                isActive ? "text-primary" : "text-content-muted hover:text-content-secondary"
+                isActive ? "text-accent" : "text-content-muted hover:text-content-primary hover:bg-surface-subtle"
               )}
             >
               {isActive && (
                 <motion.div
                   layoutId="activeTab"
-                  className="absolute inset-0 bg-surface border border-edge shadow-sm rounded-[10px]"
+                  className="absolute inset-0 bg-accent/10 border border-accent/20 shadow-sm rounded-xl"
                   transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                 />
               )}
@@ -202,9 +210,9 @@ export default function ValidationsCenter({ activeView }: ValidationsCenterProps
               <span className="relative z-10 whitespace-nowrap uppercase tracking-wider">{tab.label}</span>
               {tab.count > 0 && (
                 <span className={cn(
-                  "relative z-10 min-w-[20px] h-5 px-1 rounded-[6px] flex items-center justify-center text-[10px] font-black transition-all",
-                  isActive ? "bg-primary text-white" : "bg-surface-muted text-content-muted group-hover:bg-edge"
-                )}>
+                    "relative z-10 text-[10px] px-1.5 py-0.5 rounded-full font-black min-w-[20px] text-center",
+                    isActive ? "bg-accent text-white shadow-sm" : "bg-surface-elevated border border-edge text-content-muted"
+                  )}>
                   {tab.count}
                 </span>
               )}

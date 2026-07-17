@@ -248,7 +248,7 @@ export default function Comptes({ activeView }: ComptesProps) {
           <ProtectedFeature requiredAbility={{ action: Actions.CREATE, subject: Subjects.COMPTE_EPARGNE }}>
             <button
               onClick={() => setShowAccountForm(true)}
-              className="px-3 py-1.5 bg-status-info hover:bg-status-info text-white rounded-lg transition shadow-sm shadow-status-info/20 flex items-center gap-1.5 font-medium text-xs"
+              className="px-3 py-1.5 bg-accent hover:bg-accent-primary-hover text-white rounded-lg transition shadow-sm shadow-accent/20 flex items-center gap-1.5 font-medium text-xs"
             >
               <Plus size={14} />
               Nouveau <span className="hidden sm:inline">Compte</span>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useClientAlerts } from '../../hooks/useClientAlerts';
-import { Plus, Search, Download, Upload, Users, MapPin, RefreshCw, List, Eye, Edit2, ChevronRight, BarChart3, Send, UserPlus } from 'lucide-react';
+import { Plus, Search, Download, Upload, Users, MapPin, RefreshCw, List, Eye, Edit2, ChevronRight, BarChart3, Send, UserPlus, ChevronDown } from 'lucide-react';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { Button, IconButton, Card, ResponsiveTable, Badge, ConfirmDialog, FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui';
 import { usePermissions, ProtectedFeature } from '../auth/ProtectedFeature';
 import ClientForm from './ClientForm';
@@ -307,67 +308,159 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
 
             <div className="w-px h-5 bg-surface-subtle-elevated mx-0.5" />
 
-            <div className="flex items-center gap-0.5">
-              <IconButton
-                icon={activeView === 'list' ? MapPin : activeView === 'map' ? BarChart3 : List}
-                variant="secondary"
-                size="sm"
-                onClick={() => setActiveView(activeView === 'list' ? 'map' : activeView === 'map' ? 'stats' : 'list')}
-                title={activeView === 'list' ? 'Carte' : activeView === 'map' ? 'Stats' : 'Liste'}
-                aria-label={activeView === 'list' ? 'Carte' : activeView === 'map' ? 'Stats' : 'Liste'}
-                className="h-7 w-7"
-              />
-              <div className="hidden sm:flex items-center gap-0.5">
-                <IconButton
+            <div className="flex items-center gap-2">
+              <div className="flex items-center bg-surface-muted/40 p-0.5 rounded-lg border border-edge shadow-sm">
+                <Button
+                  icon={activeView === 'list' ? MapPin : activeView === 'map' ? BarChart3 : List}
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setActiveView(activeView === 'list' ? 'map' : activeView === 'map' ? 'stats' : 'list')}
+                  className="h-7 text-xs px-2.5 bg-surface shadow-sm text-content-primary border border-edge/50"
+                >
+                  <span className="hidden sm:inline">{activeView === 'list' ? 'Voir sur la carte' : activeView === 'map' ? 'Statistiques' : 'Vue Liste'}</span>
+                </Button>
+              </div>
+
+              <div className="hidden md:flex items-center bg-surface-muted/40 p-0.5 rounded-lg border border-edge shadow-sm">
+                <Button
                   icon={Search}
-                  variant="secondary"
+                  variant="ghost"
                   size="sm"
                   onClick={() => setShowAdvancedSearch(true)}
-                  title="Recherche avancée"
-                  aria-label="Recherche avancée"
-                  className="h-7 w-7"
-                />
-                <IconButton
+                  className="h-7 text-xs px-3 text-content-secondary hover:text-content-primary hover:bg-surface"
+                >
+                  Rechercher
+                </Button>
+                <div className="w-px h-4 bg-edge mx-1" />
+                <Button
                   icon={RefreshCw}
-                  variant="secondary"
+                  variant="ghost"
                   size="sm"
                   onClick={loadClients}
-                  title="Actualiser"
-                  aria-label="Actualiser"
-                  className="h-7 w-7"
-                />
+                  className="h-7 text-xs px-3 text-content-secondary hover:text-content-primary hover:bg-surface"
+                >
+                  Actualiser
+                </Button>
+                
                 {canImportClients && (
-                  <IconButton
-                    icon={Upload}
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setShowImport(true)}
-                    title="Imp."
-                    aria-label="Importer"
-                    className="h-7 w-7"
-                  />
+                  <>
+                    <div className="w-px h-4 bg-edge mx-1" />
+                    <DropdownMenu.Root>
+                      <DropdownMenu.Trigger asChild>
+                        <Button
+                          icon={ChevronDown}
+                          iconPosition="right"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs px-3 text-content-secondary hover:text-content-primary hover:bg-surface"
+                        >
+                          Actions
+                        </Button>
+                      </DropdownMenu.Trigger>
+                      <DropdownMenu.Portal>
+                        <DropdownMenu.Content 
+                          className="min-w-[180px] bg-surface-base border border-edge rounded-xl shadow-2xl p-1 z-50 animate-in fade-in zoom-in-95 duration-100"
+                          sideOffset={5}
+                          align="end"
+                        >
+                          <DropdownMenu.Item
+                            onSelect={() => setShowImport(true)}
+                            className="group flex items-center px-2 py-2 text-sm text-content-secondary hover:text-content-primary hover:bg-surface rounded-lg outline-none cursor-pointer"
+                          >
+                            <Upload className="mr-2 h-4 w-4 text-content-muted group-hover:text-content-primary" />
+                            Importer
+                          </DropdownMenu.Item>
+                          
+                          {canExportClients && (
+                            <DropdownMenu.Item
+                              onSelect={() => setShowExport(true)}
+                              className="group flex items-center px-2 py-2 text-sm text-content-secondary hover:text-content-primary hover:bg-surface rounded-lg outline-none cursor-pointer"
+                            >
+                              <Download className="mr-2 h-4 w-4 text-content-muted group-hover:text-content-primary" />
+                              Exporter
+                            </DropdownMenu.Item>
+                          )}
+                          
+                          {clients.length > 0 && (
+                            <>
+                              <DropdownMenu.Separator className="h-px bg-surface my-1" />
+                              <DropdownMenu.Item
+                                onSelect={() => setShowBulkCommunication(true)}
+                                className="group flex items-center px-2 py-2 text-sm text-content-secondary hover:text-content-primary hover:bg-surface rounded-lg outline-none cursor-pointer"
+                              >
+                                <Send className="mr-2 h-4 w-4 text-content-muted group-hover:text-content-primary" />
+                                Communication
+                              </DropdownMenu.Item>
+                            </>
+                          )}
+                        </DropdownMenu.Content>
+                      </DropdownMenu.Portal>
+                    </DropdownMenu.Root>
+                  </>
                 )}
-                {canExportClients && (
-                  <IconButton
-                    icon={Download}
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setShowExport(true)}
-                    title="Exp."
-                    aria-label="Exporter"
-                    className="h-7 w-7"
-                  />
+                
+                {/* Fallback if no import permission but export/comm exists */}
+                {!canImportClients && canExportClients && (
+                  <>
+                    <div className="w-px h-4 bg-edge mx-1" />
+                    <DropdownMenu.Root>
+                      <DropdownMenu.Trigger asChild>
+                        <Button
+                          icon={ChevronDown}
+                          iconPosition="right"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs px-3 text-content-secondary hover:text-content-primary hover:bg-surface"
+                        >
+                          Actions
+                        </Button>
+                      </DropdownMenu.Trigger>
+                      <DropdownMenu.Portal>
+                        <DropdownMenu.Content 
+                          className="min-w-[180px] bg-surface-base border border-edge rounded-xl shadow-2xl p-1 z-50 animate-in fade-in zoom-in-95 duration-100"
+                          sideOffset={5}
+                          align="end"
+                        >
+                          <DropdownMenu.Item
+                            onSelect={() => setShowExport(true)}
+                            className="group flex items-center px-2 py-2 text-sm text-content-secondary hover:text-content-primary hover:bg-surface rounded-lg outline-none cursor-pointer"
+                          >
+                            <Download className="mr-2 h-4 w-4 text-content-muted group-hover:text-content-primary" />
+                            Exporter
+                          </DropdownMenu.Item>
+                          
+                          {clients.length > 0 && (
+                            <>
+                              <DropdownMenu.Separator className="h-px bg-surface my-1" />
+                              <DropdownMenu.Item
+                                onSelect={() => setShowBulkCommunication(true)}
+                                className="group flex items-center px-2 py-2 text-sm text-content-secondary hover:text-content-primary hover:bg-surface rounded-lg outline-none cursor-pointer"
+                              >
+                                <Send className="mr-2 h-4 w-4 text-content-muted group-hover:text-content-primary" />
+                                Communication
+                              </DropdownMenu.Item>
+                            </>
+                          )}
+                        </DropdownMenu.Content>
+                      </DropdownMenu.Portal>
+                    </DropdownMenu.Root>
+                  </>
                 )}
-                {clients.length > 0 && (
-                  <IconButton
-                    icon={Send}
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setShowBulkCommunication(true)}
-                    title="Com."
-                    aria-label="Communication en masse"
-                    className="h-7 w-7"
-                  />
+
+                {/* Fallback if no import/export but comm exists */}
+                {!canImportClients && !canExportClients && clients.length > 0 && (
+                  <>
+                    <div className="w-px h-4 bg-edge mx-1" />
+                    <Button
+                      icon={Send}
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowBulkCommunication(true)}
+                      className="h-7 text-xs px-3 text-content-secondary hover:text-content-primary hover:bg-surface"
+                    >
+                      Communication
+                    </Button>
+                  </>
                 )}
               </div>
             </div>
