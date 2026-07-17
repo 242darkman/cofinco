@@ -273,8 +273,8 @@ export default function TransfertInterCoffresModule({
         api.getTransfertStats(),
       ]);
       setCoffres(coffresData);
-      if (statsData.success) setStats(statsData.data);
-      if (tStatsData.success) setTransfertStats(tStatsData.data);
+      if (statsData?.success) setStats(statsData.data);
+      if (tStatsData?.success) setTransfertStats(tStatsData.data);
 
       await loadTransferts();
     } catch (error) {
