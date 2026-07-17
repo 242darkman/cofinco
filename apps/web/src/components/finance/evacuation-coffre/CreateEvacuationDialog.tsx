@@ -153,29 +153,37 @@ export default function CreateEvacuationDialog({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-surface-base border border-edge rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-surface-base/90 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="bg-surface-base border border-edge w-full max-w-4xl max-h-[95vh] sm:rounded-2xl rounded-t-3xl shadow-2xl flex flex-col animate-in slide-in-from-bottom-5 duration-300">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-edge">
-          <div className="flex items-center gap-2">
-            <Vault size={16} className="text-status-info" />
-            <h2 className="text-sm font-semibold text-content-primary">Nouvelle évacuation de coffre</h2>
+        <header className="p-5 border-b border-edge flex items-center justify-between sticky top-0 bg-surface-base/95 backdrop-blur z-10 rounded-t-3xl sm:rounded-t-2xl">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-accent/10 border border-accent/20">
+              <Vault size={20} className="text-accent" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-content-primary">Nouvelle évacuation de coffre</h2>
+              <p className="text-xs text-content-muted mt-0.5">Veuillez renseigner les détails de l'évacuation</p>
+            </div>
           </div>
-          <button onClick={onClose} className="p-1 text-content-muted hover:text-content-primary transition">
-            <X size={16} />
+          <button onClick={onClose} className="p-2 text-content-muted hover:text-content-primary hover:bg-surface rounded-full transition-colors">
+            <X size={20} />
           </button>
-        </div>
+        </header>
 
-        <div className="p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto p-5 sm:p-6 custom-scrollbar">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
+            {/* Colonne Gauche */}
+            <div className="space-y-6">
           {/* Coffre source */}
-          <div>
-            <label className="block text-[10px] font-bold text-content-muted uppercase tracking-widest mb-1.5">
-              Coffre source
-            </label>
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-content-muted uppercase">Coffre source *</label>
             <select
               value={coffreSourceId}
               onChange={(e) => setCoffreSourceId(e.target.value)}
-              className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary focus:outline-none focus:border-status-info/50"
+              className={`w-full px-4 py-3 bg-input-bg border rounded-xl text-content-primary focus:ring-2 focus:ring-accent/30 outline-none transition-all ${
+                errors.coffreSourceId ? 'border-status-danger' : 'border-edge focus:border-accent'
+              }`}
             >
               <option value="">Sélectionner un coffre...</option>
               {activeCoffres.map(c => (
@@ -188,18 +196,21 @@ export default function CreateEvacuationDialog({
           </div>
 
           {/* Montant */}
-          <div>
-            <label className="block text-[10px] font-bold text-content-muted uppercase tracking-widest mb-1.5">
-              Montant (FCFA)
-            </label>
-            <input
-              inputMode="numeric"
-              pattern="[0-9]*"
-              value={montant}
-              onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setMontant(v); }}
-              placeholder="0"
-              className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-status-info/50"
-            />
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-content-muted uppercase">Montant (FCFA) *</label>
+            <div className="relative">
+              <input
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={montant}
+                onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setMontant(v); }}
+                placeholder="0"
+                className={`w-full pl-4 pr-16 py-4 bg-input-bg border rounded-xl text-2xl font-bold text-content-primary focus:ring-2 focus:ring-accent/30 outline-none transition-all ${
+                  errors.montant ? 'border-status-danger' : 'border-edge focus:border-accent'
+                }`}
+              />
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-content-muted">FCFA</span>
+            </div>
             {coffreSource && montant && (
               <p className="text-[10px] text-content-muted mt-1">
                 Solde disponible: {formatMoney(coffreSource.solde)}
@@ -212,11 +223,9 @@ export default function CreateEvacuationDialog({
           </div>
 
           {/* Type destination */}
-          <div>
-            <label className="block text-[10px] font-bold text-content-muted uppercase tracking-widest mb-1.5">
-              Type de destination
-            </label>
-            <div className="grid grid-cols-3 gap-2">
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-content-muted uppercase">Type de destination *</label>
+            <div className="grid grid-cols-3 gap-3">
               {[
                 { value: TypeDestinationEvacuation.BANQUE, label: 'Banque', icon: Building2 },
                 { value: TypeDestinationEvacuation.COFFRE_CENTRAL, label: 'Coffre Central', icon: Vault },
@@ -226,64 +235,74 @@ export default function CreateEvacuationDialog({
                   key={opt.value}
                   type="button"
                   onClick={() => setTypeDestination(opt.value)}
-                  className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border text-xs transition ${
+                  className={`flex flex-col items-center gap-2 p-4 rounded-xl border text-sm font-medium transition-all ${
                     typeDestination === opt.value
-                      ? 'border-status-info/50 bg-status-info-bg text-status-info'
-                      : 'border-edge bg-surface/50 text-content-muted hover:border-edge-strong'
+                      ? 'bg-accent/10 text-accent border border-accent/50'
+                      : 'bg-input-bg text-content-muted border border-edge hover:border-edge-strong'
                   }`}
                 >
-                  <opt.icon size={16} />
+                  <opt.icon size={20} />
                   {opt.label}
                 </button>
               ))}
             </div>
           </div>
+        </div>
+
+        {/* Colonne Droite */}
+        <div className="space-y-6">
 
           {/* Destination-specific fields */}
           {typeDestination === TypeDestinationEvacuation.BANQUE && (
-            <div className="space-y-3 p-3 bg-surface/30 border border-edge/40 rounded-lg">
-              <div>
-                <label className="block text-[10px] font-bold text-content-muted mb-1">Nom de la banque</label>
+            <div className="space-y-4 p-5 bg-surface/30 border border-edge/40 rounded-xl">
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-content-muted uppercase">Nom de la banque *</label>
                 <input
                   type="text"
                   value={banqueNom}
                   onChange={(e) => setBanqueNom(e.target.value)}
                   placeholder="Ex: BGFI Bank, Afriland First Bank..."
-                  className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-status-info/50"
+                  className={`w-full px-4 py-3 bg-input-bg border rounded-xl text-content-primary placeholder:text-content-muted focus:ring-2 focus:ring-accent/30 outline-none transition-all ${
+                    errors.banqueNom ? 'border-status-danger' : 'border-edge focus:border-accent'
+                  }`}
                 />
                 {errors.banqueNom && <p className="text-[10px] text-status-danger mt-1">{errors.banqueNom}</p>}
               </div>
-              <div>
-                <label className="block text-[10px] font-bold text-content-muted mb-1">Numéro de compte</label>
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-content-muted uppercase">Numéro de compte *</label>
                 <input
                   type="text"
                   value={banqueCompte}
                   onChange={(e) => setBanqueCompte(e.target.value)}
                   placeholder="Numéro de compte bancaire"
-                  className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-status-info/50"
+                  className={`w-full px-4 py-3 bg-input-bg border rounded-xl text-content-primary placeholder:text-content-muted focus:ring-2 focus:ring-accent/30 outline-none transition-all ${
+                    errors.banqueCompte ? 'border-status-danger' : 'border-edge focus:border-accent'
+                  }`}
                 />
                 {errors.banqueCompte && <p className="text-[10px] text-status-danger mt-1">{errors.banqueCompte}</p>}
               </div>
-              <div>
-                <label className="block text-[10px] font-bold text-content-muted mb-1">N° comptable (GL)</label>
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-content-muted uppercase">N° comptable (GL)</label>
                 <input
                   type="text"
                   value={banqueNumeroComptable}
                   onChange={(e) => setBanqueNumeroComptable(e.target.value)}
                   placeholder="512"
-                  className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-status-info/50"
+                  className="w-full px-4 py-3 bg-input-bg border border-edge rounded-xl text-content-primary placeholder:text-content-muted focus:ring-2 focus:ring-accent/30 focus:border-accent outline-none transition-all"
                 />
               </div>
             </div>
           )}
 
           {typeDestination === TypeDestinationEvacuation.COFFRE_CENTRAL && (
-            <div className="p-3 bg-surface/30 border border-edge/40 rounded-lg">
-              <label className="block text-[10px] font-bold text-content-muted mb-1">Coffre destination</label>
+            <div className="space-y-2 p-5 bg-surface/30 border border-edge/40 rounded-xl">
+              <label className="text-xs font-medium text-content-muted uppercase">Coffre destination *</label>
               <select
                 value={coffreDestinationId}
                 onChange={(e) => setCoffreDestinationId(e.target.value)}
-                className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary focus:outline-none focus:border-status-info/50"
+                className={`w-full px-4 py-3 bg-input-bg border rounded-xl text-content-primary focus:ring-2 focus:ring-accent/30 outline-none transition-all ${
+                  errors.coffreDestinationId ? 'border-status-danger' : 'border-edge focus:border-accent'
+                }`}
               >
                 <option value="">Sélectionner un coffre...</option>
                 {destinationCoffres.map(c => (
@@ -297,51 +316,53 @@ export default function CreateEvacuationDialog({
           )}
 
           {typeDestination === TypeDestinationEvacuation.TRANSPORTEUR && (
-            <div className="space-y-3 p-3 bg-surface/30 border border-edge/40 rounded-lg">
-              <div>
-                <label className="block text-[10px] font-bold text-content-muted mb-1">Nom du transporteur</label>
+            <div className="space-y-4 p-5 bg-surface/30 border border-edge/40 rounded-xl">
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-content-muted uppercase">Nom du transporteur *</label>
                 <input
                   type="text"
                   value={transporteurNom}
                   onChange={(e) => setTransporteurNom(e.target.value)}
                   placeholder="Ex: Brinks, Prosegur..."
-                  className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-status-info/50"
+                  className={`w-full px-4 py-3 bg-input-bg border rounded-xl text-content-primary placeholder:text-content-muted focus:ring-2 focus:ring-accent/30 outline-none transition-all ${
+                    errors.transporteurNom ? 'border-status-danger' : 'border-edge focus:border-accent'
+                  }`}
                 />
                 {errors.transporteurNom && <p className="text-[10px] text-status-danger mt-1">{errors.transporteurNom}</p>}
               </div>
-              <div>
-                <label className="block text-[10px] font-bold text-content-muted mb-1">Contact</label>
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-content-muted uppercase">Contact *</label>
                 <input
                   type="text"
                   value={transporteurContact}
                   onChange={(e) => setTransporteurContact(e.target.value)}
                   placeholder="Numéro ou email"
-                  className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-status-info/50"
+                  className={`w-full px-4 py-3 bg-input-bg border rounded-xl text-content-primary placeholder:text-content-muted focus:ring-2 focus:ring-accent/30 outline-none transition-all ${
+                    errors.transporteurContact ? 'border-status-danger' : 'border-edge focus:border-accent'
+                  }`}
                 />
                 {errors.transporteurContact && <p className="text-[10px] text-status-danger mt-1">{errors.transporteurContact}</p>}
               </div>
-              <div>
-                <label className="block text-[10px] font-bold text-content-muted mb-1">Référence contrat (optionnel)</label>
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-content-muted uppercase">Référence contrat (optionnel)</label>
                 <input
                   type="text"
                   value={transporteurReference}
                   onChange={(e) => setTransporteurReference(e.target.value)}
                   placeholder="N° contrat ou référence"
-                  className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-status-info/50"
+                  className="w-full px-4 py-3 bg-input-bg border border-edge rounded-xl text-content-primary placeholder:text-content-muted focus:ring-2 focus:ring-accent/30 focus:border-accent outline-none transition-all"
                 />
               </div>
             </div>
           )}
 
           {/* Motif */}
-          <div>
-            <label className="block text-[10px] font-bold text-content-muted uppercase tracking-widest mb-1.5">
-              Motif d'évacuation
-            </label>
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-content-muted uppercase">Motif d'évacuation *</label>
             <select
               value={motifEvacuation}
               onChange={(e) => setMotifEvacuation(e.target.value)}
-              className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary focus:outline-none focus:border-status-info/50"
+              className="w-full px-4 py-3 bg-input-bg border border-edge rounded-xl text-content-primary focus:ring-2 focus:ring-accent/30 focus:border-accent outline-none transition-all"
             >
               {Object.entries(MOTIF_EVACUATION_LABELS).map(([key, label]) => (
                 <option key={key} value={key}>{label}</option>
@@ -350,47 +371,56 @@ export default function CreateEvacuationDialog({
           </div>
 
           {/* Motif detail */}
-          <div>
-            <label className="block text-[10px] font-bold text-content-muted uppercase tracking-widest mb-1.5">
-              Détails / Justification
-            </label>
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-content-muted uppercase">Détails / Justification *</label>
             <textarea
               value={motifDetail}
               onChange={(e) => setMotifDetail(e.target.value)}
               placeholder="Décrivez la raison de cette évacuation (min 10 caractères)..."
-              rows={3}
-              className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-status-info/50 resize-none"
+              rows={4}
+              className={`w-full px-4 py-3 bg-input-bg border rounded-xl text-content-primary placeholder:text-content-muted focus:ring-2 focus:ring-accent/30 outline-none resize-none transition-all ${
+                errors.motifDetail ? 'border-status-danger' : 'border-edge focus:border-accent'
+              }`}
             />
-            <p className="text-[10px] text-content-muted mt-1">{motifDetail.length}/10 caractères minimum</p>
-            {errors.motifDetail && <p className="text-[10px] text-status-danger mt-1">{errors.motifDetail}</p>}
+            <div className="flex justify-between text-xs">
+              {errors.motifDetail && <p className="text-status-danger">{errors.motifDetail}</p>}
+              <p className={`ml-auto ${motifDetail.length >= 10 ? 'text-status-success' : 'text-content-muted'}`}>
+                {motifDetail.length}/10 min
+              </p>
+            </div>
           </div>
+          </div>
+        </div>
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between gap-2 p-4 border-t border-edge">
-          <Button variant="ghost" size="sm" onClick={onClose} disabled={loading}>
-            Annuler
-          </Button>
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => { setSubmitAndSend(false); handleSubmit(); }}
-              disabled={loading}
-            >
-              <FileText size={12} className="mr-1" />
-              {loading && !submitAndSend ? 'Création...' : 'Brouillon'}
+        <footer className="p-5 border-t border-edge bg-surface-base/95 backdrop-blur sticky bottom-0 rounded-b-2xl">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button variant="outline" onClick={onClose} disabled={loading} className="w-full sm:w-auto">
+              Annuler
             </Button>
-            <Button
-              size="sm"
-              onClick={() => { setSubmitAndSend(true); handleSubmit(); }}
-              disabled={loading}
-            >
-              <Send size={12} className="mr-1" />
-              {loading && submitAndSend ? 'Envoi...' : 'Créer & Soumettre'}
-            </Button>
+            <div className="flex-1 flex gap-3">
+              <Button
+                variant="secondary"
+                onClick={() => { setSubmitAndSend(false); handleSubmit(); }}
+                disabled={loading}
+                className="flex-1"
+              >
+                <FileText size={18} className="mr-2" />
+                {loading && !submitAndSend ? 'Création...' : 'Brouillon'}
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => { setSubmitAndSend(true); handleSubmit(); }}
+                disabled={loading}
+                className="flex-1"
+              >
+                <Send size={18} className="mr-2" />
+                {loading && submitAndSend ? 'Envoi...' : 'Créer & Soumettre'}
+              </Button>
+            </div>
           </div>
-        </div>
+        </footer>
       </div>
     </div>
   );
