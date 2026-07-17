@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { SkeletonStatsGrid } from '@/components/ui/Skeleton';
 import { useQuery } from '@tanstack/react-query';
 import {
   BarChart3, Download, Filter, TrendingUp,
@@ -258,7 +259,7 @@ function EventsTab() {
 
       {/* Table */}
       {isLoading ? (
-        <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>
+        <SkeletonStatsGrid />
       ) : !data || data.rows.length === 0 ? (
         <EmptyState
           icon={Filter}

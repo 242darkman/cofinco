@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Spinner } from '@/components/ui/Spinner';
+import { SkeletonList } from '@/components/ui/Skeleton';
 import { useQuery } from '@tanstack/react-query';
 import { Card } from '../ui';
 import { FileText, Download, Calendar, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -86,9 +86,7 @@ export default function MesBulletinsTab() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Spinner size="md" />
-      </div>
+      <SkeletonList items={5} />
     );
   }
 

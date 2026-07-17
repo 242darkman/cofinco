@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Spinner } from '@/components/ui/Spinner';
+import { SkeletonList } from '@/components/ui/Skeleton';
 import { useDocumentRequests, DocumentRequest } from '../../hooks/hr/useDocumentRequests';
 import { Card, Button, Badge, Modal, SelectField, FormField } from '../ui';
 import { Plus, FileText, Clock, CheckCircle, XCircle, Download, AlertTriangle } from 'lucide-react';
@@ -110,9 +110,7 @@ export default function MesDocumentsTab() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Spinner size="md" />
-      </div>
+      <SkeletonList items={5} />
     );
   }
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Spinner } from '@/components/ui/Spinner';
+import { SkeletonForm } from '@/components/ui/Skeleton';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Banknote, Smartphone, Building2, FileCheck, CreditCard, AlertTriangle } from 'lucide-react';
 import Switch from '../ui/Switch';
@@ -134,9 +134,7 @@ export default function AdminPaymentMethodToggles() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Spinner size="sm" tone="current" className="text-content-muted" />
-      </div>
+      <SkeletonForm fields={4} />
     );
   }
 

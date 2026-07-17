@@ -76,10 +76,7 @@ export default function AgentSessionManager({ agentId, agenceId, mode }: AgentSe
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center p-12">
-        <Spinner size="sm" tone="accent" />
-        <span className="ml-2 text-content-muted text-sm">Chargement de la session...</span>
-      </div>
+      <SkeletonCard />
     );
   }
 

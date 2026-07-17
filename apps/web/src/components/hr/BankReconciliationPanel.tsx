@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Spinner } from '@/components/ui/Spinner';
+import { SkeletonList } from '@/components/ui/Skeleton';
 import { Plus, Upload, Zap, CheckCircle, AlertTriangle, Eye, ArrowLeft, Lock, FileText } from 'lucide-react';
 import { Card, Button, Modal, Badge, FormField, SelectField } from '../ui';
 import { useBankReconciliation, useReconciliationDetail, type ReconciliationSession } from '../../hooks/hr/useBankReconciliation';
@@ -67,9 +68,7 @@ export default function BankReconciliationPanel() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <Spinner size="sm" />
-      </div>
+      <SkeletonList items={5} />
     );
   }
 

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Spinner } from '@/components/ui/Spinner';
+import { SkeletonList } from '@/components/ui/Skeleton';
 import { useQuery } from '@tanstack/react-query';
 import { useMyEvaluations, MyEvaluation } from '../../hooks/hr/useMonEspace';
 import { Card, Badge, EmptyState } from '../ui';
@@ -44,9 +45,7 @@ export default function MesEvaluationsTab() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Spinner size="md" />
-      </div>
+      <SkeletonList items={5} />
     );
   }
 

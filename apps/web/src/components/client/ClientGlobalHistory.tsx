@@ -1,5 +1,6 @@
 import React from 'react';
 import { Spinner } from '@/components/ui/Spinner';
+import { SkeletonTransactionList } from '@/components/ui/Skeleton';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { Activity, CreditCard, PiggyBank, Users, ArrowUpRight, ArrowDownLeft, RefreshCw, Banknote } from 'lucide-react';
 import { Card } from '../ui';
@@ -150,11 +151,7 @@ export default function ClientGlobalHistory({ clientId }: ClientGlobalHistoryPro
     const total = data?.pages[0]?.pagination.total || 0;
 
     if (isLoading) {
-        return (
-            <div className="flex items-center justify-center py-12">
-                <Spinner size="sm" tone="accent" />
-            </div>
-        );
+        return <SkeletonTransactionList rows={6} />;
     }
 
     if (isError) {

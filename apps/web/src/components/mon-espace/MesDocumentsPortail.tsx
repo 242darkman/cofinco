@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Spinner } from '@/components/ui/Spinner';
+import { SkeletonList } from '@/components/ui/Skeleton';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, Button, Badge, Modal, SelectField } from '../ui';
 import { FileText, Plus, Download } from 'lucide-react';
@@ -104,9 +104,7 @@ export default function MesDocumentsPortail() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Spinner size="md" />
-      </div>
+      <SkeletonList items={5} />
     );
   }
 

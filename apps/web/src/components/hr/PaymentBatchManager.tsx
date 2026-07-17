@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Spinner } from '@/components/ui/Spinner';
+import { SkeletonList } from '@/components/ui/Skeleton';
 import { Building2, Send, CheckCircle, XCircle, Clock, ChevronDown, ChevronUp, FileSpreadsheet, AlertTriangle } from 'lucide-react';
 import { Card, Button, Modal, Badge, FormField } from '../ui';
 import { usePaymentBatches, usePaymentBatchDetail, type PaymentBatch } from '../../hooks/hr/usePaymentBatches';
@@ -48,9 +49,7 @@ export default function PaymentBatchManager({ runId, onGenerateXlsx }: PaymentBa
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <Spinner size="sm" />
-      </div>
+      <SkeletonList items={5} />
     );
   }
 

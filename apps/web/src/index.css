@@ -106,6 +106,10 @@
   --loader-ring-2: var(--accent-secondary);
   --loader-ring-3: var(--accent-primary-hover);
 
+  /* Skeleton shimmer — reflet argenté + cœur doré discret (thème clair). */
+  --skeleton-sheen: rgba(255, 255, 255, 0.65);
+  --skeleton-sheen-gold: rgba(232, 163, 61, 0.18);
+
   /* Login page - theme-aware */
   --login-bg-from: #f0f4f8;
   --login-bg-via: #e8eef5;
@@ -218,6 +222,10 @@
   --loader-ring-1: var(--accent-primary);
   --loader-ring-2: var(--accent-secondary);
   --loader-ring-3: var(--accent-primary-hover);
+
+  /* Skeleton shimmer — reflet plus discret sur fond sombre. */
+  --skeleton-sheen: rgba(255, 255, 255, 0.10);
+  --skeleton-sheen-gold: rgba(232, 163, 61, 0.10);
 
   /* Login page - dark variant */
   --login-bg-from: #0a1628;
@@ -370,6 +378,19 @@ body {
     animation: shimmer 2s infinite;
   }
 
+  /* Skeleton shimmer premium : reflet qui balaie le bloc (transform-free,
+     background-position uniquement → 60 FPS, faible coût CPU/GPU). */
+  .animate-skeleton {
+    background-size: 200% 100%;
+    animation: skeletonShimmer 1.6s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-skeleton {
+      animation: none;
+    }
+  }
+
   .animate-suction {
     animation: glow-pulse 2s ease-in-out infinite;
     transition: all 0.3s ease;
@@ -504,6 +525,16 @@ body {
   }
   100% {
     background-position: 1000px 0;
+  }
+}
+
+/* Balayage du reflet skeleton (pair avec background-size: 200%). */
+@keyframes skeletonShimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
   }
 }
 

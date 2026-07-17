@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { SkeletonList } from '@/components/ui/Skeleton';
 import { Spinner } from '@/components/ui/Spinner';
 import { Briefcase, MapPin, Calendar, Users, Send, CheckCircle, Clock } from 'lucide-react';
 import { Card, Button, Modal, Badge, TextareaField } from '../ui';
@@ -30,9 +31,7 @@ export default function InternalPortalTab() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Spinner size="md" />
-      </div>
+      <SkeletonList items={4} />
     );
   }
 

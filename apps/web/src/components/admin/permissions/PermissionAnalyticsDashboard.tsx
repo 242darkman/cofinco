@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { SkeletonDashboard } from '@/components/ui/Skeleton';
 import { Spinner } from '@/components/ui/Spinner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -137,9 +138,7 @@ export default function PermissionAnalyticsDashboard() {
 
   if (isLoading && !config) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <Spinner size="md" tone="accent" />
-      </div>
+      <SkeletonDashboard />
     );
   }
 

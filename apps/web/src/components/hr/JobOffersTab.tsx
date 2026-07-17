@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Spinner } from '@/components/ui/Spinner';
+import { SkeletonList } from '@/components/ui/Skeleton';
 import { Plus, Briefcase, Eye, Globe, Lock, Users, BarChart3, Calendar, Target, RefreshCw, X } from 'lucide-react';
 import { Card, Button, Modal, FormField, SelectField, TextareaField, Badge, ResponsiveTable } from '../ui';
 import { useJobOffers, useJobOfferCandidatures, type JobOffer } from '../../hooks/hr/useJobOffers';
@@ -159,9 +160,7 @@ export default function JobOffersTab({ positions, departments }: JobOffersTabPro
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Spinner size="md" />
-      </div>
+      <SkeletonList items={5} />
     );
   }
 

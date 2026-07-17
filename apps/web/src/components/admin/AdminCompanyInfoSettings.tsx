@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Spinner } from '@/components/ui/Spinner';
+import { SkeletonForm } from '@/components/ui/Skeleton';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Building2, Check, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
@@ -71,9 +71,7 @@ export default function AdminCompanyInfoSettings() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <Spinner size="md" />
-      </div>
+      <SkeletonForm fields={5} />
     );
   }
 

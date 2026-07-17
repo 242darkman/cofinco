@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Spinner } from '@/components/ui/Spinner';
+import { SkeletonList } from '@/components/ui/Skeleton';
 import { Briefcase, MapPin, Clock, Send } from 'lucide-react';
 import { Card, Modal, TextareaField } from '../ui';
 import { useInternalOffers } from '../../hooks/hr/useJobOffers';
@@ -40,9 +41,7 @@ export default function MesOffresInternesTab() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Spinner size="md" />
-      </div>
+      <SkeletonList items={5} />
     );
   }
 

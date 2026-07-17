@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from 'react';
+import { SkeletonList } from '@/components/ui/Skeleton';
 import {
   Building2, Briefcase, ChevronDown, ChevronRight, Plus,
   Pencil, Trash2, Users, BarChart3,
 } from 'lucide-react';
-import { Card, Button, Badge, TabGroup, LoadingSpinner } from '../ui';
+import { Card, Button, Badge, TabGroup } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { usePositionManager } from '../../hooks/hr/usePositionManager';
 import type { Department, JobPosition, VacancyStat } from '../../hooks/hr/usePositionManager';
@@ -161,9 +162,7 @@ export default function PositionManager() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <LoadingSpinner />
-      </div>
+      <SkeletonList items={5} />
     );
   }
 
