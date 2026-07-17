@@ -273,21 +273,21 @@ export default function TableauTresorerie() {
               title="A - Exploitation"
               flux={data.exploitation}
               total={totalExploitation}
-              colorClass="bg-gradient-to-r from-status-success to-status-success"
+              colorClass="bg-linear-to-r from-status-success to-status-success"
               icon={<TrendingUp size={14} className="text-white" />}
             />
             <FluxSection 
               title="B - Investissement"
               flux={data.investissement}
               total={totalInvestissement}
-              colorClass="bg-gradient-to-r from-status-info to-status-info"
+              colorClass="bg-linear-to-r from-status-info to-status-info"
               icon={<Wallet size={14} className="text-white" />}
             />
             <FluxSection 
               title="C - Financement"
               flux={data.financement}
               total={totalFinancement}
-              colorClass="bg-gradient-to-r from-status-info to-status-info"
+              colorClass="bg-linear-to-r from-status-info to-status-info"
               icon={<DollarSign size={14} className="text-white" />}
             />
           </div>

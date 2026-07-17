@@ -457,8 +457,8 @@ export default function TransfertInterCoffresReception({
               }
               className={
                 conforme
-                  ? 'bg-gradient-to-r from-status-success to-accent hover:from-status-success hover:to-accent'
-                  : 'bg-gradient-to-r from-status-warning to-status-warning hover:from-status-warning hover:to-status-warning'
+                  ? 'bg-linear-to-r from-status-success to-accent hover:from-status-success hover:to-accent'
+                  : 'bg-linear-to-r from-status-warning to-status-warning hover:from-status-warning hover:to-status-warning'
               }
             >
               {loading ? (

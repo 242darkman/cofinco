@@ -234,7 +234,7 @@ export default function ProspectDetailSheet({ prospectId, onClose, onUpdate, can
                       <button
                         onClick={() => setShowConvertConfirm(true)}
                         disabled={actionLoading}
-                        className="w-full py-3 bg-gradient-to-r from-status-info to-accent hover:from-status-info hover:to-accent text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-status-info/20 hover:shadow-status-info/20 disabled:opacity-50"
+                        className="w-full py-3 bg-linear-to-r from-status-info to-accent hover:from-status-info hover:to-accent text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-status-info/20 hover:shadow-status-info/20 disabled:opacity-50"
                       >
                         <UserCheck size={16} />
                         Convertir en Client

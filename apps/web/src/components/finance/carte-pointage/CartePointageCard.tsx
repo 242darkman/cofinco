@@ -41,7 +41,7 @@ export const CartePointageCard: React.FC<CartePointageCardProps> = ({
   return (
     <article className="group flex flex-col overflow-hidden rounded-xl border border-edge bg-surface shadow-sm transition-shadow hover:shadow-md">
       {/* En-tête aux couleurs de la marque */}
-      <div className="flex items-center justify-between gap-2 bg-gradient-to-r from-accent to-accent/80 px-4 py-3 text-content-inverted">
+      <div className="flex items-center justify-between gap-2 bg-linear-to-r from-accent to-accent/80 px-4 py-3 text-content-inverted">
         <div className="flex min-w-0 items-center gap-2">
           <PiggyBank className="h-4 w-4 shrink-0 opacity-90" />
           <span className="truncate font-mono text-xs tracking-wider">{carte.reference}</span>
@@ -72,7 +72,7 @@ export const CartePointageCard: React.FC<CartePointageCardProps> = ({
           <div className="h-1.5 overflow-hidden rounded-full bg-surface-muted" role="progressbar"
             aria-valuenow={carte.completedSlots} aria-valuemin={0} aria-valuemax={NOMBRE_CASES}>
             <div
-              className="h-full rounded-full bg-gradient-to-r from-accent to-accent/70 transition-all duration-300"
+              className="h-full rounded-full bg-linear-to-r from-accent to-accent/70 transition-all duration-300"
               style={{ width: `${progression}%` }}
             />
           </div>

@@ -1266,7 +1266,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                   type="button"
                   onClick={handleSubmit}
                   disabled={loading || montantNum <= 0}
-                  className="w-full py-4 rounded-xl font-semibold text-white bg-gradient-to-r from-status-success to-accent hover:from-status-success/90 hover:to-accent/90 shadow-lg shadow-status-success/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
+                  className="w-full py-4 rounded-xl font-semibold text-white bg-linear-to-r from-status-success to-accent hover:from-status-success/90 hover:to-accent/90 shadow-lg shadow-status-success/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
                 >
                   {loading ? (
                     <Spinner size="sm" tone="onAccent" />

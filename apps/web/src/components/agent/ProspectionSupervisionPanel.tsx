@@ -129,7 +129,7 @@ export default function ProspectionSupervisionPanel() {
               {/* Progress bar */}
               <div className="h-2 bg-surface-elevated rounded-full overflow-hidden mb-2">
                 <div
-                  className="h-full bg-gradient-to-r from-accent to-status-info rounded-full transition-all"
+                  className="h-full bg-linear-to-r from-accent to-status-info rounded-full transition-all"
                   style={{ width: `${(agent.totalProspects / maxProspects) * 100}%` }}
                 />
               </div>

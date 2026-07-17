@@ -269,7 +269,7 @@ export default function ClientBulkCommunication({ clients, onClose, onComplete }
               <p className="text-center text-content-secondary mb-4">Envoi en cours...</p>
               <div className="w-full bg-surface-elevated rounded-full h-4 mb-2">
                 <div
-                  className="bg-gradient-to-r from-accent-secondary to-status-info h-4 rounded-full transition-all duration-300"
+                  className="bg-linear-to-r from-accent-secondary to-status-info h-4 rounded-full transition-all duration-300"
                   style={{ width: `${progress}%` }}
                 ></div>
               </div>
@@ -299,7 +299,7 @@ export default function ClientBulkCommunication({ clients, onClose, onComplete }
 
               <button
                 onClick={handleComplete}
-                className="w-full px-6 py-3 bg-gradient-to-r from-accent-secondary to-status-info hover:from-accent-secondary-hover hover:to-status-info text-white font-semibold rounded-lg transition"
+                className="w-full px-6 py-3 bg-linear-to-r from-accent-secondary to-status-info hover:from-accent-secondary-hover hover:to-status-info text-white font-semibold rounded-lg transition"
               >
                 Terminer
               </button>
@@ -311,7 +311,7 @@ export default function ClientBulkCommunication({ clients, onClose, onComplete }
               <button
                 onClick={handleSend}
                 disabled={!message.trim() || (method === 'email' && !subject.trim())}
-                className="w-full px-6 py-3 bg-gradient-to-r from-accent-secondary to-status-info hover:from-accent-secondary-hover hover:to-status-info disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition flex items-center justify-center gap-2"
+                className="w-full px-6 py-3 bg-linear-to-r from-accent-secondary to-status-info hover:from-accent-secondary-hover hover:to-status-info disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition flex items-center justify-center gap-2"
               >
                 <Send size={20} />
                 Envoyer à {clients.length} client{clients.length > 1 ? 's' : ''}

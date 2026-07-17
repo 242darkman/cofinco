@@ -282,7 +282,7 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
   const renderPlanOHADA = () => (
     <div className="space-y-3">
       {/* Header compact - UNE SEULE LIGNE avec overflow scroll si nécessaire */}
-      <div className="bg-gradient-to-r from-status-info to-status-success rounded-xl p-3">
+      <div className="bg-linear-to-r from-status-info to-status-success rounded-xl p-3">
         <div className="flex items-center gap-3 overflow-x-auto">
           {/* Titre - ne shrink pas */}
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -359,7 +359,7 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
             <div key={classe.numero} className="rounded-lg overflow-hidden">
               <button
                 onClick={() => toggleClasse(classe.numero)}
-                className={`w-full bg-gradient-to-r ${classe.color}
+                className={`w-full bg-linear-to-r ${classe.color}
                   px-3 py-2
                   flex items-center gap-3 text-white
                   hover:opacity-90 transition-all duration-200`}
@@ -437,7 +437,7 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
   const renderJournaux = () => (
     <div className="space-y-3">
       {/* Header compact */}
-      <div className="bg-gradient-to-r from-status-info to-pink-600 rounded-xl p-3">
+      <div className="bg-linear-to-r from-status-info to-pink-600 rounded-xl p-3">
         <div className="flex items-center gap-3 overflow-x-auto">
           <div className="flex items-center gap-2 flex-shrink-0">
             <FileText className="w-5 h-5 text-white" />
@@ -683,7 +683,7 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
   const renderBilan = () => (
     <div className="space-y-3">
       {/* Header compact */}
-      <div className="bg-gradient-to-r from-accent to-status-info rounded-xl p-3">
+      <div className="bg-linear-to-r from-accent to-status-info rounded-xl p-3">
         <div className="flex items-center justify-between gap-3 overflow-x-auto">
           <div className="flex items-center gap-2 flex-shrink-0">
             <PieChart className="w-5 h-5 text-white" />
@@ -849,7 +849,7 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
   const renderRapports = () => (
     <div className="space-y-3">
       {/* Header compact */}
-      <div className="bg-gradient-to-r from-accent to-accent rounded-xl p-3">
+      <div className="bg-linear-to-r from-accent to-accent rounded-xl p-3">
         <div className="flex items-center gap-3 overflow-x-auto">
           <div className="flex items-center gap-2 flex-shrink-0">
             <Download className="w-5 h-5 text-white" />

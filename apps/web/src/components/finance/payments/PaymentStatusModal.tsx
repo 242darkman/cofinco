@@ -254,7 +254,7 @@ export function PaymentStatusModal({
               {onViewDetails && (
                 <button
                   onClick={onViewDetails}
-                  className="w-full py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-status-success to-accent hover:from-status-success hover:to-accent transition-all"
+                  className="w-full py-3 rounded-xl font-semibold text-white bg-linear-to-r from-status-success to-accent hover:from-status-success hover:to-accent transition-all"
                 >
                   Voir les détails
                 </button>
@@ -273,7 +273,7 @@ export function PaymentStatusModal({
               {onRetry && (
                 <button
                   onClick={onRetry}
-                  className={`w-full py-3 rounded-xl font-semibold text-content-primary bg-gradient-to-r ${
+                  className={`w-full py-3 rounded-xl font-semibold text-content-primary bg-linear-to-r ${
                     provider === 'MTN'
                       ? 'from-status-warning to-status-warning hover:from-status-warning hover:to-status-warning'
                       : 'from-status-danger to-status-danger hover:from-status-danger hover:to-status-danger'

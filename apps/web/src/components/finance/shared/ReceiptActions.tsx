@@ -248,8 +248,8 @@ export const ReceiptActions: React.FC<ReceiptActionsProps> = ({
             flex items-center justify-center gap-3
             active:scale-[0.98] transition-all
             ${activeTab === 'ticket'
-              ? 'bg-gradient-to-r from-status-success to-status-success hover:from-status-success hover:to-status-success shadow-lg shadow-status-success/25'
-              : 'bg-gradient-to-r from-status-info to-status-info hover:from-status-info hover:to-status-info shadow-lg shadow-status-info/25'
+              ? 'bg-linear-to-r from-status-success to-status-success hover:from-status-success hover:to-status-success shadow-lg shadow-status-success/25'
+              : 'bg-linear-to-r from-status-info to-status-info hover:from-status-info hover:to-status-info shadow-lg shadow-status-info/25'
             }
           `}
         >

@@ -145,7 +145,7 @@ export default function RapportsOHADA() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="bg-gradient-to-r from-status-warning to-status-danger rounded-xl p-3">
+      <div className="bg-linear-to-r from-status-warning to-status-danger rounded-xl p-3">
         <div className="flex items-center gap-3 overflow-x-auto">
           <div className="flex items-center gap-2 flex-shrink-0">
             <FileText className="w-5 h-5 text-white" />
@@ -178,7 +178,7 @@ export default function RapportsOHADA() {
 
         {/* 1. Journal Centralisateur */}
         <div className="bg-surface rounded-xl overflow-hidden">
-          <div className="bg-gradient-to-r from-status-info to-accent p-3">
+          <div className="bg-linear-to-r from-status-info to-accent p-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <BookOpen className="w-4 h-4 text-white" />
@@ -237,7 +237,7 @@ export default function RapportsOHADA() {
 
         {/* 2. Bilan OHADA */}
         <div className="bg-surface rounded-xl overflow-hidden">
-          <div className="bg-gradient-to-r from-accent to-status-info p-3">
+          <div className="bg-linear-to-r from-accent to-status-info p-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <ClipboardList className="w-4 h-4 text-white" />
@@ -282,7 +282,7 @@ export default function RapportsOHADA() {
 
         {/* 3. Compte de Résultat OHADA */}
         <div className="bg-surface rounded-xl overflow-hidden">
-          <div className="bg-gradient-to-r from-status-success to-status-success p-3">
+          <div className="bg-linear-to-r from-status-success to-status-success p-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4 text-white" />
@@ -337,7 +337,7 @@ export default function RapportsOHADA() {
 
         {/* 4. Livre d'Inventaire */}
         <div className="bg-surface rounded-xl overflow-hidden">
-          <div className="bg-gradient-to-r from-status-warning to-status-warning p-3">
+          <div className="bg-linear-to-r from-status-warning to-status-warning p-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <ClipboardList className="w-4 h-4 text-white" />

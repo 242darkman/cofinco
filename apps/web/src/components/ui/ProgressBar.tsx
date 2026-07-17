@@ -47,11 +47,11 @@ const ProgressBar: React.FC<ProgressBarProps> = ({
 
   // Color classes (mobile-first)
   const colorClasses = {
-    primary: 'bg-gradient-to-r from-accent to-accent-secondary',
-    success: 'bg-gradient-to-r from-status-success to-status-success',
-    warning: 'bg-gradient-to-r from-status-warning to-status-warning',
-    danger: 'bg-gradient-to-r from-status-danger to-status-danger',
-    neutral: 'bg-gradient-to-r from-surface-subtle to-surface-subtle',
+    primary: 'bg-linear-to-r from-accent to-accent-secondary',
+    success: 'bg-linear-to-r from-status-success to-status-success',
+    warning: 'bg-linear-to-r from-status-warning to-status-warning',
+    danger: 'bg-linear-to-r from-status-danger to-status-danger',
+    neutral: 'bg-linear-to-r from-surface-subtle to-surface-subtle',
   };
 
   // Size classes (mobile-first)

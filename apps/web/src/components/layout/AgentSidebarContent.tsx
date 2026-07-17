@@ -99,7 +99,7 @@ export default function AgentSidebarContent({
             fullWidth
             className={`flex items-center gap-3 px-4 py-2 text-sm transition justify-start rounded-none ${
               activeTab === tab
-                ? 'bg-gradient-to-r from-status-info/30 to-accent/30 border-l-2 border-accent text-white'
+                ? 'bg-linear-to-r from-status-info/30 to-accent/30 border-l-2 border-accent text-white'
                 : 'text-content-muted hover:text-content-primary hover:bg-surface-elevated/50 border-l-2 border-transparent'
             } ${!canPerformTab(tab) ? 'opacity-50 cursor-not-allowed' : ''} ${sidebarOpen ? '' : 'justify-center mx-auto'}`}
           >

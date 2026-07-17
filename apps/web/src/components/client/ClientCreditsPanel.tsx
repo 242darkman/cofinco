@@ -235,9 +235,9 @@ function CreditCard_({ credit, defaultExpanded }: { credit: any; defaultExpanded
           <div className="h-2 bg-surface-elevated/50 rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-500 ${
-                c.statut === 'LATE' ? 'bg-gradient-to-r from-status-danger to-status-danger' :
-                c.statut === 'PAID' ? 'bg-gradient-to-r from-status-success to-status-success' :
-                'bg-gradient-to-r from-status-info to-accent-secondary'
+                c.statut === 'LATE' ? 'bg-linear-to-r from-status-danger to-status-danger' :
+                c.statut === 'PAID' ? 'bg-linear-to-r from-status-success to-status-success' :
+                'bg-linear-to-r from-status-info to-accent-secondary'
               }`}
               style={{ width: `${progressPct}%` }}
             />
@@ -369,7 +369,7 @@ export default function ClientCreditsPanel({ clientId, isOpen, onClose }: Client
                 </div>
                 <div className="h-2.5 bg-surface-elevated/50 rounded-full overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-status-info to-accent-secondary transition-all"
+                    className="h-full rounded-full bg-linear-to-r from-status-info to-accent-secondary transition-all"
                     style={{ width: `${Math.max(0, Math.min(100, (1 - totalSoldeRestant / totalDueAll) * 100))}%` }}
                   />
                 </div>

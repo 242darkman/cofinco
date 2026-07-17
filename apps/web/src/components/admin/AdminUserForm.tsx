@@ -134,7 +134,7 @@ export default function AdminUserForm({ user, onClose, onSuccess }: AdminUserFor
               disabled={loading}
               icon={Save}
               variant="primary"
-              className="bg-gradient-to-r from-status-success to-status-success hover:from-status-success hover:to-status-success"
+              className="bg-linear-to-r from-status-success to-status-success hover:from-status-success hover:to-status-success"
             >
               {loading ? 'Sauvegarde...' : user ? 'Modifier' : 'Créer'}
             </Button>

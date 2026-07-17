@@ -52,7 +52,7 @@ export default function ClientIdentityCard({ client, onEdit, onDelete }: ClientI
   return (
     <Card variant="default" padding="none" className="overflow-hidden">
       {/* Top accent bar */}
-      <div className="h-1 bg-gradient-to-r from-accent via-status-info to-accent" />
+      <div className="h-1 bg-linear-to-r from-accent via-status-info to-accent" />
 
       <div className="p-5">
         {/* Avatar + Name */}

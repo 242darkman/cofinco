@@ -32,7 +32,7 @@ export const CarteVirtuelle: React.FC<CarteVirtuelleProps> = ({ carte }) => {
   return (
     <div className="overflow-hidden rounded-2xl border border-edge bg-surface shadow-xl">
       {/* Bandeau d'en-tête aux couleurs de la marque du tenant */}
-      <div className="bg-gradient-to-r from-accent to-accent/80 p-4 text-content-inverted sm:p-5">
+      <div className="bg-linear-to-r from-accent to-accent/80 p-4 text-content-inverted sm:p-5">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="flex items-center gap-2">

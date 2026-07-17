@@ -144,7 +144,7 @@ export default function SupervisionConfirmModal({
     >
       <div className="space-y-5 -mx-2 sm:mx-0">
         {/* Target Session Info */}
-        <div className="p-4 bg-gradient-to-r from-surface/60 to-surface/30 rounded-xl border border-edge-subtle">
+        <div className="p-4 bg-linear-to-r from-surface/60 to-surface/30 rounded-xl border border-edge-subtle">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 rounded-full bg-accent/10 border border-accent/30 flex items-center justify-center text-accent font-bold text-lg shrink-0">
               {session.caissierNom?.[0] || 'C'}

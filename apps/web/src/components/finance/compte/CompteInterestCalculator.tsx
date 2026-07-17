@@ -111,7 +111,7 @@ export default function CompteInterestCalculator({ compte, onClose, onSuccess }:
     >
       <div className="bg-surface rounded-xl border border-edge w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="bg-gradient-to-r from-status-success/20 to-accent/20 border-b border-edge p-6 flex justify-between items-center sticky top-0 z-10">
+        <div className="bg-linear-to-r from-status-success/20 to-accent/20 border-b border-edge p-6 flex justify-between items-center sticky top-0 z-10">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-status-success-bg rounded-lg" aria-hidden="true">
               <Percent className="text-status-success" size={24} />

@@ -454,7 +454,7 @@ export default function CompteSavingsGoals({ compteId, compteSolde, onClose }: C
                         aria-label={`Progression: ${pourcentage.toFixed(1)}%`}
                       >
                         <div
-                          className={`h-4 rounded-full bg-gradient-to-r ${getProgressionColor(pourcentage)} transition-all duration-500`}
+                          className={`h-4 rounded-full bg-linear-to-r ${getProgressionColor(pourcentage)} transition-all duration-500`}
                           style={{ width: `${Math.min(pourcentage, 100)}%` }}
                         />
                       </div>

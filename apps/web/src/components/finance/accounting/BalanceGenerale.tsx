@@ -74,7 +74,7 @@ export default function BalanceGenerale() {
   return (
     <div className="space-y-3">
       {/* Header compact - UNE SEULE LIGNE */}
-      <div className="bg-gradient-to-r from-status-success to-status-success rounded-xl p-3">
+      <div className="bg-linear-to-r from-status-success to-status-success rounded-xl p-3">
         <div className="flex items-center gap-3 overflow-x-auto">
           {/* Titre */}
           <div className="flex items-center gap-2 flex-shrink-0">

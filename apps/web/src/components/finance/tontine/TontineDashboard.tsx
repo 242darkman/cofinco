@@ -399,7 +399,7 @@ export default function TontineDashboard({
         <div className="grid md:grid-cols-2 gap-3">
           {/* Prochain tour */}
           {nextTurn && (
-            <Card className="p-3 bg-gradient-to-r from-accent/10 to-accent-secondary/10 border-accent/30">
+            <Card className="p-3 bg-linear-to-r from-accent/10 to-accent-secondary/10 border-accent/30">
               <div className="flex items-start justify-between">
                 <div>
                   <div className="text-accent text-xs font-semibold uppercase tracking-wider mb-1">

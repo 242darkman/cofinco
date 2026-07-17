@@ -32,7 +32,7 @@ export default function LogeHeader({ onLock, onUpload, onNewFolder }: LogeHeader
         </Button>
         <Button
           onClick={onUpload}
-          className="bg-gradient-to-r from-status-info to-accent hover:opacity-90 shadow-lg text-white"
+          className="bg-linear-to-r from-status-info to-accent hover:opacity-90 shadow-lg text-white"
           icon={Upload}
         >
           Téléverser

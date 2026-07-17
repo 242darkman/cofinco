@@ -387,8 +387,8 @@ export default function SettlementModal({ isOpen, onClose, onSuccess, agentId, a
                 flex items-center justify-center gap-2 transition-all
                 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]
                 ${canSubmitNormally
-                  ? 'bg-gradient-to-r from-accent to-status-success hover:from-accent hover:to-status-success shadow-lg shadow-accent/20'
-                  : 'bg-gradient-to-r from-status-warning to-status-warning hover:from-status-warning hover:to-status-warning shadow-lg shadow-status-warning/20'
+                  ? 'bg-linear-to-r from-accent to-status-success hover:from-accent hover:to-status-success shadow-lg shadow-accent/20'
+                  : 'bg-linear-to-r from-status-warning to-status-warning hover:from-status-warning hover:to-status-warning shadow-lg shadow-status-warning/20'
                 }
               `}
             >

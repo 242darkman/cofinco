@@ -55,14 +55,14 @@ export default function PlatformHeader({
         </div>
         <div className="flex items-center gap-4 border-l border-edge pl-4">
           <div>
-            <h2 className="text-2xl font-black tracking-tight bg-gradient-to-r from-accent via-blue-500 to-status-info bg-clip-text text-transparent">
+            <h2 className="text-2xl font-black tracking-tight bg-linear-to-r from-accent via-accent-secondary to-accent bg-clip-text text-transparent">
               {t('microflexPlatform')}
             </h2>
             <div className="flex items-center gap-2">
               <span className="text-[10px] uppercase font-bold tracking-[0.15em] text-content-muted/80">
                 {t('platformeMicrofinance')}
               </span>
-              <div className="h-px flex-1 bg-gradient-to-r from-accent/20 to-transparent"></div>
+              <div className="h-px flex-1 bg-linear-to-r from-accent/20 to-transparent"></div>
             </div>
           </div>
         </div>

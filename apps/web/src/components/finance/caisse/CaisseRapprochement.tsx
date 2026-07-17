@@ -563,7 +563,7 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
     >
       <div className="bg-surface-base border border-edge-subtle w-full max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden rounded-t-2xl sm:rounded-2xl shadow-2xl shadow-black/50 flex flex-col">
         {/* Header with Stepper */}
-        <header className="shrink-0 px-3 sm:px-5 py-2.5 sm:py-3 border-b border-edge bg-gradient-to-r from-accent/30 to-accent-secondary/30">
+        <header className="shrink-0 px-3 sm:px-5 py-2.5 sm:py-3 border-b border-edge bg-linear-to-r from-accent/30 to-accent-secondary/30">
           <div className="flex items-center justify-between mb-2.5">
             <div className="flex items-center gap-2.5">
               <div className="p-2 bg-accent/20 rounded-xl border border-accent/30">

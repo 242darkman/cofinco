@@ -248,7 +248,7 @@ export default function OfflineDaySession({ agentId, agenceId }: OfflineDaySessi
       </div>
 
       {/* Cash Balance */}
-      <div className="p-4 bg-gradient-to-r from-surface to-surface-elevated">
+      <div className="p-4 bg-linear-to-r from-surface to-surface-elevated">
         <div className="text-center">
           <p className="text-content-muted text-sm">Solde caisse actuel</p>
           <p className="text-3xl font-bold text-content-primary mt-1">

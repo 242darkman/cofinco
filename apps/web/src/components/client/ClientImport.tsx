@@ -198,7 +198,7 @@ Marie Sengele,marie@example.com,+242 06 234 5678,Brazzaville,ACTIVE,Standard,92,
                     onChange={handleFileUpload}
                     className="hidden"
                   />
-                  <span className="px-6 py-3 bg-gradient-to-r from-accent to-status-info hover:from-accent hover:to-status-info text-white font-semibold rounded-lg inline-flex items-center gap-2 transition shadow-lg shadow-accent/20">
+                  <span className="px-6 py-3 bg-linear-to-r from-accent to-status-info hover:from-accent hover:to-status-info text-white font-semibold rounded-lg inline-flex items-center gap-2 transition shadow-lg shadow-accent/20">
                     <Upload size={20} />
                     Choisir un fichier
                   </span>
@@ -261,7 +261,7 @@ Marie Sengele,marie@example.com,+242 06 234 5678,Brazzaville,ACTIVE,Standard,92,
                  <button
                     onClick={handleConfirmImport}
                     disabled={parsedData.valid.length === 0}
-                    className="flex-1 px-6 py-3 bg-gradient-to-r from-status-success to-status-success hover:from-status-success hover:to-status-success text-white font-bold rounded-lg shadow-lg shadow-status-success/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition"
+                    className="flex-1 px-6 py-3 bg-linear-to-r from-status-success to-status-success hover:from-status-success hover:to-status-success text-white font-bold rounded-lg shadow-lg shadow-status-success/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition"
                  >
                     Importer {parsedData.valid.length} clients
                     <ArrowRight size={20} />

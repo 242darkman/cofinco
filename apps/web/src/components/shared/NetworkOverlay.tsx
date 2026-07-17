@@ -40,7 +40,7 @@ export default function NetworkOverlay({ isOpen, isChecking = false, onRetry }: 
 
           <div className="mt-4 h-1 w-full overflow-hidden rounded-full bg-white/10">
             <div
-              className="h-full w-1/3 rounded-full bg-gradient-to-r from-accent via-blue-400 to-status-success"
+              className="h-full w-1/3 rounded-full bg-linear-to-r from-accent via-blue-400 to-status-success"
               style={{ animation: 'network-bar 1.6s ease-in-out infinite' }}
             />
           </div>

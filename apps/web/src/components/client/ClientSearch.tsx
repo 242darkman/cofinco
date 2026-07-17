@@ -205,7 +205,7 @@ export default function ClientSearch({ onSearch, onClose }: ClientSearchProps) {
             </button>
             <button
               onClick={handleSearch}
-              className="flex-1 px-6 py-3 bg-gradient-to-r from-accent to-status-info hover:from-accent hover:to-status-info text-white font-semibold rounded-lg transition flex items-center justify-center gap-2"
+              className="flex-1 px-6 py-3 bg-linear-to-r from-accent to-status-info hover:from-accent hover:to-status-info text-white font-semibold rounded-lg transition flex items-center justify-center gap-2"
             >
               <Search size={20} />
               Rechercher

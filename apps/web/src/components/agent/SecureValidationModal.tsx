@@ -175,7 +175,7 @@ export default function SecureValidationModal({
                 type="submit"
                 variant="success"
                 disabled={loading || password.length < 4}
-                className="flex-1 h-12 bg-gradient-to-r from-status-success to-status-success hover:from-status-success hover:to-status-success"
+                className="flex-1 h-12 bg-linear-to-r from-status-success to-status-success hover:from-status-success hover:to-status-success"
               >
                 {loading ? (
                   <>

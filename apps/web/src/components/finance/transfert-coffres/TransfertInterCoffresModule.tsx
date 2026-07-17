@@ -720,7 +720,7 @@ export default function TransfertInterCoffresModule({
               {canManage && (
               <Button
                 onClick={() => setShowCreateForm(true)}
-                className="bg-gradient-to-r from-status-success to-accent hover:from-status-success/90 hover:to-accent/90 text-white shadow-lg shadow-status-success/20"
+                className="bg-linear-to-r from-status-success to-accent hover:from-status-success/90 hover:to-accent/90 text-white shadow-lg shadow-status-success/20"
               >
                 <Plus size={18} className="mr-2 hidden sm:inline" />
                 <span className="hidden sm:inline">Nouveau Transfert</span>

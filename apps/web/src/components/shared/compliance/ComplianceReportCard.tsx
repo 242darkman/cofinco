@@ -28,7 +28,7 @@ export default function ComplianceReportCard({
   
   return (
     <Card className="flex flex-col h-full overflow-hidden border-0 shadow-lg group hover:transform hover:scale-[1.02] transition-transform duration-300">
-      <div className={`bg-gradient-to-r ${color} p-6 relative overflow-hidden`}>
+      <div className={`bg-linear-to-r ${color} p-6 relative overflow-hidden`}>
          {/* Decorative background circle */}
          <div className="absolute -right-6 -top-6 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
          
@@ -53,7 +53,7 @@ export default function ComplianceReportCard({
           disabled={loading}
           fullWidth
           icon={Download}
-          className={`bg-gradient-to-r ${color} border-0 hover:opacity-90 hover:scale-[1.01] transition-all shadow-md`}
+          className={`bg-linear-to-r ${color} border-0 hover:opacity-90 hover:scale-[1.01] transition-all shadow-md`}
         >
           {loading ? 'Génération...' : 'Générer le Rapport'}
         </Button>

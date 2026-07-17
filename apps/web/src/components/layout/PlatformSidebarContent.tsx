@@ -337,7 +337,7 @@ export default function PlatformSidebarContent({
           transition-all duration-300 text-sm overflow-hidden
           ${!sidebarOpen ? 'justify-center' : ''}
           ${isActive
-            ? 'bg-gradient-to-r from-accent/15 via-accent/5 to-transparent text-accent font-semibold shadow-sm ring-1 ring-accent/10'
+            ? 'bg-linear-to-r from-accent/15 via-accent/5 to-transparent text-accent font-semibold shadow-sm ring-1 ring-accent/10'
             : 'text-sidebar-text hover:text-sidebar-text-active hover:bg-sidebar-hover'
           }
           ${isDisabled ? 'opacity-50 cursor-not-allowed grayscale-[0.5]' : 'cursor-pointer'}

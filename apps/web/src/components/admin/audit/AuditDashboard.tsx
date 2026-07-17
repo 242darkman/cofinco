@@ -204,7 +204,7 @@ export default function AuditDashboard() {
                 </div>
                 <div className="h-3 bg-surface-elevated rounded-full overflow-hidden">
                   <div
-                    className={`h-full bg-gradient-to-r ${item.color} transition-all`}
+                    className={`h-full bg-linear-to-r ${item.color} transition-all`}
                     style={{ width: `${item.percent}%` }}
                   ></div>
                 </div>
@@ -272,7 +272,7 @@ export default function AuditDashboard() {
                 <span className="text-status-success font-bold">45%</span>
               </div>
               <div className="h-2 bg-surface-elevated rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-status-success to-status-success" style={{ width: '45%' }}></div>
+                <div className="h-full bg-linear-to-r from-status-success to-status-success" style={{ width: '45%' }}></div>
               </div>
             </div>
             <div>
@@ -281,7 +281,7 @@ export default function AuditDashboard() {
                 <span className="text-status-info font-bold">62%</span>
               </div>
               <div className="h-2 bg-surface-elevated rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-status-info to-accent" style={{ width: '62%' }}></div>
+                <div className="h-full bg-linear-to-r from-status-info to-accent" style={{ width: '62%' }}></div>
               </div>
             </div>
             <div>
@@ -290,7 +290,7 @@ export default function AuditDashboard() {
                 <span className="text-status-success font-bold">38%</span>
               </div>
               <div className="h-2 bg-surface-elevated rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-status-success to-accent" style={{ width: '38%' }}></div>
+                <div className="h-full bg-linear-to-r from-status-success to-accent" style={{ width: '38%' }}></div>
               </div>
             </div>
             <div className="pt-2 border-t border-edge">

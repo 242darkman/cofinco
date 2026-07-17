@@ -153,7 +153,7 @@ const PaymentPreview = ({
   if (breakdown.length === 0) return null;
 
   return (
-    <div className="mt-3 p-3 bg-gradient-to-r from-accent/10 to-accent-secondary/10 border border-accent/30 rounded-xl animate-in fade-in slide-in-from-top-1 duration-200">
+    <div className="mt-3 p-3 bg-linear-to-r from-accent/10 to-accent-secondary/10 border border-accent/30 rounded-xl animate-in fade-in slide-in-from-top-1 duration-200">
       <div className="flex items-start gap-2">
         <div className="p-1.5 rounded-lg bg-accent/10">
           <Zap size={14} className="text-accent" />

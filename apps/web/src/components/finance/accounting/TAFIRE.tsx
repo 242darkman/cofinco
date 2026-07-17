@@ -209,7 +209,7 @@ export default function TAFIRE() {
             'I - Ressources Durables',
             data.ressourcesDurables,
             totalRessources,
-            'bg-gradient-to-r from-status-success to-status-success',
+            'bg-linear-to-r from-status-success to-status-success',
             <PlusCircle size={14} className="text-white" />,
             'ressource'
           )}
@@ -217,7 +217,7 @@ export default function TAFIRE() {
             'II - Emplois Durables',
             data.emploisDurables,
             totalEmplois,
-            'bg-gradient-to-r from-status-danger to-status-danger',
+            'bg-linear-to-r from-status-danger to-status-danger',
             <MinusCircle size={14} className="text-white" />,
             'emploi'
           )}
@@ -238,7 +238,7 @@ export default function TAFIRE() {
           'III - Variation du BFR',
           data.variationBFR,
           variationBFR,
-          'bg-gradient-to-r from-status-info to-status-info',
+          'bg-linear-to-r from-status-info to-status-info',
           <Layers size={14} className="text-white" />,
           'ressource'
         )}

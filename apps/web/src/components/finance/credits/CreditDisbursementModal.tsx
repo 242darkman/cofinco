@@ -361,7 +361,7 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
                 <Button
                   onClick={handleOpenReplenishmentForm}
                   disabled={loadingCoffres}
-                  className="w-full bg-gradient-to-r from-status-warning to-status-warning hover:from-status-warning hover:to-status-warning text-white font-semibold py-3"
+                  className="w-full bg-linear-to-r from-status-warning to-status-warning hover:from-status-warning hover:to-status-warning text-white font-semibold py-3"
                 >
                   {loadingCoffres ? (
                     <>
@@ -555,7 +555,7 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
                           onClick={() => setMobileProvider(op.id)}
                           className={`flex items-center gap-2.5 p-3 rounded-lg border text-sm font-medium transition-all ${
                             mobileProvider === op.id
-                              ? `bg-gradient-to-r ${op.color} border-transparent text-white shadow-lg`
+                              ? `bg-linear-to-r ${op.color} border-transparent text-white shadow-lg`
                               : 'bg-surface border-edge text-content-secondary hover:bg-surface-elevated hover:border-edge-strong'
                           }`}
                         >
@@ -1170,7 +1170,7 @@ function TransfertInterCoffresFormWithPrefill({
                 type="button"
                 onClick={(e) => handleSubmit(e, true)}
                 disabled={loading || !validation.valid}
-                className="flex-1 bg-gradient-to-r from-status-warning to-status-warning hover:from-status-warning hover:to-status-warning text-white shadow-lg shadow-status-warning/20"
+                className="flex-1 bg-linear-to-r from-status-warning to-status-warning hover:from-status-warning hover:to-status-warning text-white shadow-lg shadow-status-warning/20"
               >
                 {loading ? 'Traitement...' : 'Soumettre la demande'}
               </Button>

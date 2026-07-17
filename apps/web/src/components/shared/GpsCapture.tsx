@@ -119,14 +119,14 @@ function CaptureProgress({
         <div
           className={`absolute inset-y-0 left-0 rounded-full transition-all duration-300 ${
             isRefining
-              ? 'bg-gradient-to-r from-accent to-status-success'
-              : 'bg-gradient-to-r from-status-success to-status-success'
+              ? 'bg-linear-to-r from-accent to-status-success'
+              : 'bg-linear-to-r from-status-success to-status-success'
           }`}
           style={{ width: `${progress}%` }}
         />
         {/* Effet de brillance animé */}
         <div
-          className="absolute inset-y-0 w-20 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+          className="absolute inset-y-0 w-20 bg-linear-to-r from-transparent via-white/30 to-transparent"
           style={{
             animation: 'shimmer 1.5s infinite',
             left: `${progress - 10}%`,
@@ -446,7 +446,7 @@ export default function GpsCapture({
           <button
             type="button"
             onClick={getCurrentPosition}
-            className="w-full px-4 py-4 bg-gradient-to-r from-status-success/20 to-status-success/20 hover:from-status-success/30 hover:to-status-success/30 text-status-success rounded-lg transition-all flex items-center justify-center gap-3 border border-status-success/30 hover:border-status-success/50 active:scale-[0.98] min-h-[56px]"
+            className="w-full px-4 py-4 bg-linear-to-r from-status-success/20 to-status-success/20 hover:from-status-success/30 hover:to-status-success/30 text-status-success rounded-lg transition-all flex items-center justify-center gap-3 border border-status-success/30 hover:border-status-success/50 active:scale-[0.98] min-h-[56px]"
           >
             <Zap size={22} />
             <div className="text-left">

@@ -650,7 +650,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                 {/* LEFT: Client Profile */}
                 <div className="md:col-span-1 space-y-3">
                     <div className="bg-surface rounded-xl overflow-hidden border border-edge">
-                        <div className="h-20 bg-gradient-to-r from-status-info to-surface-base relative">
+                        <div className="h-20 bg-linear-to-r from-status-info to-surface-base relative">
                              <div className="absolute -bottom-8 left-4 w-16 h-16 rounded-full bg-surface border-4 border-edge flex items-center justify-center overflow-hidden">
                                 {clientAvatarUrl ? (
                                     <img

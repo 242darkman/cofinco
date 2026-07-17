@@ -570,7 +570,7 @@ export default function TransfertInterCoffresForm({
                 type="button"
                 onClick={(e) => handleSubmit(e, true)}
                 disabled={loading || !validation.valid}
-                className="flex-1 bg-gradient-to-r from-status-success to-accent hover:from-status-success hover:to-accent text-white shadow-lg shadow-status-success/20"
+                className="flex-1 bg-linear-to-r from-status-success to-accent hover:from-status-success hover:to-accent text-white shadow-lg shadow-status-success/20"
               >
                 <Send size={18} className="mr-2" />
                 {loading ? 'Traitement...' : 'Soumettre'}

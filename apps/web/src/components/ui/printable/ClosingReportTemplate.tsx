@@ -123,7 +123,7 @@ export const ClosingReportTemplate = React.forwardRef<HTMLDivElement, ClosingRep
         <div className="w-full max-w-[210mm] mx-auto min-h-[297mm] bg-white font-sans text-content-primary flex flex-col">
 
           {/* ═══ Header ═══ */}
-          <div className="h-1.5 bg-gradient-to-r from-status-info via-blue-500 to-status-success" />
+          <div className="h-1.5 bg-linear-to-r from-status-info via-blue-500 to-status-success" />
 
           <header className="px-8 py-5 flex justify-between items-start">
             <div className="flex items-center gap-3">
@@ -366,7 +366,7 @@ export const ClosingReportTemplate = React.forwardRef<HTMLDivElement, ClosingRep
                 {branding.appName} — Rapport de Cloture — Document confidentiel
               </p>
             </div>
-            <div className="h-1.5 bg-gradient-to-r from-status-info via-emerald-500 to-status-info" />
+            <div className="h-1.5 bg-linear-to-r from-status-info via-emerald-500 to-status-info" />
           </footer>
         </div>
       </div>

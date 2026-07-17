@@ -185,7 +185,7 @@ export default function SaisieEcriture({ onSuccess }: SaisieEcritureProps) {
   return (
     <div className="space-y-3">
       {/* Header compact - UNE SEULE LIGNE */}
-      <div className="bg-gradient-to-r from-status-info to-status-success rounded-xl p-3">
+      <div className="bg-linear-to-r from-status-info to-status-success rounded-xl p-3">
         <div className="flex items-center gap-3 overflow-x-auto">
           {/* Titre */}
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -493,7 +493,7 @@ export default function SaisieEcriture({ onSuccess }: SaisieEcritureProps) {
             disabled={!isEquilibre || submitting}
             className={`w-full px-4 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors ${
               isEquilibre && !submitting
-                ? 'bg-gradient-to-r from-status-success to-status-success text-white'
+                ? 'bg-linear-to-r from-status-success to-status-success text-white'
                 : 'bg-surface-elevated text-content-muted cursor-not-allowed'
             }`}
           >

@@ -392,7 +392,7 @@ export default function AgentTerrainProfile({ agentId, onClose, onEdit }: AgentT
                    </div>
                    <div className="w-full bg-surface-elevated rounded-full h-2 overflow-hidden mb-1">
                       <div
-                         className="h-full rounded-full bg-gradient-to-r from-accent to-status-success transition-all duration-500 ease-out"
+                         className="h-full rounded-full bg-linear-to-r from-accent to-status-success transition-all duration-500 ease-out"
                          style={{ width: `${tauxReussite}%` }}
                       />
                    </div>

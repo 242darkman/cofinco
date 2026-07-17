@@ -286,7 +286,7 @@ export default function OnboardingWizard({
         {/* Progress bar */}
         <div className="h-2 bg-surface-elevated rounded-full overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-status-warning to-status-warning transition-all duration-300"
+            className="h-full bg-linear-to-r from-status-warning to-status-warning transition-all duration-300"
             style={{ width: `${progress}%` }}
           />
         </div>

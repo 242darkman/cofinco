@@ -157,7 +157,7 @@ const TabGroup: React.FC<TabGroupProps> = ({
         border
         ${fullWidth ? 'flex-1 justify-center' : 'shrink-0'}
       `,
-      active: 'bg-gradient-to-r from-accent/20 to-accent-secondary/20 text-accent border-accent/50',
+      active: 'bg-linear-to-r from-accent/20 to-accent-secondary/20 text-accent border-accent/50',
       inactive: 'bg-surface/50 text-content-muted border-edge hover:bg-surface-elevated hover:text-content-primary hover:border-edge-strong',
       disabled: 'opacity-50 cursor-not-allowed',
     },
@@ -171,7 +171,7 @@ const TabGroup: React.FC<TabGroupProps> = ({
       {/* Left fade + arrow */}
       {showArrows && canScrollLeft && (
         <>
-          <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-surface-base to-transparent z-10 pointer-events-none" />
+          <div className="absolute left-0 top-0 bottom-0 w-8 bg-linear-to-r from-surface-base to-transparent z-10 pointer-events-none" />
           <button
             type="button"
             onClick={() => scroll('left')}

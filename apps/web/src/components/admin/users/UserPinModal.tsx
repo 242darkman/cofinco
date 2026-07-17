@@ -448,7 +448,7 @@ export default function UserPinModal({ isOpen, onClose, userId, userName }: User
                 disabled={loading || pin.length !== 6 || confirmPin.length !== 6 || !pinsMatch || pinSecurity.isWeak}
                 isLoading={loading}
                 icon={pinsMatch && !pinSecurity.isWeak ? Sparkles : KeyRound}
-                className={pinsMatch && !pinSecurity.isWeak ? 'bg-gradient-to-r from-status-success to-accent hover:from-status-success hover:to-accent' : ''}
+                className={pinsMatch && !pinSecurity.isWeak ? 'bg-linear-to-r from-status-success to-accent hover:from-status-success hover:to-accent' : ''}
               >
                 Définir le PIN
               </Button>

@@ -115,7 +115,7 @@ export function ReportsToolbar({
               <span>{type.label}</span>
               {/* Active indicator */}
               {typeRapport === type.value && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-accent to-status-info" />
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-linear-to-r from-accent to-status-info" />
               )}
             </button>
           ))}
@@ -135,7 +135,7 @@ export function ReportsToolbar({
                   onClick={() => setPeriode(btn.type)}
                   className={`px-2.5 sm:px-3 py-1.5 text-[10px] sm:text-xs font-semibold rounded-lg whitespace-nowrap transition-all ${
                     activePeriod === btn.type
-                      ? 'bg-gradient-to-r from-accent/20 to-status-info/20 text-accent ring-1 ring-accent/30'
+                      ? 'bg-linear-to-r from-accent/20 to-status-info/20 text-accent ring-1 ring-accent/30'
                       : 'bg-surface/50 text-content-muted hover:text-content-primary hover:bg-surface-elevated/50'
                   }`}
                 >
@@ -244,7 +244,7 @@ export function ReportsToolbar({
       {/* Loading indicator */}
       {loading && (
         <div className="h-0.5 w-full bg-surface overflow-hidden">
-          <div className="h-full w-1/3 bg-gradient-to-r from-accent to-status-info animate-[shimmer_1s_ease-in-out_infinite]"
+          <div className="h-full w-1/3 bg-linear-to-r from-accent to-status-info animate-[shimmer_1s_ease-in-out_infinite]"
                style={{ animation: 'shimmer 1s ease-in-out infinite' }} />
         </div>
       )}

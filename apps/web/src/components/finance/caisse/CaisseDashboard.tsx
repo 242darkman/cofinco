@@ -1320,7 +1320,7 @@ export default function CaisseDashboard({
         />
 
         {supervisedSession && supervisionInfo && (
-          <div className="bg-gradient-to-r from-status-warning-bg via-amber-500/5 to-status-warning/10 border-y border-status-warning/20 -mx-4 md:-mx-6 mb-4 animate-in slide-in-from-top duration-500">
+          <div className="bg-linear-to-r from-status-warning-bg via-amber-500/5 to-status-warning/10 border-y border-status-warning/20 -mx-4 md:-mx-6 mb-4 animate-in slide-in-from-top duration-500">
             {/* Main supervision banner */}
             <div className="px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               {/* Left side - Info */}

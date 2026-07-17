@@ -214,7 +214,7 @@ export default function ClientScoreTab({ client }: ClientScoreTabProps) {
 
                 <div className="h-2 bg-surface-elevated rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-status-success to-accent rounded-full transition-all duration-700"
+                    className="h-full bg-linear-to-r from-status-success to-accent rounded-full transition-all duration-700"
                     style={{ width: `${percentile.percentile}%` }}
                   />
                 </div>
