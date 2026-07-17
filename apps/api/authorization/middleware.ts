@@ -23,7 +23,7 @@ import { createLogger } from '../lib/logger';
 import { db } from '../db';
 import { users, userRoles } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
-import { SystemRole } from '@shared/types/roles';
+import { SystemRole, isPlatformOperator } from '@shared/types/roles';
 
 const logger = createLogger('Authorization');
 
@@ -364,6 +364,28 @@ export function requireResetPassword() {
 export function hasAbility(req: Request, action: Action, subject: Subject): boolean {
   if (!req.ability) return false;
   return req.ability.can(action, subject);
+}
+
+/**
+ * Middleware: réserve un endpoint à l'opérateur plateforme (éditeur).
+ *
+ * Contrairement à `requireAbility`, ce garde est basé sur le RÔLE, pas sur les
+ * abilities CASL : l'admin tenant possède « manage all » et passerait sinon.
+ * À appliquer aux endpoints d'exploitation (reset agence, maintenance,
+ * provisioning tenant…). Doit suivre `requireAuth`.
+ *
+ * Usage :
+ *   app.post('/api/admin/reset-agence/:id', requireAuth, requirePlatformOperator(), handler);
+ */
+export function requirePlatformOperator() {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const role = req.session?.user?.role;
+    if (!isPlatformOperator(role)) {
+      res.status(403).json({ error: "Action réservée à l'opérateur plateforme." });
+      return;
+    }
+    next();
+  };
 }
 
 /**

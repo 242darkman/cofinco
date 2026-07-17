@@ -1,7 +1,7 @@
 import { lazy, useState, type ReactNode } from 'react';
 import { Activity, MessageSquare } from 'lucide-react';
 import type { TenantFeatureKey } from '@shared/tenant-config';
-import { SystemRole } from '@shared/types/roles';
+import { SystemRole, isPlatformOperator } from '@shared/types/roles';
 
 /**
  * SOURCE UNIQUE DE VÉRITÉ des onglets d'administration.
@@ -142,18 +142,8 @@ export const ADMIN_TABS: AdminTab[] = [
   { id: 'sync', label: 'Synchronisation', icon: 'CloudUpload', path: '/administration/sync', permission: 'admin.settings', scope: 'platform', render: () => <AdminSyncPanel /> },
 ];
 
-/**
- * Rôles autorisés à voir les onglets d'exploitation plateforme (`scope: platform`).
- * Volontairement restreint à l'opérateur/éditeur (Support IT) : l'admin tenant,
- * même avec « manage all », ne doit pas voir ni atteindre ces onglets.
- * Un seul point à modifier pour ajuster qui est « opérateur ».
- */
-export const PLATFORM_OPERATOR_ROLES: readonly SystemRole[] = [SystemRole.SUPPORT_IT];
-
-/** Vrai si le rôle donné est un opérateur plateforme. */
-export function isPlatformOperator(role?: SystemRole | string | null): boolean {
-  return !!role && (PLATFORM_OPERATOR_ROLES as readonly string[]).includes(role);
-}
+// Source unique des rôles opérateur : partagée front + back.
+export { PLATFORM_OPERATOR_ROLES, isPlatformOperator } from '@shared/types/roles';
 
 /** Un onglet est-il visible pour ce rôle (garde de portée plateforme) ? */
 export function isAdminTabInScope(tab: AdminTab, role?: SystemRole | string | null): boolean {

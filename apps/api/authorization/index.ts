@@ -96,6 +96,7 @@ export {
   requireAllAbilities,
   requireDisbursement,
   requireResetPassword,
+  requirePlatformOperator,
   hasAbility,
   assertAbility,
   withAbility,

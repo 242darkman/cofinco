@@ -5,7 +5,7 @@ import { createLogger } from "../lib/logger";
 import { getTenantConfig } from "../config/tenant-config";
 import { isModuleFeature } from "@shared/tenant-config";
 import { requireAuth } from "../auth";
-import { attachAbility, requireAbility } from "../authorization";
+import { attachAbility, requireAbility, requirePlatformOperator } from "../authorization";
 import { logAudit } from "../audit";
 import {
   clearFeatureOverride,
@@ -55,7 +55,8 @@ export function registerTenantRoutes(app: Express) {
     }
   });
 
-  const adminGuards = [requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.SETTINGS)] as const;
+  // Provisioning & branding tenant = exploitation plateforme : opérateur uniquement.
+  const adminGuards = [requireAuth, requirePlatformOperator(), attachAbility, requireAbility(Actions.MANAGE, Subjects.SETTINGS)] as const;
 
   /**
    * GET /api/admin/tenant-features — état effectif de chaque flag et sa provenance.
