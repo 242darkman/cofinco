@@ -7,6 +7,16 @@ import { coffreRouter } from '../../apps/api/routes/coffre';
 // Since we cannot easily spin up a full express app with DB in this environment without setup,
 // we will mock the service layer to test the route logic (controller test).
 
+// La chaîne d'import (router → middleware/idempotency → db) exige DATABASE_URL :
+// on mocke la db comme dans coffre-config.test.ts pour rester exécutable sans PostgreSQL.
+vi.mock('../../apps/api/db', () => ({
+  db: {
+    select: vi.fn(),
+    update: vi.fn(),
+    insert: vi.fn(),
+  },
+}));
+
 vi.mock('../../apps/api/services/coffre/transfert-service', () => {
   return {
     TransfertCoffreService: class {
