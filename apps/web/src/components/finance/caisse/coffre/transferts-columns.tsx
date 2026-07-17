@@ -137,7 +137,7 @@ export function buildRenderRowActions(ctx: RowActionsContext) {
             <Button
               size="sm"
               variant="secondary"
-              className="h-6 sm:h-7 px-1.5 sm:px-2.5 text-[10px] sm:text-xs font-medium bg-status-success-bg text-status-success border-status-success/30 hover:bg-status-success-bg hover:border-status-success/50 transition-all"
+              className="h-7 sm:h-8 px-2.5 sm:px-3 text-[11px] sm:text-xs font-semibold bg-status-success text-white border-transparent hover:bg-status-success/90 transition-all shadow-sm shadow-status-success/20"
               onClick={(e) => { e.stopPropagation(); setConfirmAction({ type: 'validate', transfert: row }); }}
               disabled={isLoading}
             >
@@ -145,20 +145,20 @@ export function buildRenderRowActions(ctx: RowActionsContext) {
                 <Spinner size="xs" tone="current" />
               ) : (
                 <>
-                  <CheckCircle2 size={12} className="lg:mr-1" />
-                  <span className="hidden lg:inline">Valider</span>
+                  <CheckCircle2 size={14} className="mr-1.5" />
+                  <span>Valider</span>
                 </>
               )}
             </Button>
             <Button
               size="sm"
               variant="secondary"
-              className="h-6 sm:h-7 px-1.5 sm:px-2.5 text-[10px] sm:text-xs font-medium bg-status-danger-bg text-status-danger border-status-danger/30 hover:bg-status-danger-bg hover:border-status-danger/50 transition-all"
+              className="h-7 sm:h-8 px-2.5 sm:px-3 text-[11px] sm:text-xs font-semibold bg-status-danger text-white border-transparent hover:bg-status-danger/90 transition-all shadow-sm shadow-status-danger/20"
               onClick={(e) => { e.stopPropagation(); setConfirmAction({ type: 'reject', transfert: row }); }}
               disabled={isLoading}
             >
-              <XCircle size={12} className="lg:mr-1" />
-              <span className="hidden lg:inline">Rejeter</span>
+              <XCircle size={14} className="mr-1.5" />
+              <span>Rejeter</span>
             </Button>
           </>
         )}
@@ -171,14 +171,14 @@ export function buildRenderRowActions(ctx: RowActionsContext) {
         {/* Cancel button available to all (backend enforces permissions) */}
         <Button
           size="sm"
-          variant="danger"
-          className="h-6 sm:h-7 px-1.5 sm:px-2.5 text-[10px] sm:text-xs font-medium cursor-pointer"
+          variant="secondary"
+          className="h-7 sm:h-8 px-2.5 sm:px-3 text-[11px] sm:text-xs font-semibold bg-surface-elevated text-content-primary border border-edge hover:bg-surface-hover hover:border-content-muted transition-all shadow-sm"
           onClick={(e) => { e.stopPropagation(); setTransfertToCancel(row); }}
           disabled={isLoading}
           title="Annuler ce transfert"
         >
-          <Ban size={12} className="lg:mr-1" />
-          <span className="hidden lg:inline">Annuler</span>
+          <Ban size={14} className="mr-1.5 text-content-muted" />
+          <span>Annuler</span>
         </Button>
       </div>
     );
@@ -192,7 +192,7 @@ export function buildRenderRowActions(ctx: RowActionsContext) {
           <Button
             size="sm"
             variant="primary"
-            className="h-6 sm:h-7 px-2 sm:px-3 text-[10px] sm:text-xs font-medium shadow-lg shadow-accent/20 hover:shadow-accent/30 transition-all"
+            className="h-7 sm:h-8 px-2.5 sm:px-3 text-[11px] sm:text-xs font-semibold shadow-lg shadow-accent/20 hover:shadow-accent/30 transition-all"
             onClick={(e) => { e.stopPropagation(); setConfirmAction({ type: 'execute', transfert: row }); }}
             disabled={isLoading}
           >
@@ -200,8 +200,8 @@ export function buildRenderRowActions(ctx: RowActionsContext) {
               <Spinner size="xs" tone="current" />
             ) : (
               <>
-                <Play size={12} className="lg:mr-1" />
-                <span className="hidden lg:inline">Exécuter</span>
+                <Play size={14} className="mr-1.5" />
+                <span>Exécuter</span>
               </>
             )}
           </Button>
@@ -214,14 +214,14 @@ export function buildRenderRowActions(ctx: RowActionsContext) {
         {/* Cancel button available to all (backend enforces permissions) */}
         <Button
           size="sm"
-          variant="danger"
-          className="h-6 sm:h-7 px-1.5 sm:px-2.5 text-[10px] sm:text-xs font-medium cursor-pointer"
+          variant="secondary"
+          className="h-7 sm:h-8 px-2.5 sm:px-3 text-[11px] sm:text-xs font-semibold bg-surface-elevated text-content-primary border border-edge hover:bg-surface-hover hover:border-content-muted transition-all shadow-sm"
           onClick={(e) => { e.stopPropagation(); setTransfertToCancel(row); }}
           disabled={isLoading}
           title="Annuler ce transfert"
         >
-          <Ban size={12} className="lg:mr-1" />
-          <span className="hidden lg:inline">Annuler</span>
+          <Ban size={14} className="mr-1.5 text-content-muted" />
+          <span>Annuler</span>
         </Button>
       </div>
     );

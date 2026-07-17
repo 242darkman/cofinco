@@ -133,7 +133,7 @@ export function CoffreOperationsTab({
                   ) : (
                     <RefreshCw size={10} />
                   )}
-                  <span className="hidden sm:inline ml-1">Actualiser</span>
+                  <span className="ml-1">Actualiser</span>
                 </Button>
               </div>
     

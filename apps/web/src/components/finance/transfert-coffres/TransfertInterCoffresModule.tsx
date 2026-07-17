@@ -679,10 +679,11 @@ export default function TransfertInterCoffresModule({
                   variant="ghost"
                   size="sm"
                   onClick={onBack}
-                  className="rounded-full hover:bg-surface text-content-muted h-10 w-10 p-0"
+                  className="hover:bg-surface text-content-muted h-9 px-3 rounded-lg flex items-center gap-1.5 transition-colors"
                   aria-label="Retour"
                 >
-                  <ArrowLeft size={20} />
+                  <ArrowLeft size={16} />
+                  <span className="text-sm font-medium">Retour</span>
                 </Button>
               )}
               <div>
@@ -701,10 +702,11 @@ export default function TransfertInterCoffresModule({
                   variant="ghost"
                   size="sm"
                   onClick={handleExportCsv}
-                  className="h-10 w-10 p-0 rounded-full text-content-muted hover:bg-surface"
+                  className="h-9 px-3 rounded-lg text-content-muted hover:text-content-primary hover:bg-surface flex items-center gap-1.5 transition-colors"
                   aria-label="Exporter CSV"
                 >
-                  <Download size={18} />
+                  <Download size={16} />
+                  <span className="text-sm font-medium">Exporter</span>
                 </Button>
               </Tooltip>
               <Button
@@ -712,90 +714,80 @@ export default function TransfertInterCoffresModule({
                 size="sm"
                 onClick={handleRefresh}
                 disabled={refreshing}
-                className="h-10 w-10 p-0 rounded-full text-content-muted hover:bg-surface"
+                className="h-9 px-3 rounded-lg text-content-muted hover:text-content-primary hover:bg-surface flex items-center gap-1.5 transition-colors"
                 aria-label="Actualiser"
               >
-                <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
+                <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
+                <span className="text-sm font-medium">Actualiser</span>
               </Button>
               {canManage && (
               <Button
                 onClick={() => setShowCreateForm(true)}
-                className="bg-linear-to-r from-status-success to-accent hover:from-status-success/90 hover:to-accent/90 text-white shadow-lg shadow-status-success/20"
+                className="bg-accent text-white hover:bg-accent-secondary shadow-lg shadow-accent/20 transition-all font-semibold"
               >
-                <Plus size={18} className="mr-2 hidden sm:inline" />
-                <span className="hidden sm:inline">Nouveau Transfert</span>
-                <Plus size={18} className="sm:hidden" />
+                <Plus size={18} className="mr-2" />
+                <span>Nouveau Transfert</span>
               </Button>
               )}
             </div>
           </div>
         </header>
 
-        {/* Stats Cards - Compact */}
-        <section className="grid grid-cols-2 lg:grid-cols-4 gap-2" aria-label="Statistiques">
-          <div className="bg-gradient-to-br from-surface/50 to-surface-base/50 border border-edge-subtle rounded-lg p-3">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-surface-elevated/50">
-                <Vault size={16} className="text-content-secondary" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[10px] text-content-muted uppercase tracking-wide leading-tight">Solde Coffres</span>
-                <span className="text-sm font-bold text-content-primary leading-tight">
-                  {loading ? "..." : formatMoney(computedStats.soldeTotalCoffres)}
-                </span>
-              </div>
+        {/* Stats Cards - Premium Inline */}
+        <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4" aria-label="Statistiques">
+          <div className="bg-surface-elevated border border-edge rounded-xl p-3 sm:p-4 flex flex-col items-start gap-1 sm:gap-2 shadow-xs transition-colors hover:border-accent/30">
+            <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-content-muted uppercase tracking-wider">
+               <Vault size={14} className="text-content-secondary" />
+               <span>Solde Coffres</span>
+            </div>
+            <div className="text-base sm:text-lg lg:text-xl font-black text-content-primary tabular-nums break-words w-full">
+               {loading ? "..." : formatMoney(computedStats.soldeTotalCoffres)}
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-status-warning/10 to-status-warning/10 border border-status-warning/20 rounded-lg p-3">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-status-warning-bg">
-                <Clock size={16} className="text-status-warning" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[10px] text-status-warning/80 uppercase tracking-wide leading-tight">En Attente</span>
-                <span className="text-sm font-bold text-status-warning leading-tight">
-                   {loading ? "..." : formatMoney(computedStats.enAttenteMontant)}
-                </span>
-                <span className="text-[9px] text-status-warning/50 leading-tight">{computedStats.enAttente} transfert{computedStats.enAttente !== 1 ? 's' : ''}</span>
-              </div>
+          <div className="bg-status-warning-bg/30 border border-status-warning/30 rounded-xl p-3 sm:p-4 flex flex-col items-start gap-1 sm:gap-2 shadow-xs transition-colors hover:border-status-warning">
+            <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-content-muted uppercase tracking-wider">
+               <Clock size={14} className="text-status-warning" />
+               <span>En Attente</span>
             </div>
+            <div className="text-base sm:text-lg lg:text-xl font-black text-status-warning tabular-nums break-words w-full">
+               {loading ? "..." : formatMoney(computedStats.enAttenteMontant)}
+            </div>
+            <span className="text-[10px] text-status-warning/70 font-medium">
+               {computedStats.enAttente} transfert{computedStats.enAttente !== 1 ? 's' : ''}
+            </span>
           </div>
 
-          <div className="bg-gradient-to-br from-status-info/10 to-status-info/10 border border-status-info/30/30 rounded-lg p-3">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-status-info-bg">
-                <Truck size={16} className="text-status-info" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[10px] text-status-info/80 uppercase tracking-wide leading-tight">En Transit</span>
-                <span className="text-sm font-bold text-status-info leading-tight">
-                   {loading ? "..." : formatMoney(computedStats.enTransitMontant)}
-                </span>
-                <span className="text-[9px] text-status-info/50 leading-tight">{computedStats.enTransit} transfert{computedStats.enTransit !== 1 ? 's' : ''}</span>
-              </div>
+          <div className="bg-status-info-bg/30 border border-status-info/30 rounded-xl p-3 sm:p-4 flex flex-col items-start gap-1 sm:gap-2 shadow-xs transition-colors hover:border-status-info">
+            <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-content-muted uppercase tracking-wider">
+               <Truck size={14} className="text-status-info" />
+               <span>En Transit</span>
             </div>
+            <div className="text-base sm:text-lg lg:text-xl font-black text-status-info tabular-nums break-words w-full">
+               {loading ? "..." : formatMoney(computedStats.enTransitMontant)}
+            </div>
+            <span className="text-[10px] text-status-info/70 font-medium">
+               {computedStats.enTransit} transfert{computedStats.enTransit !== 1 ? 's' : ''}
+            </span>
           </div>
 
-          <div className="bg-gradient-to-br from-status-success/10 to-status-success/10 border border-status-success/20 rounded-lg p-3">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-status-success-bg">
-                <CheckCircle size={16} className="text-status-success" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[10px] text-status-success/80 uppercase tracking-wide leading-tight">Reçus</span>
-                <span className="text-sm font-bold text-status-success leading-tight">
-                   {loading ? "..." : formatMoney(computedStats.recusMontant)}
-                </span>
-                <span className="text-[9px] text-status-success/50 leading-tight">{computedStats.recus} transfert{computedStats.recus !== 1 ? 's' : ''}</span>
-              </div>
+          <div className="bg-status-success-bg/30 border border-status-success/30 rounded-xl p-3 sm:p-4 flex flex-col items-start gap-1 sm:gap-2 shadow-xs transition-colors hover:border-status-success">
+            <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-content-muted uppercase tracking-wider">
+               <CheckCircle size={14} className="text-status-success" />
+               <span>Reçus</span>
             </div>
+            <div className="text-base sm:text-lg lg:text-xl font-black text-status-success tabular-nums break-words w-full">
+               {loading ? "..." : formatMoney(computedStats.recusMontant)}
+            </div>
+            <span className="text-[10px] text-status-success/70 font-medium">
+               {computedStats.recus} transfert{computedStats.recus !== 1 ? 's' : ''}
+            </span>
           </div>
         </section>
 
         {/* Filters */}
-        <section className="bg-surface-base/50 border border-edge rounded-lg p-3">
-          <div className="flex flex-col sm:flex-row gap-2">
+        <section className="bg-surface-base border border-edge rounded-xl p-3 shadow-xs">
+          <div className="flex flex-col sm:flex-row gap-3">
             {/* Search */}
             <div className="relative flex-1">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" />
@@ -807,7 +799,7 @@ export default function TransfertInterCoffresModule({
                   setSearchQuery(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="w-full pl-9 pr-4 py-2 bg-surface-base border border-edge rounded-lg text-sm text-content-primary placeholder-content-muted focus:ring-2 focus:ring-accent/30 focus:border-accent outline-none transition-all"
+                className="w-full pl-9 pr-4 py-2 bg-input-bg border border-input-border rounded-xl text-[13px] text-content-primary placeholder-content-muted focus:ring-[3px] focus:ring-accent/30 focus:border-accent hover:border-content-muted shadow-sm transition-all outline-none"
               />
             </div>
 
@@ -818,7 +810,7 @@ export default function TransfertInterCoffresModule({
                 setStatutFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="px-3 py-2 bg-surface-base border border-edge rounded-lg text-sm text-content-primary focus:ring-2 focus:ring-accent/30 focus:border-accent outline-none transition-all"
+              className="px-4 py-2 bg-input-bg border border-input-border rounded-xl text-[13px] text-content-primary focus:ring-[3px] focus:ring-accent/30 focus:border-accent hover:border-content-muted shadow-sm transition-all outline-none cursor-pointer"
             >
               <option value="all">Tous les statuts</option>
               <option value="DRAFT">Brouillon</option>
@@ -841,7 +833,7 @@ export default function TransfertInterCoffresModule({
                   setDateDebutFilter(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="px-2 py-2 bg-surface-base border border-edge rounded-lg text-sm text-content-primary focus:ring-2 focus:ring-accent/30 outline-none"
+                className="px-3 py-2 bg-input-bg border border-input-border rounded-xl text-[13px] text-content-primary focus:ring-[3px] focus:ring-accent/30 focus:border-accent hover:border-content-muted shadow-sm transition-all outline-none"
               />
               <span className="text-content-muted text-xs">→</span>
               <input
@@ -851,7 +843,7 @@ export default function TransfertInterCoffresModule({
                   setDateFinFilter(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="px-2 py-2 bg-surface-base border border-edge rounded-lg text-sm text-content-primary focus:ring-2 focus:ring-accent/30 outline-none"
+                className="px-3 py-2 bg-input-bg border border-input-border rounded-xl text-[13px] text-content-primary focus:ring-[3px] focus:ring-accent/30 focus:border-accent hover:border-content-muted shadow-sm transition-all outline-none"
               />
             </div>
 
@@ -865,7 +857,7 @@ export default function TransfertInterCoffresModule({
                   setMontantMin(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="w-24 px-2 py-2 bg-surface-base border border-edge rounded-lg text-sm text-content-primary focus:ring-2 focus:ring-accent/30 outline-none"
+                className="w-24 px-3 py-2 bg-input-bg border border-input-border rounded-xl text-[13px] text-content-primary placeholder-content-muted focus:ring-[3px] focus:ring-accent/30 focus:border-accent hover:border-content-muted shadow-sm transition-all outline-none"
               />
               <span className="text-content-muted text-xs">→</span>
               <input
@@ -876,7 +868,7 @@ export default function TransfertInterCoffresModule({
                   setMontantMax(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="w-24 px-2 py-2 bg-surface-base border border-edge rounded-lg text-sm text-content-primary focus:ring-2 focus:ring-accent/30 outline-none"
+                className="w-24 px-3 py-2 bg-input-bg border border-input-border rounded-xl text-[13px] text-content-primary placeholder-content-muted focus:ring-[3px] focus:ring-accent/30 focus:border-accent hover:border-content-muted shadow-sm transition-all outline-none"
               />
             </div>
           </div>
@@ -927,14 +919,15 @@ export default function TransfertInterCoffresModule({
                 }}
                 actions={(transfert) => (
                     <div className="flex flex-row items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                          {/* Bouton secondaire (Voir) - Ghost style */}
+                          {/* Bouton secondaire (Voir) - Text + Icon */}
                           <Tooltip content="Voir les détails" position="top">
                             <button
                               onClick={(e) => { e.stopPropagation(); handleViewDetails(transfert); }}
-                              className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-content-muted hover:text-content-secondary hover:bg-surface-elevated/50 transition-colors"
+                              className="h-7 px-2.5 inline-flex items-center gap-1.5 rounded-lg text-[11px] font-semibold text-content-secondary bg-surface-elevated hover:bg-surface-hover hover:text-content-primary border border-edge transition-colors shadow-sm"
                               aria-label="Voir les détails"
                             >
-                              <Eye size={16} />
+                              <Eye size={12} />
+                              <span>Voir</span>
                             </button>
                           </Tooltip>
 
@@ -1016,10 +1009,11 @@ export default function TransfertInterCoffresModule({
                             <Tooltip content="Supprimer le brouillon" position="top">
                               <button
                                 onClick={(e) => { e.stopPropagation(); setDeleteTarget(transfert); }}
-                                className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-status-danger hover:bg-status-danger-bg transition-colors"
+                                className="h-7 px-2.5 inline-flex items-center gap-1.5 rounded-lg text-[11px] font-semibold text-status-danger bg-status-danger-bg hover:bg-status-danger/20 border border-status-danger/30 transition-colors shadow-sm"
                                 aria-label="Supprimer"
                               >
-                                <Trash2 size={14} />
+                                <Trash2 size={12} />
+                                <span>Supprimer</span>
                               </button>
                             </Tooltip>
                           )}
@@ -1029,10 +1023,11 @@ export default function TransfertInterCoffresModule({
                             <Tooltip content="Annuler le transfert" position="top">
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleCancel(transfert); }}
-                                className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-content-muted hover:text-status-danger hover:bg-status-danger-bg transition-colors"
+                                className="h-7 px-2.5 inline-flex items-center gap-1.5 rounded-lg text-[11px] font-semibold text-content-muted bg-surface-base hover:text-status-danger hover:bg-status-danger-bg border border-edge transition-colors shadow-sm"
                                 aria-label="Annuler"
                               >
-                                <X size={14} />
+                                <Ban size={12} />
+                                <span>Annuler</span>
                               </button>
                             </Tooltip>
                           )}
