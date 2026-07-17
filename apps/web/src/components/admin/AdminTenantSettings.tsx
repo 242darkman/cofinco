@@ -172,7 +172,7 @@ export default function AdminTenantSettings() {
       : null;
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6">
       {/* Modules provisionnés & intégrations (feature flags) */}
       <TenantModulesPanel
         features={features}

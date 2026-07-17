@@ -37,7 +37,7 @@ function FeatureRow({ state, onToggle, onReset, resetPending }: { state: Feature
   const locked = isModule && !provisioned;
 
   return (
-    <div className="flex items-center gap-3 py-3">
+    <div className="flex items-center gap-3 p-3 rounded-lg border border-edge-subtle bg-surface-base/40">
       <Icon size={18} className="text-content-muted shrink-0" />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
@@ -102,7 +102,7 @@ function FeaturesGroup({
       {list.length === 0 ? (
         <p className="text-sm text-content-muted py-4 text-center">{emptyLabel}</p>
       ) : (
-        <div className="divide-y divide-edge-subtle">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2">
           {list.map((state) => (
             <FeatureRow key={state.feature} state={state} {...handlers} />
           ))}
@@ -119,7 +119,9 @@ function FeaturesGroup({
  * - « Intégrations » : basculables librement à chaud.
  */
 export function TenantModulesPanel({ features, ...handlers }: { features: FeatureState[] } & RowHandlers) {
-  const modules = features.filter((f) => TENANT_FEATURE_KIND[f.feature] === 'module');
+  // Seuls les modules PROVISIONNÉS sont affichés : un module non provisionné est
+  // verrouillé (non activable) et n'a donc pas à encombrer l'écran du client.
+  const modules = features.filter((f) => TENANT_FEATURE_KIND[f.feature] === 'module' && f.static);
   const integrations = features.filter((f) => TENANT_FEATURE_KIND[f.feature] === 'integration');
 
   return (
