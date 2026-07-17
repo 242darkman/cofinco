@@ -92,3 +92,5 @@ export { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from './
 // Feature Header (with descriptions)
 export { FeatureHeader, FEATURE_DESCRIPTIONS, getFeatureDescription } from './FeatureHeader';
 export type { FeatureKey } from './FeatureHeader';
+export { default as Avatar } from './Avatar';
+export type { AvatarProps } from './Avatar';

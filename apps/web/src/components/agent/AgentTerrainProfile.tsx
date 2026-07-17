@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Spinner } from '@/components/ui/Spinner';
 import { X, User, Phone, Mail, MapPin, Calendar, Target, TrendingUp, Users, DollarSign, CheckCircle, Clock, Camera } from 'lucide-react';
-import { Button, Card, Badge, TabGroup } from '../ui';
+import { Button, Card, Badge, TabGroup, Avatar } from '../ui';
 import { resolveStorageUrl } from '../../lib/format';
 
 interface AgentTerrainProfileProps {
@@ -171,17 +171,13 @@ export default function AgentTerrainProfile({ agentId, onClose, onEdit }: AgentT
         <div className="p-4 border-b border-edge flex items-center justify-between gap-3 bg-surface-base shrink-0 sm:rounded-t-2xl">
           <div className="flex items-center gap-3 overflow-hidden">
             <div className="relative group">
-              {photoUrl ? (
-                <img
-                  src={resolveStorageUrl(photoUrl)}
-                  alt={`${agent.nom} ${agent.prenom}`}
-                  className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-status-info/30 shadow-lg shadow-status-info/20"
-                />
-              ) : (
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-status-info to-accent flex items-center justify-center text-white font-bold text-sm sm:text-base shrink-0 shadow-lg shadow-status-info/20">
-                  {agent.nom?.charAt(0)}{agent.prenom?.charAt(0)}
-                </div>
-              )}
+              <Avatar
+                photoUrl={photoUrl}
+                fullName={`${agent.nom || ''} ${agent.prenom || ''}`}
+                initials={`${agent.nom?.charAt(0) || ''}${agent.prenom?.charAt(0) || ''}`}
+                size="lg"
+                className="w-10 h-10 sm:w-12 sm:h-12 border-2 border-status-info/30 shadow-lg shadow-status-info/20"
+              />
               <input
                 ref={photoInputRef}
                 type="file"

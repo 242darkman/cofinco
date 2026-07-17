@@ -6,7 +6,7 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
 } from '../ui/sheet';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '../ui/accordion';
-import { FormField, SelectField, Button } from '../ui';
+import { FormField, SelectField, Button, Avatar } from '../ui';
 import SmartDocumentUpload, { type UploadedDocument, type DocumentType } from '../ui/SmartDocumentUpload';
 import FaceLivenessCapture from '../security/FaceLivenessCapture';
 import { useUserProfile } from '../../hooks/useUserProfile';
@@ -463,15 +463,16 @@ export default function ClientEditDrawer({ client, isOpen, onClose, onSave }: Cl
                   <div className="flex items-start gap-4">
                     <div className="relative">
                       {formData.photoProfile ? (
-                        <div className="relative">
-                          <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-edge-strong shadow-lg">
-                            <img src={resolveStorageUrl(formData.photoProfile)} className="w-full h-full object-cover" alt="Profil"
-                              onError={(e) => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(`${formData.prenom || ''} ${formData.nom || ''}`.trim() || 'Client')}&size=80&background=1e293b&color=94a3b8`; }} />
-                          </div>
+                        <div className="relative inline-block">
+                          <Avatar
+                            photoUrl={formData.photoProfile}
+                            fullName={`${formData.prenom || ''} ${formData.nom || ''}`.trim() || 'Client'}
+                            className="w-20 h-20 text-2xl border-2 border-edge-strong shadow-lg"
+                          />
                           <button type="button" onClick={() => handleChange('photoProfile', '')}
-                            className="absolute -top-1 -right-1 p-1 bg-status-danger text-white rounded-full hover:bg-status-danger shadow"><Trash2 size={10} /></button>
+                            className="absolute -top-1 -right-1 p-1 bg-status-danger text-white rounded-full hover:bg-status-danger shadow z-10"><Trash2 size={10} /></button>
                           <button type="button" onClick={() => setIsLivenessOpen(true)}
-                            className="absolute bottom-0 right-0 p-1.5 bg-accent-secondary hover:bg-accent-secondary-hover text-content-primary rounded-full shadow"><Camera size={12} /></button>
+                            className="absolute bottom-0 right-0 p-1.5 bg-accent-secondary hover:bg-accent-secondary-hover text-content-primary rounded-full shadow z-10"><Camera size={12} /></button>
                         </div>
                       ) : (
                         <div className="relative">

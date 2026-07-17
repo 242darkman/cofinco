@@ -18,6 +18,7 @@ import {
 } from '../../hooks/useMessagesV2';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { resolveStorageUrl } from '../../lib/format';
+import { Avatar } from '@/components/ui/Avatar';
 import { authService } from '../../lib/auth';
 import { ALLOWED_REACTION_EMOJIS } from '@shared/schema';
 import DocumentPreviewModal from '../ui/DocumentPreviewModal';
@@ -410,13 +411,14 @@ export default function MessagesModule({ initialConversationId, initialChatUserI
                     className="w-full p-4 flex items-center gap-3 border-b border-edge transition-colors hover:bg-surface-base border-l-4 border-l-transparent"
                   >
                     <div className="relative">
-                      {item.photoProfile ? (
-                        <img src={resolveStorageUrl(item.photoProfile)} alt={name} className="w-12 h-12 rounded-full object-cover border border-edge" />
-                      ) : (
-                        <div className="w-12 h-12 rounded-full bg-surface flex items-center justify-center font-bold text-content-secondary border border-edge">
-                          {getInitials(name)}
-                        </div>
-                      )}
+                      <div className="shrink-0">
+                        <Avatar
+                          photoUrl={item.photoProfile}
+                          fullName={name}
+                          initials={getInitials(name)}
+                          size="md"
+                        />
+                      </div>
                       {online && <div className="absolute bottom-0 right-0 w-3 h-3 bg-status-success rounded-full border-2 border-edge"></div>}
                     </div>
                     <div className="flex-1 min-w-0 text-left">
@@ -447,11 +449,14 @@ export default function MessagesModule({ initialConversationId, initialChatUserI
                       <div className="w-12 h-12 rounded-full bg-gradient-to-br from-status-info to-accent flex items-center justify-center border border-edge">
                         <UsersRound size={20} className="text-white" />
                       </div>
-                    ) : avatar ? (
-                      <img src={resolveStorageUrl(avatar)} alt={conv.displayTitle} className="w-12 h-12 rounded-full object-cover border border-edge" />
                     ) : (
-                      <div className="w-12 h-12 rounded-full bg-surface flex items-center justify-center font-bold text-content-secondary border border-edge">
-                        {getInitials(conv.displayTitle)}
+                      <div className="shrink-0">
+                        <Avatar
+                          photoUrl={avatar}
+                          fullName={conv.displayTitle}
+                          initials={getInitials(conv.displayTitle)}
+                          size="md"
+                        />
                       </div>
                     )}
                     {online && <div className="absolute bottom-0 right-0 w-3 h-3 bg-status-success rounded-full border-2 border-edge"></div>}
@@ -507,11 +512,14 @@ export default function MessagesModule({ initialConversationId, initialChatUserI
                     </div>
                   ) : (() => {
                     const avatar = activeConv ? getConversationAvatar(activeConv) : null;
-                    return avatar ? (
-                      <img src={resolveStorageUrl(avatar)} alt="" className="w-10 h-10 rounded-full object-cover" />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-accent to-status-info flex items-center justify-center font-bold text-white text-sm">
-                        {getInitials(activeConv?.displayTitle || '?')}
+                    return (
+                      <div className="shrink-0">
+                        <Avatar
+                          photoUrl={avatar}
+                          fullName={activeConv?.displayTitle || '?'}
+                          initials={getInitials(activeConv?.displayTitle || '?')}
+                          size="sm"
+                        />
                       </div>
                     );
                   })()}

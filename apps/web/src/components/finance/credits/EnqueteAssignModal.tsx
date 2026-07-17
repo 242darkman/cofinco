@@ -4,6 +4,7 @@ import { X, UserCheck, Calendar, AlertTriangle, Search, MapPin, FileText, Shield
 import { api } from '../../../lib/api';
 import { creditPlanApi } from '../../../lib/api-client';
 import { resolveStorageUrl } from '../../../lib/format';
+import { Avatar } from '@/components/ui/Avatar';
 
 interface Agent {
   id: string;
@@ -212,13 +213,14 @@ export default function EnqueteAssignModal({ isOpen, onClose, demande, onAssign 
                     }`}
                   >
                     {/* Avatar */}
-                    {photoUrl ? (
-                      <img src={photoUrl} alt="" className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
-                    ) : (
-                      <div className="w-7 h-7 rounded-full bg-surface-elevated flex items-center justify-center text-[10px] font-bold text-content-muted flex-shrink-0">
-                        {initials}
-                      </div>
-                    )}
+                    <div className="shrink-0">
+                      <Avatar
+                        photoUrl={photoUrl}
+                        fullName={`${agent.prenom} ${agent.nom}`}
+                        initials={initials}
+                        className="w-7 h-7 text-[10px]"
+                      />
+                    </div>
                     <div className="min-w-0 flex-1">
                       <p className={`text-xs font-medium truncate ${isSelected ? 'text-accent' : 'text-content-primary'}`}>
                         {agent.prenom} {agent.nom}

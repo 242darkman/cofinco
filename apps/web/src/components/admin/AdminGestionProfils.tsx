@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Spinner } from '@/components/ui/Spinner';
 import { Users, Plus, Edit2, Trash2, Lock, Unlock, Eye, EyeOff, Shield, CheckCircle, XCircle, Search, Filter, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Upload, Image as ImageIcon, User, Briefcase, Check, Save, CreditCard, KeyRound, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Card, Button, IconButton, ResponsiveTable } from '../ui';
+import { Card, Button, IconButton, ResponsiveTable, Avatar } from '../ui';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { userApi, employeApi } from '../../lib/api-client';
@@ -669,19 +669,12 @@ export default function AdminGestionProfils() {
                       const user = emp.user || emp;
                       return (
                         <div className="flex items-center gap-2 py-0.5">
-                          <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center border border-primary/20 shrink-0 overflow-hidden">
-                            {user.photoProfile ? (
-                              <img
-                                src={resolveStorageUrl(user.photoProfile)}
-                                alt={`${user.nom} ${user.prenom}`}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <span className="text-xs font-bold text-primary max-w-full truncate px-1">
-                                {getInitials(user.nom, user.prenom)}
-                              </span>
-                            )}
-                          </div>
+                          <Avatar
+                            photoUrl={user.photoProfile}
+                            fullName={`${user.nom} ${user.prenom}`}
+                            initials={getInitials(user.nom, user.prenom)}
+                            size="sm"
+                          />
                           <div className="min-w-0">
                             <p className="text-sm font-semibold text-content-primary truncate max-w-[140px] sm:max-w-xs">{user.nom} {user.prenom}</p>
                             <p className="text-[10px] text-content-muted truncate">{user.email}</p>
@@ -988,16 +981,17 @@ export default function AdminGestionProfils() {
                         {/* Photo */}
                         <div className="flex flex-col items-center justify-center">
                           <div className="relative group">
-                            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-surface-muted overflow-hidden shadow-lg bg-surface-muted flex items-center justify-center relative">
+                            <div className="relative">
+                              <Avatar
+                                photoUrl={formData.photoProfile}
+                                fullName={`${formData.nom || ''} ${formData.prenom || ''}`}
+                                size="xxl"
+                                className="border-4 border-surface shadow-lg"
+                              />
                               {uploadingPhoto && (
-                                <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
+                                <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center z-10">
                                   <Spinner size="sm" tone="accent" />
                                 </div>
-                              )}
-                              {formData.photoProfile ? (
-                                <img src={resolveStorageUrl(formData.photoProfile)} alt="Profil" className="w-full h-full object-cover" />
-                              ) : (
-                                <ImageIcon size={32} className="text-content-muted opacity-50" />
                               )}
                             </div>
                             <div className="absolute inset-x-0 bottom-0 bg-black/60 backdrop-blur-sm p-1.5 flex justify-center gap-3 translate-y-full group-hover:translate-y-0 transition-transform duration-200 rounded-b-full z-20">

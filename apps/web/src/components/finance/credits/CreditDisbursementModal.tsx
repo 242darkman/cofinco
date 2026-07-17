@@ -423,7 +423,7 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
   return (
     <>
       <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
-        <div className="bg-surface-base rounded-xl border border-edge w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh]">
+        <div className="bg-surface-base rounded-2xl border border-edge w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh]">
           
           {/* === HEADER === */}
           <div className="bg-surface/80 border-b border-edge p-4 flex justify-between items-center shrink-0">
@@ -445,15 +445,10 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
                 <div className="flex items-center gap-3">
                     <div className="h-10 w-10 rounded-full bg-surface-elevated flex items-center justify-center text-content-muted overflow-hidden">
                         {clientAvatarUrl ? (
-                          <img
-                            src={clientAvatarUrl}
-                            alt={formatClientName(demande.clients.nom, demande.clients.prenom)}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.onerror = null;
-                              target.src = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="%2364748b" stroke-width="1.5"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>')}`;
-                            }}
+                          <Avatar
+                            photoUrl={clientAvatarUrl}
+                            fullName={formatClientName(demande.clients.nom, demande.clients.prenom)}
+                            size="md"
                           />
                         ) : (
                           <User size={20} />
@@ -896,7 +891,7 @@ function TransfertInterCoffresFormWithPrefill({
 
   return (
     <div className="fixed inset-0 bg-surface-base/90 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
-      <div className="bg-surface-base border border-edge w-full max-w-2xl max-h-[95vh] sm:rounded-2xl rounded-t-3xl shadow-2xl flex flex-col animate-in slide-in-from-bottom-5 duration-300">
+      <div className="bg-surface-base w-full max-w-5xl max-h-[90vh] flex flex-col rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
         {/* Header */}
         <header className="p-5 border-b border-edge flex items-center justify-between sticky top-0 bg-surface-base/95 backdrop-blur z-10 rounded-t-3xl sm:rounded-t-2xl">
           <div className="flex items-center gap-3">
@@ -1160,9 +1155,10 @@ function TransfertInterCoffresFormWithPrefill({
             <div className="flex-1 flex gap-3">
               <Button
                 type="button"
+                variant="secondary"
                 onClick={(e) => handleSubmit(e, false)}
                 disabled={loading || !validation.valid}
-                className="flex-1 bg-surface-elevated hover:bg-surface-subtle text-content-primary"
+                className="flex-1"
               >
                 Sauvegarder brouillon
               </Button>

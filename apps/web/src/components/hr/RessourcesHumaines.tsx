@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Spinner } from '@/components/ui/Spinner';
-import { TabGroup, ConfirmDialog, PageHeader, FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui';
+import { TabGroup, ConfirmDialog, PageHeader, FeatureHeader, FEATURE_DESCRIPTIONS, Button } from '../ui';
 import { Users, Calendar, UserPlus, AlertTriangle, Gift, GraduationCap, ClipboardCheck, Building2, FileText, Upload, BarChart3, Star, Briefcase, FileBarChart, FolderOpen, Clock, Crown } from 'lucide-react';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
@@ -360,24 +360,28 @@ export default function RessourcesHumaines() {
           actions={
             activeTab === 'list' && canCreateEmployes ? (
               <div className="flex items-center gap-2">
-                <button
+                <Button
+                  variant="outline"
+                  size="sm"
+                  icon={Upload}
                   onClick={() => setShowImportModal(true)}
-                  className="px-3 py-1.5 bg-surface-elevated hover:bg-surface-subtle text-content-primary rounded-lg text-xs font-medium transition flex items-center gap-1.5"
+                  className="hidden sm:flex text-xs"
                   title="Importer des employés depuis un fichier CSV"
                 >
-                  <Upload size={14} />
-                  <span className="hidden sm:inline">Import CSV</span>
-                </button>
-                <button
+                  Import CSV
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon={UserPlus}
                   onClick={() => {
                     setEditingEmploye(null);
                     setShowForm(true);
                   }}
-                  className="px-3 py-1.5 bg-accent-secondary hover:bg-accent-secondary-hover text-white rounded-lg text-xs font-bold shadow-lg shadow-accent/20 transition flex items-center gap-1.5 self-start sm:self-auto"
+                  className="text-xs self-start sm:self-auto"
                 >
-                  <UserPlus size={14} />
-                  <span>Nouvel Employé</span>
-                </button>
+                  Nouvel Employé
+                </Button>
               </div>
             ) : undefined
           }
@@ -387,10 +391,10 @@ export default function RessourcesHumaines() {
           tabs={visibleTabs}
           activeTab={activeTab}
           onTabChange={(key) => setActiveTab(key as TabKey)}
-          variant="underline"
+          variant="pills"
           size="sm"
-          className="mt-2"
-          scrollable={false}
+          className="mt-2 pb-1"
+          scrollable={true}
         />
       </div>
 

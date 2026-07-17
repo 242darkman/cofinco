@@ -20,6 +20,7 @@ import { useWebSocket } from '../../../hooks/useWebSocket';
 import { usePermissions } from '../../auth/ProtectedFeature';
 import { formatDistance } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { Avatar } from '@/components/ui/Avatar';
 
 // ═══════════════════════════════════════════════════════════════
 // Types
@@ -710,8 +711,12 @@ export default function CaisseDemandesTab({
 
                     {/* Icon / Photo */}
                     {item.photoUrl ? (
-                      <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-surface border border-edge overflow-hidden shrink-0">
-                        <img src={resolveStorageUrl(item.photoUrl)} className="w-full h-full object-cover" alt="" />
+                      <div className="shrink-0">
+                        <Avatar
+                          photoUrl={resolveStorageUrl(item.photoUrl)}
+                          fullName={item.nom}
+                          size="md"
+                        />
                       </div>
                     ) : (
                       <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center shrink-0 ${

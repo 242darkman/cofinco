@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Crown, Plus, History, Trash2, Edit3, UserCheck, AlertCircle } from 'lucide-react';
 import Button from '../ui/Button';
+import { Avatar } from '../ui/Avatar';
 import { toast } from '../../lib/toast';
 
 interface GlobalRole {
@@ -155,12 +156,13 @@ export default function DirectionGeneralePanel() {
         <div className="grid gap-4 md:grid-cols-2">
           {activeRoles.map(role => (
             <div key={role.id} className="flex items-center gap-4 p-4 rounded-xl border border-edge bg-card">
-              <div className="w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center text-accent font-bold text-lg shrink-0">
-                {role.photoProfile ? (
-                  <img src={role.photoProfile} alt="" className="w-12 h-12 rounded-full object-cover" />
-                ) : (
-                  `${role.employeNom.charAt(0)}${role.employePrenom?.charAt(0) || ''}`
-                )}
+              <div className="shrink-0">
+                <Avatar
+                  photoUrl={role.photoProfile}
+                  fullName={`${role.employePrenom} ${role.employeNom}`}
+                  initials={`${role.employeNom.charAt(0)}${role.employePrenom?.charAt(0) || ''}`}
+                  size="lg"
+                />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="font-semibold text-content-primary truncate">
@@ -208,8 +210,13 @@ export default function DirectionGeneralePanel() {
           <h3 className="text-sm font-semibold text-content-secondary">Historique</h3>
           {historicalRoles.map(role => (
             <div key={role.id} className="flex items-center gap-3 p-3 rounded-lg bg-surface-subtle text-content-muted text-sm">
-              <div className="w-8 h-8 rounded-full bg-surface-subtle-elevated flex items-center justify-center text-xs font-medium shrink-0">
-                {role.employeNom.charAt(0)}{role.employePrenom?.charAt(0) || ''}
+              <div className="shrink-0">
+                <Avatar
+                  photoUrl={role.photoProfile}
+                  fullName={`${role.employePrenom} ${role.employeNom}`}
+                  initials={`${role.employeNom.charAt(0)}${role.employePrenom?.charAt(0) || ''}`}
+                  size="sm"
+                />
               </div>
               <div className="flex-1">
                 <span className="font-medium">{role.employePrenom} {role.employeNom}</span>

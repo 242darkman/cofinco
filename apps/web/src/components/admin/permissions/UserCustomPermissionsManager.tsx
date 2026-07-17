@@ -3,7 +3,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { Users, Shield, Search, CheckCircle, RotateCcw, Filter, Wifi, ArrowLeft, Award, Sparkles, Ban, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, AlertTriangle, Info } from 'lucide-react';
 import { Permission } from '../../../hooks/admin/usePermissions';
 import { UserPermission } from '../../../hooks/admin/useUserPermissions';
-import { Button } from '../../ui';
+import { Button, Avatar } from '../../ui';
 import { usePagination } from '../../../hooks/usePagination';
 import { getRoleBadgeStyle } from '../../../lib/role-utils';
 import { resolveStorageUrl } from '../../../lib/format';
@@ -306,17 +306,13 @@ export default function UserCustomPermissionsManager({
               >
                 {/* Avatar - Compact */}
                 <div className="relative shrink-0">
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-accent to-status-info flex items-center justify-center text-xs font-bold text-white shadow-lg shadow-accent/20 group-hover:scale-105 transition-transform overflow-hidden">
-                    {getUserPhotoUrl(user) ? (
-                      <img
-                        src={getUserPhotoUrl(user)}
-                        alt={getUserFullName(user)}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      getUserInitials(user)
-                    )}
-                  </div>
+                  <Avatar
+                    photoUrl={user.photoProfile}
+                    fullName={getUserFullName(user)}
+                    initials={getUserInitials(user)}
+                    size="sm"
+                    className="shadow-lg shadow-accent/20 group-hover:scale-105 transition-transform"
+                  />
                 </div>
 
                 {/* User Info - Compact */}
@@ -460,17 +456,13 @@ export default function UserCustomPermissionsManager({
           </button>
 
           <div className="relative">
-            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-accent to-status-info flex items-center justify-center text-[10px] font-bold text-white shadow-lg shadow-accent/20 overflow-hidden">
-              {getUserPhotoUrl(selectedUser) ? (
-                <img
-                  src={getUserPhotoUrl(selectedUser)}
-                  alt={getUserFullName(selectedUser)}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                getUserInitials(selectedUser)
-              )}
-            </div>
+            <Avatar
+              photoUrl={selectedUser.photoProfile}
+              fullName={getUserFullName(selectedUser)}
+              initials={getUserInitials(selectedUser)}
+              size="sm"
+              className="w-7 h-7 shadow-lg shadow-accent/20"
+            />
             <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-status-success border border-edge rounded-full"></span>
           </div>
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Spinner } from '@/components/ui/Spinner';
 import { ChevronDown, Search, X, Check, AlertCircle } from 'lucide-react';
 import { resolveStorageUrl } from '../../lib/format';
+import { Avatar } from '@/components/ui/Avatar';
 import * as Popover from '@radix-ui/react-popover';
 
 const PAGE_SIZE = 20;
@@ -14,34 +15,23 @@ function getInitials(label: string): string {
   return (words[0].charAt(0) + words[words.length - 1].charAt(0)).toUpperCase();
 }
 
-/** Composant Avatar avec fallback initiales */
 function OptionAvatar({ image, label, disabled, emoji }: { image?: string; label: string; disabled?: boolean; emoji?: string }) {
-  const [hasError, setHasError] = useState(false);
-  const resolvedUrl = image ? resolveStorageUrl(image) : null;
-
-  // Reset error state when image changes
-  useEffect(() => {
-    setHasError(false);
-  }, [image]);
-
-  const showImage = resolvedUrl && !hasError;
+  if (emoji && !image) {
+    return (
+      <div className={`relative ${disabled ? 'grayscale opacity-70' : ''}`}>
+        <span className="w-8 h-8 flex items-center justify-center text-xl leading-none flex-shrink-0">{emoji}</span>
+      </div>
+    );
+  }
 
   return (
-    <div className={`relative ${disabled ? 'grayscale opacity-70' : ''}`}>
-      {showImage ? (
-        <img
-          src={resolvedUrl}
-          alt=""
-          className="w-8 h-8 rounded-full object-cover border border-edge-strong"
-          onError={() => setHasError(true)}
-        />
-      ) : emoji ? (
-        <span className="w-8 h-8 flex items-center justify-center text-xl leading-none flex-shrink-0">{emoji}</span>
-      ) : (
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-surface-subtle to-surface-elevated flex items-center justify-center text-xs font-bold text-content-primary border border-edge-strong flex-shrink-0">
-          {getInitials(label)}
-        </div>
-      )}
+    <div className={`shrink-0 ${disabled ? 'grayscale opacity-70' : ''}`}>
+      <Avatar
+        photoUrl={image}
+        fullName={label}
+        initials={getInitials(label)}
+        size="sm"
+      />
     </div>
   );
 }
@@ -310,14 +300,15 @@ export default function SearchableSelect({
               {/* Left Icon / Avatar — small (20px) to match SelectField height */}
                {showAvatarInTrigger && selectedOption && !selectedOption.hideAvatar ? (
                  <div className="shrink-0 mr-2 flex items-center">
-                   {selectedOption.image && !selectedOption.emoji ? (
-                     <img src={resolveStorageUrl(selectedOption.image)} alt="" className="w-5 h-5 rounded-full object-cover border border-edge-strong" />
-                   ) : selectedOption.emoji ? (
+                   {selectedOption.emoji && !selectedOption.image ? (
                      <span className="w-5 h-5 flex items-center justify-center text-sm leading-none">{selectedOption.emoji}</span>
                    ) : (
-                     <div className="w-5 h-5 rounded-full bg-gradient-to-br from-surface-subtle to-surface-elevated flex items-center justify-center text-[9px] font-bold text-content-primary border border-edge-strong">
-                       {getInitials(selectedOption.label)}
-                     </div>
+                     <Avatar
+                       photoUrl={selectedOption.image}
+                       fullName={selectedOption.label}
+                       initials={getInitials(selectedOption.label)}
+                       className="w-5 h-5 text-[9px]"
+                     />
                    )}
                  </div>
                ) : (

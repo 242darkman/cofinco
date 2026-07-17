@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Spinner } from '@/components/ui/Spinner';
 import { Search, User, CheckCircle, X, Users } from 'lucide-react';
+import { Avatar } from '@/components/ui/Avatar';
 import { resolveStorageUrl } from '../../lib/format';
 import { getRoleLabel } from '@shared/types/roles';
 
@@ -158,12 +159,13 @@ export default function AssignCashierModal({
                   </div>
 
                   {/* Avatar */}
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs relative overflow-hidden flex-shrink-0 ${isSelected ? 'bg-accent/30 text-accent' : 'bg-surface text-content-muted'}`}>
-                    {user.photoProfile ? (
-                      <img src={resolveStorageUrl(user.photoProfile)} alt={fullName} className="w-full h-full object-cover" />
-                    ) : (
-                      initials
-                    )}
+                  <div className="relative flex-shrink-0">
+                    <Avatar
+                      photoUrl={user.photoProfile}
+                      fullName={fullName}
+                      initials={initials}
+                      size="sm"
+                    />
                     {isCurrent && (
                       <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-status-success opacity-75"></span>

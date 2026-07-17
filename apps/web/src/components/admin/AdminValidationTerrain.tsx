@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { Spinner } from '@/components/ui/Spinner';
 import { CheckCircle, XCircle, Search, Clock, DollarSign, User, AlertCircle, RefreshCw, MapPin, Smartphone, CreditCard, Hash, Calendar, Building2, CheckSquare, Square, MinusSquare, FileImage, Eye } from 'lucide-react';
-import { Button, Modal, FormField, ResponsiveTable, Badge, Card, FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui';
+import { Button, Modal, FormField, ResponsiveTable, Badge, Card, FeatureHeader, FEATURE_DESCRIPTIONS, Avatar } from '../ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -362,24 +362,29 @@ export default function AdminValidationTerrain() {
       label: 'Client',
       format: (_: any, item: PaiementTerrain) => (
         <div className="flex items-center gap-2">
-          {item.clients?.photoProfile && (
+          {item.clients?.photoProfile ? (
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 handlePreviewDocument(item);
               }}
-              className="relative group"
+              className="relative group shrink-0"
               title="Voir la photo"
             >
-              <img
-                src={item.clients.photoProfile}
-                alt=""
-                className="w-8 h-8 rounded-full object-cover border border-edge-strong"
+              <Avatar
+                photoUrl={item.clients.photoProfile}
+                fullName={`${item.clients.nom} ${item.clients.prenom}`}
+                size="sm"
               />
               <div className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
-                <Eye size={12} className="text-content-primary" />
+                <Eye size={12} className="text-white" />
               </div>
             </button>
+          ) : (
+            <Avatar
+              fullName={item.clients ? `${item.clients.nom} ${item.clients.prenom}` : 'Inconnu'}
+              size="sm"
+            />
           )}
           <div className="flex flex-col">
             <span className="font-medium">{item.clients ? `${item.clients.nom} ${item.clients.prenom}` : 'Inconnu'}</span>
