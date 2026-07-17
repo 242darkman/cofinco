@@ -228,7 +228,7 @@ const TabGroup: React.FC<TabGroupProps> = ({
       {/* Right fade + arrow */}
       {showArrows && canScrollRight && (
         <>
-          <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-surface-base to-transparent z-10 pointer-events-none" />
+          <div className="absolute right-0 top-0 bottom-0 w-8 bg-linear-to-l from-surface-base to-transparent z-10 pointer-events-none" />
           <button
             type="button"
             onClick={() => scroll('right')}
