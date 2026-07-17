@@ -342,7 +342,7 @@ jobs:
   # ==========================================
   deploy:
     name: Deploy (${{ needs.prepare.outputs.environment }})
-    needs: [prepare, build]
+    needs: [prepare, build, build-client-images]
     runs-on: ubuntu-latest
     environment: ${{ needs.prepare.outputs.environment }}
     steps:
@@ -361,6 +361,14 @@ jobs:
           # Tenant — la config métier vient du fichier embarqué dans l'image
           # (TENANT_CONFIG_FILE au build) + surcharges en base, jamais d'env.
           TENANT_CONFIG_PATH=dist/tenant-config.json
+
+          # Sélection de l'image tenant AU DÉPLOIEMENT (vide = image de base microflex).
+          # DEPLOY_TENANT = clé du fichier config/tenants/<clé>.json (ex: micro-cred-sepela).
+          TENANT_IMAGE_SUFFIX=${{ vars.DEPLOY_TENANT && format('-{0}', vars.DEPLOY_TENANT) || '' }}
+
+          # Réassignation d'identité tenant — opération exceptionnelle, one-shot.
+          # À poser à "true" sur l'environnement le temps d'un redéploiement de bascule, puis retirer.
+          TENANT_IDENTITY_REBIND=${{ vars.TENANT_IDENTITY_REBIND }}
 
           # Registry
           REGISTRY=${{ env.REGISTRY }}
