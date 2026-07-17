@@ -45,5 +45,8 @@ export {
   ADMIN_TAB_TENANT_FEATURE,
   ADMIN_SUBROUTES,
   getAdminTab,
+  isAdminTabInScope,
+  isPlatformOperator,
+  PLATFORM_OPERATOR_ROLES,
   type AdminTab,
 } from '@/components/admin/admin-tabs';

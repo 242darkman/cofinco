@@ -1,6 +1,7 @@
 import { lazy, useState, type ReactNode } from 'react';
 import { Activity, MessageSquare } from 'lucide-react';
 import type { TenantFeatureKey } from '@shared/tenant-config';
+import { SystemRole } from '@shared/types/roles';
 
 /**
  * SOURCE UNIQUE DE VÉRITÉ des onglets d'administration.
@@ -63,6 +64,11 @@ export interface AdminTab {
   permission?: string;
   /** Feature tenant : l'onglet est masqué/inaccessible si elle est désactivée. */
   feature?: TenantFeatureKey;
+  /**
+   * Portée « exploitation plateforme » : onglet réservé à l'opérateur (éditeur),
+   * jamais visible pour l'admin tenant — même s'il dispose du « manage all ».
+   */
+  scope?: 'platform';
   /** Rendu du contenu de l'onglet. */
   render: (ctx: AdminTabContext) => ReactNode;
 }
@@ -114,14 +120,14 @@ export const ADMIN_TABS: AdminTab[] = [
   { id: 'logs', label: 'Logs', icon: 'Activity', path: '/administration/logs', permission: 'admin.logs', render: () => <AdminActivityLogs /> },
   { id: 'sessions', label: 'Sessions', icon: 'Monitor', path: '/administration/sessions', permission: 'admin.settings', render: () => <AdminSessionsManager /> },
   { id: 'roles', label: 'Gestion des Accès', icon: 'Shield', path: '/administration/acces', permission: 'admin.roles', render: () => <AccessManagement /> },
-  { id: 'maintenance', label: 'Maintenance', icon: 'Power', path: '/administration/maintenance', permission: 'admin.settings', render: () => <AdminMaintenanceMode /> },
+  { id: 'maintenance', label: 'Maintenance', icon: 'Power', path: '/administration/maintenance', permission: 'admin.settings', scope: 'platform', render: () => <AdminMaintenanceMode /> },
   { id: 'caisses', label: 'Caisses', icon: 'Wallet', path: '/administration/caisses', permission: 'caisse.manage', feature: 'enableCaisse', render: () => <AdminGestionCaisses /> },
   { id: 'credits', label: 'Crédits', icon: 'CreditCard', path: '/administration/credits', permission: 'credits.view', feature: 'enableCredits', render: () => <AdminCreditsGestion /> },
   { id: 'tontines', label: 'Tontines', icon: 'Users', path: '/administration/tontines', permission: 'tontines.manage', feature: 'enableTontine', render: () => <AdminTontinesGestion /> },
   { id: 'agences', label: 'Agences', icon: 'Building2', path: '/administration/agences', permission: 'admin.settings', render: () => <AdminGestionAgences /> },
   { id: 'zones', label: 'Zones', icon: 'MapPin', path: '/administration/zones', permission: 'admin.settings', render: () => <AdminGestionZones /> },
   { id: 'notifications', label: 'Notifications', icon: 'MessageSquare', path: '/administration/notifications', permission: 'admin.settings', render: () => <NotificationsSection /> },
-  { id: 'updates', label: 'Version', icon: 'Package', path: '/administration/version', permission: 'admin.settings', render: () => <AdminVersionInfo /> },
+  { id: 'updates', label: 'Version', icon: 'Package', path: '/administration/version', permission: 'admin.settings', scope: 'platform', render: () => <AdminVersionInfo /> },
   { id: 'codes', label: 'Codes Caisse', icon: 'KeyRound', path: '/administration/codes-caisse', permission: 'caisse.manage', feature: 'enableCaisse', render: (ctx) => <AdminCaisseAccessCodes onClose={ctx.goToDashboard} /> },
   { id: 'regularisation', label: 'Régularisation', icon: 'AlertTriangle', path: '/administration/regularisation', permission: 'admin.manage', render: () => <RegularizationDashboard /> },
   { id: 'client-credentials', label: 'Accès Clients', icon: 'Key', path: '/administration/acces-clients', permission: 'admin.manage', render: () => <AdminClientCredentials /> },
@@ -130,11 +136,29 @@ export const ADMIN_TABS: AdminTab[] = [
   { id: 'payment-methods', label: 'Paiements', icon: 'CreditCard', path: '/administration/paiements', permission: 'admin.settings', render: () => <AdminPaymentMethodToggles /> },
   { id: 'currency', label: 'Devise', icon: 'Coins', path: '/administration/devise', permission: 'admin.settings', render: () => <AdminCurrencySettings /> },
   { id: 'company-info', label: 'Société', icon: 'Building2', path: '/administration/societe', permission: 'admin.settings', render: () => <AdminCompanyInfoSettings /> },
-  { id: 'tenant', label: 'Tenant & Modules', icon: 'Settings', path: '/administration/tenant', permission: 'admin.settings', render: () => <AdminTenantSettings /> },
-  { id: 'reset-agence', label: 'Reset Agence', icon: 'RotateCcw', path: '/administration/reset-agence', permission: 'admin.manage', render: () => <AdminAgencyReset /> },
+  { id: 'tenant', label: 'Tenant & Modules', icon: 'Settings', path: '/administration/tenant', permission: 'admin.settings', scope: 'platform', render: () => <AdminTenantSettings /> },
+  { id: 'reset-agence', label: 'Reset Agence', icon: 'RotateCcw', path: '/administration/reset-agence', permission: 'admin.manage', scope: 'platform', render: () => <AdminAgencyReset /> },
   { id: 'scoring', label: 'Scoring', icon: 'BarChart3', path: '/administration/scoring', permission: 'loyalty.view', feature: 'enableCredits', render: () => <AdminScoring /> },
-  { id: 'sync', label: 'Synchronisation', icon: 'CloudUpload', path: '/administration/sync', permission: 'admin.settings', render: () => <AdminSyncPanel /> },
+  { id: 'sync', label: 'Synchronisation', icon: 'CloudUpload', path: '/administration/sync', permission: 'admin.settings', scope: 'platform', render: () => <AdminSyncPanel /> },
 ];
+
+/**
+ * Rôles autorisés à voir les onglets d'exploitation plateforme (`scope: platform`).
+ * Volontairement restreint à l'opérateur/éditeur (Support IT) : l'admin tenant,
+ * même avec « manage all », ne doit pas voir ni atteindre ces onglets.
+ * Un seul point à modifier pour ajuster qui est « opérateur ».
+ */
+export const PLATFORM_OPERATOR_ROLES: readonly SystemRole[] = [SystemRole.SUPPORT_IT];
+
+/** Vrai si le rôle donné est un opérateur plateforme. */
+export function isPlatformOperator(role?: SystemRole | string | null): boolean {
+  return !!role && (PLATFORM_OPERATOR_ROLES as readonly string[]).includes(role);
+}
+
+/** Un onglet est-il visible pour ce rôle (garde de portée plateforme) ? */
+export function isAdminTabInScope(tab: AdminTab, role?: SystemRole | string | null): boolean {
+  return tab.scope !== 'platform' || isPlatformOperator(role);
+}
 
 
 /**

@@ -7,12 +7,13 @@ import {
 } from 'lucide-react';
 
 // Constants
-import { ADMIN_TABS, ADMIN_TAB_TENANT_FEATURE } from '../../constants/admin-constants';
+import { ADMIN_TABS, ADMIN_TAB_TENANT_FEATURE, isAdminTabInScope } from '../../constants/admin-constants';
 import { useAbility } from '../../contexts/AbilityContext';
 import { Actions, Subjects } from '@/lib/casl';
 import { getPermissionMapping } from '@shared/ability/mappings';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { useTenant } from '@/contexts/TenantContext';
+import { useUserProfile } from '../../hooks/useUserProfile';
 
 // Le rendu des onglets vient de la source unique `admin-tabs` (composants lazy).
 import { Spinner } from '@/components/ui/Spinner';
@@ -27,19 +28,24 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
   const { currentSubModule, navigateToModule } = useAppNavigation();
   const { config: tenantConfig } = useTenant();
   const tenantFeatures = tenantConfig.features;
+  const { user } = useUserProfile();
+  const role = user?.role;
 
   // Dérive l'onglet actif depuis l'URL (source de vérité)
   const VALID_TAB_IDS = ADMIN_TABS.map(t => t.id) as string[];
   const activeTab = useMemo<string>(() => {
     if (currentSubModule && VALID_TAB_IDS.includes(currentSubModule)) {
       const tabId = currentSubModule as string;
-      // Onglet lié à une feature désactivée : inaccessible même en accès direct
+      const tab = ADMIN_TABS.find((t) => t.id === tabId);
+      // Onglet d'exploitation plateforme : inaccessible côté tenant, même en URL directe.
+      if (tab && !isAdminTabInScope(tab, role)) return 'dashboard';
+      // Onglet lié à une feature désactivée : inaccessible même en accès direct.
       const feature = ADMIN_TAB_TENANT_FEATURE[tabId];
       if (feature && !tenantFeatures[feature]) return 'dashboard';
       return tabId;
     }
     return 'dashboard';
-  }, [currentSubModule, tenantFeatures]);
+  }, [currentSubModule, tenantFeatures, role]);
 
   const setActiveTab = useCallback((tab: string) => {
     navigateToModule('administrateur', tab);
@@ -161,6 +167,9 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
                 className="flex-1 flex items-center gap-1 overflow-x-auto no-scrollbar scroll-smooth px-2"
             >
                {ADMIN_TABS.filter(tab => {
+                  // Onglet d'exploitation plateforme : réservé à l'opérateur, jamais
+                  // visible côté tenant — vérifié AVANT le raccourci « manage all ».
+                  if (!isAdminTabInScope(tab, role)) return false;
                   // Masqué si la feature tenant associée est désactivée
                   const feature = ADMIN_TAB_TENANT_FEATURE[tab.id];
                   if (feature && !tenantFeatures[feature]) return false;
