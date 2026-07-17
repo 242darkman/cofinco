@@ -40,10 +40,11 @@ export function ClearingRing({
 
   const ringColors: Record<SpinnerTone, { bg: string; active: string; glow?: string }> = {
     accent: {
-      // Teintes dérivées de l'accent tenant via color-mix (aucune var RGB requise).
-      bg: 'color-mix(in srgb, var(--accent-primary) 8%, transparent)',
+      // Structures de fond dérivées de l'accent tenant via son triplet RGB
+      // (injecté par tenant-theme). Anneau fixe subtil + halo premium.
+      bg: 'rgba(var(--accent-primary-rgb), 0.1)',
       active: 'conic-gradient(from 0deg, transparent 30%, var(--accent-primary))',
-      glow: 'drop-shadow(0 0 4px color-mix(in srgb, var(--accent-primary) 22%, transparent))',
+      glow: 'drop-shadow(0 0 4px rgba(var(--accent-primary-rgb), 0.35))',
     },
     onAccent: {
       bg: 'rgba(255, 255, 255, 0.15)',

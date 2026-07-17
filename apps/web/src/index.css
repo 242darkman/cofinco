@@ -31,8 +31,10 @@
 
   /* Brand/Accent Colors - Vert émeraude professionnel */
   --accent-primary: #047857; /* Émeraude foncé - 5.1:1 contrast */
+  --accent-primary-rgb: 4, 120, 87; /* Repli RGB (surchargé par le thème tenant) */
   --accent-primary-hover: #065f46;
   --accent-secondary: #0e7490; /* Cyan foncé - 5.5:1 contrast */
+  --accent-secondary-rgb: 14, 116, 144;
   --accent-secondary-hover: #155e75;
 
   /* Semantic Colors - RGAA AA compliant */
@@ -151,8 +153,10 @@
 
   /* Brand/Accent Colors - Cyan vif pour dark mode */
   --accent-primary: #22d3ee; /* Cyan brillant - 8.7:1 contrast */
+  --accent-primary-rgb: 34, 211, 238; /* Repli RGB (surchargé par le thème tenant) */
   --accent-primary-hover: #67e8f9;
   --accent-secondary: #60a5fa; /* Bleu brillant - 6.1:1 contrast */
+  --accent-secondary-rgb: 96, 165, 250;
   --accent-secondary-hover: #93c5fd;
 
   /* Semantic Colors - RGAA AA compliant on dark */
@@ -535,6 +539,50 @@ body {
   }
   100% {
     background-position: -200% 0;
+  }
+}
+
+/* Remplissage fluide d'une barre de progression via scaleX (composé GPU, 60 FPS).
+   Synchronisé sur la durée de l'étape pour une sensation d'accélération continue. */
+@keyframes loadingFillX {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Tracé de la coche de succès (SuccessCheckmark) — cercle puis coche.
+   pathLength normalise les longueurs : 132 (cercle) et 30 (coche). */
+@keyframes drawCircle {
+  from {
+    stroke-dashoffset: 132;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes drawCheck {
+  from {
+    stroke-dashoffset: 30;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Apparition ressort/amorti du conteneur de succès (overshoot porté par la
+   cubic-bezier côté composant). */
+@keyframes successPop {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 

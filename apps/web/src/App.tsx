@@ -6,6 +6,7 @@ import { toast, Toaster } from 'sonner';
 import LoginPage from './components/auth/LoginPage';
 import ErrorBoundary from './components/shared/ErrorBoundary';
 import LoadingScreen from './components/ui/LoadingScreen';
+import { SuccessCheckmark } from './components/ui/SuccessCheckmark';
 import AppShell from './components/layout/AppShell';
 import { authService } from './lib/auth';
 import { getReturnTo, getPostLoginDestination, buildLoginUrl } from './lib/navigation';
@@ -32,6 +33,20 @@ import { TenantProvider } from './contexts/TenantContext';
 const MicroflexPlatform = lazy(() => import('./MicroflexPlatform'));
 const AgentCaisseInterface = lazy(() => import('./components/agent/AgentCaisseInterface'));
 const SeasonalWelcome = lazy(() => import('./components/shared/SeasonalWelcome'));
+
+/**
+ * Durées (ms) de la séquence post-login, centralisées pour ajuster finement le
+ * temps d'attente perçu (~2 s cumulés) sans toucher à la logique.
+ */
+const POST_LOGIN_TIMINGS = {
+  /** Écran « Connexion en cours… » — phase de sécurisation. */
+  securing: 800,
+  /** Écran « Connecté / Bienvenue » — phase de succès. */
+  success: 1200,
+} as const;
+
+/** Pause asynchrone (permet un flux post-login lisible en async/await). */
+const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 function App() {
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -137,31 +152,34 @@ function App() {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
-  const handleLogin = (user: any) => {
+  /**
+   * Séquence post-login en deux phases (~2 s), orchestrée en async/await :
+   *  1. sécurisation (« Connexion en cours… »),
+   *  2. succès (« Connecté / Bienvenue »),
+   * puis entrée synchrone dans l'espace de travail + accueil saisonnier.
+   */
+  const handleLogin = async (user: any) => {
     setCurrentUser(user);
     setIsAuthenticated(true);
-    setShowLoadingAfterLogin(true);
     setSessionExpiredMessage(null);
 
-    // Capturer returnTo AVANT que l'URL change
+    // Destination capturée AVANT tout changement d'URL.
     const returnTo = getReturnTo();
-
     preloadProfilePhoto(user?.photoProfile);
 
-    // Afficher le cercle de chargement pendant 1.5 secondes
-    setTimeout(() => {
-      setShowLoadingAfterLogin(false);
-      setShowConnectedSuccess(true);
-      setShowSeasonalWelcome(true);
+    // Phase 1 — sécurisation de la session.
+    setShowLoadingAfterLogin(true);
+    await wait(POST_LOGIN_TIMINGS.securing);
 
-      // Afficher "Connecté" pendant 3 secondes
-      setTimeout(() => {
-        setShowConnectedSuccess(false);
-        const destination = getPostLoginDestination(user?.role || '', returnTo);
-        // replace: true pour ne pas empiler login dans l'historique
-        setLocation(destination, { replace: true });
-      }, 3000);
-    }, 1500);
+    // Phase 2 — confirmation de connexion.
+    setShowLoadingAfterLogin(false);
+    setShowConnectedSuccess(true);
+    setShowSeasonalWelcome(true);
+    await wait(POST_LOGIN_TIMINGS.success);
+
+    // Entrée dans l'espace de travail (replace: pas d'empilement du login).
+    setShowConnectedSuccess(false);
+    setLocation(getPostLoginDestination(user?.role || '', returnTo), { replace: true });
   };
   
   // Sync URL avec l'état d'authentification
@@ -226,7 +244,7 @@ function App() {
   if (showLoadingAfterLogin) {
     return (
       <>
-        <LoadingScreen showLogo={true} message="Connexion en cours..." />
+        <LoadingScreen showLogo={true} message="Connexion en cours..." progressDurationMs={POST_LOGIN_TIMINGS.securing} />
         <NetworkOverlay isOpen={showNetworkOverlay} isChecking={isChecking} onRetry={forceRetry} />
       </>
     );
@@ -259,44 +277,13 @@ function App() {
         >
           <div className="flex items-center justify-center min-h-[60vh]">
             <div className="text-center">
-              <div className="relative mb-6">
-                <div
-                  className="w-24 h-24 mx-auto rounded-full border-4 border-status-success flex items-center justify-center"
-                  style={{
-                    animation: 'scaleIn 0.3s ease-out',
-                    boxShadow: '0 0 30px rgba(16, 185, 129, 0.4)',
-                  }}
-                >
-                  <svg
-                    className="w-12 h-12 text-status-success"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    style={{ animation: 'checkmark 0.4s ease-out 0.2s both' }}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={3}
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
-                </div>
+              <div className="mb-6 flex justify-center">
+                <SuccessCheckmark />
               </div>
-              <h3 className="text-2xl font-bold text-content-primary mb-2">Connecté</h3>
-              <p className="text-content-muted">Chargement de l’espace de travail…</p>
+              <h3 className="mb-1 text-2xl font-bold text-slate-800 dark:text-slate-100">Connecté</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Chargement de l’espace de travail…</p>
             </div>
           </div>
-          <style>{`
-            @keyframes scaleIn {
-              0% { transform: scale(0); opacity: 0; }
-              100% { transform: scale(1); opacity: 1; }
-            }
-            @keyframes checkmark {
-              0% { stroke-dasharray: 0 100; opacity: 0; }
-              100% { stroke-dasharray: 100 100; opacity: 1; }
-            }
-          `}</style>
         </AppShell>
         <NetworkOverlay isOpen={showNetworkOverlay} isChecking={isChecking} onRetry={forceRetry} />
       </>
