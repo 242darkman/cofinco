@@ -116,6 +116,8 @@ function TenantBootstrapScreen() {
         alignItems: 'center',
         justifyContent: 'center',
         background: '#0B0F19',
+        // Au-dessus de la TopProgressBar (z-100) : un seul loader visible au boot.
+        zIndex: 200,
       }}
     >
       <Spinner size="xl" tone="onAccent" />

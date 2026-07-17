@@ -117,7 +117,7 @@ export default function LoadingScreen({ message = 'Chargement...', fullScreen = 
   const branding = useDocumentBranding();
   if (fullScreen) {
     return (
-      <div className="fixed inset-0 bg-gradient-to-br from-surface-base via-surface-base to-surface flex items-center justify-center z-50">
+      <div className="fixed inset-0 bg-gradient-to-br from-surface-base via-surface-base to-surface flex items-center justify-center z-[200]">
         <div className="text-center">
           {showLogo && (
             <div className="relative mb-8">
