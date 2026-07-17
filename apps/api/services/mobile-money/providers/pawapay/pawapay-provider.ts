@@ -49,6 +49,15 @@ export class PawaPayProvider implements IMobileMoneyProvider {
     });
   }
 
+  /**
+   * Indique si le provider dispose des identifiants requis pour appeler l'API
+   * (token présent). En dev/local sans token, on l'utilise pour dégrader
+   * proprement au lieu de laisser l'appel réseau échouer en 500.
+   */
+  isConfigured(): boolean {
+    return this.config.apiToken.trim().length > 0;
+  }
+
   // ============================================
   // COLLECT (Deposit - argent entrant)
   // ============================================
