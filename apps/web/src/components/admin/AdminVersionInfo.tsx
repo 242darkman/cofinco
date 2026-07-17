@@ -60,15 +60,15 @@ export default function AdminVersionInfo() {
   return (
     <div className="space-y-4">
       {/* Compact Header with Version */}
-      <div className="bg-linear-to-br from-accent via-blue-600/90 to-accent rounded-xl p-4">
+      <div className="bg-linear-to-br from-accent via-accent-secondary to-accent rounded-xl p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white/20 rounded-lg">
-              <Package size={20} className="text-content-primary" />
+              <Package size={20} className="text-white" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-xl font-bold text-content-primary">v{versionData.version}</h2>
+                <h2 className="text-xl font-bold text-white">v{versionData.version}</h2>
                 <span className={cn(
                   "px-2 py-0.5 text-[10px] font-bold uppercase rounded-full",
                   isProduction
@@ -78,25 +78,25 @@ export default function AdminVersionInfo() {
                   {isProduction ? 'Production' : 'Dev'}
                 </span>
               </div>
-              <p className="text-[11px] text-status-info-text">{branding.appName} Platform</p>
+              <p className="text-[11px] text-white/75">{branding.appName} Platform</p>
             </div>
           </div>
 
           {/* Quick Stats */}
           <div className="hidden sm:flex items-center gap-6">
             <div className="text-center">
-              <p className="text-lg font-bold text-content-primary">{TECH_STACK.length}</p>
-              <p className="text-[9px] text-status-info-text/70 uppercase">Technologies</p>
+              <p className="text-lg font-bold text-white">{TECH_STACK.length}</p>
+              <p className="text-[9px] text-white/60 uppercase">Technologies</p>
             </div>
             <div className="w-px h-8 bg-white/20" />
             <div className="text-center">
-              <p className="text-lg font-bold text-status-success">{FEATURES.filter(f => f.status).length}</p>
-              <p className="text-[9px] text-status-info-text/70 uppercase">Features</p>
+              <p className="text-lg font-bold text-white">{FEATURES.filter(f => f.status).length}</p>
+              <p className="text-[9px] text-white/60 uppercase">Features</p>
             </div>
             <div className="w-px h-8 bg-white/20" />
             <div className="text-center">
-              <p className="text-lg font-bold text-content-primary">{currentYear}</p>
-              <p className="text-[9px] text-status-info-text/70 uppercase">Year</p>
+              <p className="text-lg font-bold text-white">{currentYear}</p>
+              <p className="text-[9px] text-white/60 uppercase">Year</p>
             </div>
           </div>
         </div>
@@ -111,10 +111,10 @@ export default function AdminVersionInfo() {
             Système
           </h3>
           <div className="grid grid-cols-2 gap-2">
-            <InfoTile icon={Code} label="Version" value={`v${versionData.version}`} color="text-status-info" />
+            <InfoTile icon={Code} label="Version" value={`v${versionData.version}`} color="text-accent" />
             <InfoTile icon={Globe} label="Env" value={isProduction ? 'Prod' : 'Dev'} color={isProduction ? 'text-status-success' : 'text-status-warning'} />
             <InfoTile icon={Database} label="DB" value="PostgreSQL 16" color="text-accent" />
-            <InfoTile icon={Shield} label="Auth" value="Session+RBAC" color="text-status-info" />
+            <InfoTile icon={Shield} label="Auth" value="Session+RBAC" color="text-accent" />
             <InfoTile icon={HardDrive} label="Storage" value="MinIO S3" color="text-status-warning" />
             <InfoTile icon={Zap} label="Runtime" value="Node.js" color="text-status-success" />
           </div>
