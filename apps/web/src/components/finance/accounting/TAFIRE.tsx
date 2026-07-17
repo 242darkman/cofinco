@@ -267,33 +267,38 @@ export default function TAFIRE() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="bg-linear-to-r from-status-warning to-status-danger rounded-xl p-3">
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-2">
-            <Activity className="w-5 h-5 text-white" />
+      <div className="bg-surface border border-edge rounded-xl p-4 shadow-xs">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-accent/10 border border-accent/20 rounded-xl">
+              <Activity className="w-5 h-5 text-accent" />
+            </div>
             <div>
-              <h2 className="text-sm font-bold text-white">TAFIRE</h2>
-              <p className="text-[10px] text-white/80">Tableau Financier des Ressources et Emplois - OHADA</p>
+              <h2 className="text-sm font-bold text-content-primary leading-tight">TAFIRE</h2>
+              <p className="text-[10px] text-content-muted">Tableau Financier des Ressources et Emplois - OHADA</p>
             </div>
           </div>
-          <div className="flex gap-2">
-            <select
-              value={exercice}
-              onChange={(e) => setExercice(Number.parseInt(e.target.value))}
-              className="bg-white/20 text-white text-xs px-3 py-1.5 rounded-lg border-transparent focus:outline-none"
-            >
-              {Array.from({ length: 5 }).map((_, i) => {
-                const year = new Date().getFullYear() - i;
-                return <option key={year} value={year} className="text-black">{year}</option>;
-              })}
-            </select>
-            <button onClick={handleExportExcel} className="bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors">
-              <Download className="w-4 h-4" />
-              Excel
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <label className="text-[10px] text-content-muted font-medium uppercase">Exercice</label>
+              <select
+                value={exercice}
+                onChange={(e) => setExercice(Number.parseInt(e.target.value))}
+                className="bg-surface-elevated text-content-primary text-xs px-3 py-1.5 rounded-lg border border-edge focus:outline-none"
+              >
+                {Array.from({ length: 5 }).map((_, i) => {
+                  const year = new Date().getFullYear() - i;
+                  return <option key={year} value={year}>{year}</option>;
+                })}
+              </select>
+            </div>
+            <button onClick={handleExportExcel} className="bg-surface-elevated border border-edge hover:bg-accent/10 hover:border-accent/20 hover:text-accent text-content-secondary px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all shadow-xs">
+              <Download className="w-3.5 h-3.5" />
+              <span>Excel</span>
             </button>
-            <button onClick={handleExportPDF} className="bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors">
-              <Printer className="w-4 h-4" />
-              PDF
+            <button onClick={handleExportPDF} className="bg-surface-elevated border border-edge hover:bg-accent/10 hover:border-accent/20 hover:text-accent text-content-secondary px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all shadow-xs">
+              <Printer className="w-3.5 h-3.5" />
+              <span>PDF</span>
             </button>
           </div>
         </div>

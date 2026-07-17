@@ -185,44 +185,46 @@ export default function SaisieEcriture({ onSuccess }: SaisieEcritureProps) {
   return (
     <div className="space-y-3">
       {/* Header compact - UNE SEULE LIGNE */}
-      <div className="bg-linear-to-r from-status-info to-status-success rounded-xl p-3">
-        <div className="flex items-center gap-3 overflow-x-auto">
+      <div className="bg-surface border border-edge rounded-xl p-4 flex items-center justify-between shadow-xs">
+        <div className="flex items-center gap-3 overflow-x-auto w-full">
           {/* Titre */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <Calculator className="w-5 h-5 text-white" />
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <div className="p-2.5 bg-accent/10 border border-accent/20 rounded-xl">
+              <Calculator className="w-5 h-5 text-accent" />
+            </div>
             <div>
-              <h2 className="text-sm font-bold text-white leading-tight whitespace-nowrap">Saisie d'Écriture</h2>
-              <p className="text-[10px] text-white/80 whitespace-nowrap">Opérations comptables</p>
+              <h2 className="text-sm font-bold text-content-primary leading-tight whitespace-nowrap">Saisie d'Écriture</h2>
+              <p className="text-[10px] text-content-muted whitespace-nowrap">Opérations comptables</p>
             </div>
           </div>
 
           {/* Séparateur */}
-          <div className="w-px h-10 bg-white/20 flex-shrink-0" />
+          <div className="w-px h-10 bg-edge flex-shrink-0 mx-2" />
 
           {/* Stats inline */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <div className="bg-white/15 rounded-lg px-3 py-1.5 flex items-center gap-2">
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <div className="bg-surface-elevated border border-edge rounded-lg px-3 py-1.5 flex items-center gap-2">
               <div>
-                <div className="text-base font-bold text-white leading-none">
+                <div className="text-base font-bold text-content-primary leading-none">
                   {formatCompact(totalDebit)}
                 </div>
-                <div className="text-[9px] text-white/70">Débit</div>
+                <div className="text-[9px] text-content-muted uppercase font-medium">Débit</div>
               </div>
             </div>
-            <div className="bg-white/15 rounded-lg px-3 py-1.5 flex items-center gap-2">
+            <div className="bg-surface-elevated border border-edge rounded-lg px-3 py-1.5 flex items-center gap-2">
               <div>
-                <div className="text-base font-bold text-white leading-none">
+                <div className="text-base font-bold text-content-primary leading-none">
                   {formatCompact(totalCredit)}
                 </div>
-                <div className="text-[9px] text-white/70">Crédit</div>
+                <div className="text-[9px] text-content-muted uppercase font-medium">Crédit</div>
               </div>
             </div>
-            <div className="bg-white/15 rounded-lg px-3 py-1.5 flex items-center gap-2">
+            <div className="bg-surface-elevated border border-edge rounded-lg px-3 py-1.5 flex items-center gap-2">
               <div>
-                <div className="text-base font-bold text-white leading-none">
+                <div className="text-base font-bold text-content-primary leading-none">
                   {lignes.filter(l => l.compte_id).length}
                 </div>
-                <div className="text-[9px] text-white/70">Lignes</div>
+                <div className="text-[9px] text-content-muted uppercase font-medium">Lignes</div>
               </div>
             </div>
           </div>
@@ -230,8 +232,8 @@ export default function SaisieEcriture({ onSuccess }: SaisieEcritureProps) {
           {/* Indicateur équilibre */}
           <div className={`px-2 py-1 rounded-full text-[10px] font-bold flex-shrink-0 flex items-center gap-1 ${
             isEquilibre
-              ? 'bg-white/25 text-white'
-              : 'bg-white/25 text-white'
+              ? 'bg-status-success/10 text-status-success border border-status-success/20'
+              : 'bg-status-danger/10 text-status-danger border border-status-danger/20'
           }`}>
             {isEquilibre ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
             {isEquilibre ? 'Équilibrée' : 'Écart: ' + Math.abs(totalDebit - totalCredit).toFixed(2)}
@@ -245,17 +247,17 @@ export default function SaisieEcriture({ onSuccess }: SaisieEcritureProps) {
             <button
               onClick={handleSubmit}
               disabled={!isEquilibre || submitting}
-              className={`px-4 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors flex-shrink-0 ${
+              className={`px-4 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition-all flex-shrink-0 shadow-xs ${
                 isEquilibre && !submitting
-                  ? 'bg-white/20 hover:bg-white/30 text-white'
-                  : 'bg-white/10 text-white/50 cursor-not-allowed'
+                  ? 'bg-accent hover:bg-accent/90 text-white'
+                  : 'bg-surface-elevated border border-edge text-content-muted cursor-not-allowed'
               }`}
             >
               <Save className="w-3.5 h-3.5" />
               <span>{submitting ? 'Enregistrement...' : 'Enregistrer & Poster'}</span>
             </button>
           ) : (
-            <div className="px-3 py-1.5 bg-status-warning-bg text-status-warning rounded-lg text-xs flex items-center gap-1.5">
+            <div className="px-3 py-1.5 bg-status-warning-bg border border-status-warning/20 text-status-warning rounded-lg text-xs flex items-center gap-1.5">
               <AlertTriangle className="w-3.5 h-3.5" />
               Permission requise
             </div>
@@ -493,7 +495,7 @@ export default function SaisieEcriture({ onSuccess }: SaisieEcritureProps) {
             disabled={!isEquilibre || submitting}
             className={`w-full px-4 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors ${
               isEquilibre && !submitting
-                ? 'bg-linear-to-r from-status-success to-status-success text-white'
+                ? 'bg-status-success text-white'
                 : 'bg-surface-elevated text-content-muted cursor-not-allowed'
             }`}
           >

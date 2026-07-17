@@ -64,7 +64,7 @@ const FluxSection = memo(function FluxSection({
       <div className={`flex items-center justify-between p-2 rounded-lg ${colorClass}`}>
         <div className="flex items-center gap-2">
           {icon}
-          <span className="text-xs font-bold text-white">{title}</span>
+          <span className="text-xs font-bold font-inherit">{title}</span>
         </div>
         <span className={`text-sm font-bold ${total >= 0 ? 'text-status-success' : 'text-status-danger'}`}>
           {total >= 0 ? '+' : ''}{total.toLocaleString()} FCFA
@@ -203,23 +203,25 @@ export default function TableauTresorerie() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="bg-linear-to-r from-accent to-status-info rounded-xl p-3">
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-2">
-            <Wallet className="w-5 h-5 text-white" />
+      <div className="bg-surface border border-edge rounded-xl p-4 shadow-xs">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-accent/10 border border-accent/20 rounded-xl">
+              <Wallet className="w-5 h-5 text-accent" />
+            </div>
             <div>
-              <h2 className="text-sm font-bold text-white">Tableau des Flux de Trésorerie</h2>
-              <p className="text-[10px] text-white/80">Méthode directe - OHADA</p>
+              <h2 className="text-sm font-bold text-content-primary leading-tight">Tableau des Flux de Trésorerie</h2>
+              <p className="text-[10px] text-content-muted">Méthode directe - OHADA</p>
             </div>
           </div>
-          <div className="flex gap-2">
-            <button onClick={handleExportExcel} className="bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors">
-              <Download className="w-4 h-4" />
-              Excel
+          <div className="flex items-center gap-2">
+            <button onClick={handleExportExcel} className="bg-surface-elevated border border-edge hover:bg-accent/10 hover:border-accent/20 hover:text-accent text-content-secondary px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all shadow-xs">
+              <Download className="w-3.5 h-3.5" />
+              <span>Excel</span>
             </button>
-            <button onClick={handleExportPDF} className="bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors">
-              <Printer className="w-4 h-4" />
-              PDF
+            <button onClick={handleExportPDF} className="bg-surface-elevated border border-edge hover:bg-accent/10 hover:border-accent/20 hover:text-accent text-content-secondary px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all shadow-xs">
+              <Printer className="w-3.5 h-3.5" />
+              <span>PDF</span>
             </button>
           </div>
         </div>
@@ -273,22 +275,22 @@ export default function TableauTresorerie() {
               title="A - Exploitation"
               flux={data.exploitation}
               total={totalExploitation}
-              colorClass="bg-linear-to-r from-status-success to-status-success"
-              icon={<TrendingUp size={14} className="text-white" />}
+              colorClass="bg-status-success/10 text-status-success border-b border-status-success/20"
+              icon={<TrendingUp size={14} />}
             />
             <FluxSection 
               title="B - Investissement"
               flux={data.investissement}
               total={totalInvestissement}
-              colorClass="bg-linear-to-r from-status-info to-status-info"
-              icon={<Wallet size={14} className="text-white" />}
+              colorClass="bg-status-info/10 text-status-info border-b border-status-info/20"
+              icon={<Wallet size={14} />}
             />
             <FluxSection 
               title="C - Financement"
               flux={data.financement}
               total={totalFinancement}
-              colorClass="bg-linear-to-r from-status-info to-status-info"
-              icon={<DollarSign size={14} className="text-white" />}
+              colorClass="bg-accent/10 text-accent border-b border-accent/20"
+              icon={<DollarSign size={14} />}
             />
           </div>
 

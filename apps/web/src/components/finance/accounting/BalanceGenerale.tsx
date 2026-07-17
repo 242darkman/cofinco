@@ -74,58 +74,60 @@ export default function BalanceGenerale() {
   return (
     <div className="space-y-3">
       {/* Header compact - UNE SEULE LIGNE */}
-      <div className="bg-linear-to-r from-status-success to-status-success rounded-xl p-3">
-        <div className="flex items-center gap-3 overflow-x-auto">
+      <div className="bg-surface border border-edge rounded-xl p-4 flex items-center justify-between shadow-xs">
+        <div className="flex items-center gap-3 overflow-x-auto w-full">
           {/* Titre */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <BarChart3 className="w-5 h-5 text-white" />
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <div className="p-2.5 bg-accent/10 border border-accent/20 rounded-xl">
+              <BarChart3 className="w-5 h-5 text-accent" />
+            </div>
             <div>
-              <h2 className="text-sm font-bold text-white leading-tight whitespace-nowrap">Balance Générale OHADA</h2>
-              <p className="text-[10px] text-white/80 whitespace-nowrap">Synthèse des soldes</p>
+              <h2 className="text-sm font-bold text-content-primary leading-tight whitespace-nowrap">Balance Générale OHADA</h2>
+              <p className="text-[10px] text-content-muted whitespace-nowrap">Synthèse des soldes</p>
             </div>
           </div>
 
           {/* Séparateur */}
-          <div className="w-px h-10 bg-white/20 flex-shrink-0" />
+          <div className="w-px h-10 bg-edge flex-shrink-0 mx-2" />
 
           {/* Stats inline compactes */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <div className="bg-white/15 rounded-lg px-3 py-1.5 flex items-center gap-2">
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <div className="bg-surface-elevated border border-edge rounded-lg px-3 py-1.5 flex items-center gap-2">
               <div>
-                <div className="text-base font-bold text-white leading-none">
+                <div className="text-base font-bold text-content-primary leading-none">
                   {formatCompact(totaux.debit)}
                 </div>
-                <div className="text-[9px] text-white/70">Débits</div>
+                <div className="text-[9px] text-content-muted uppercase font-medium">Débits</div>
               </div>
             </div>
-            <div className="bg-white/15 rounded-lg px-3 py-1.5 flex items-center gap-2">
+            <div className="bg-surface-elevated border border-edge rounded-lg px-3 py-1.5 flex items-center gap-2">
               <div>
-                <div className="text-base font-bold text-white leading-none">
+                <div className="text-base font-bold text-content-primary leading-none">
                   {formatCompact(totaux.credit)}
                 </div>
-                <div className="text-[9px] text-white/70">Crédits</div>
+                <div className="text-[9px] text-content-muted uppercase font-medium">Crédits</div>
               </div>
             </div>
-            <div className="bg-white/15 rounded-lg px-3 py-1.5 flex items-center gap-2">
+            <div className="bg-surface-elevated border border-edge rounded-lg px-3 py-1.5 flex items-center gap-2">
               <div>
-                <div className="text-base font-bold text-white leading-none">
+                <div className="text-base font-bold text-content-primary leading-none">
                   {formatCompact(totaux.solde_debiteur)}
                 </div>
-                <div className="text-[9px] text-white/70">Solde D.</div>
+                <div className="text-[9px] text-content-muted uppercase font-medium">Solde D.</div>
               </div>
             </div>
-            <div className="bg-white/15 rounded-lg px-3 py-1.5 flex items-center gap-2">
+            <div className="bg-surface-elevated border border-edge rounded-lg px-3 py-1.5 flex items-center gap-2">
               <div>
-                <div className="text-base font-bold text-white leading-none">
+                <div className="text-base font-bold text-content-primary leading-none">
                   {formatCompact(totaux.solde_crediteur)}
                 </div>
-                <div className="text-[9px] text-white/70">Solde C.</div>
+                <div className="text-[9px] text-content-muted uppercase font-medium">Solde C.</div>
               </div>
             </div>
           </div>
 
           {/* Indicateur équilibre */}
-          <div className="px-2 py-1 rounded-full text-[10px] font-bold flex-shrink-0 bg-white/25 text-white">
+          <div className={`px-2 py-1 rounded-full text-[10px] font-bold flex-shrink-0 ${isEquilibre ? 'bg-status-success/10 text-status-success border border-status-success/20' : 'bg-status-danger/10 text-status-danger border border-status-danger/20'}`}>
             {isEquilibre ? '✓ Équilibrée' : '✗ Déséquilibrée'}
           </div>
 
@@ -136,14 +138,14 @@ export default function BalanceGenerale() {
           <div className="flex gap-2 flex-shrink-0">
             <button 
               onClick={handleExportExcel}
-              className="bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors"
+              className="bg-surface-elevated border border-edge hover:bg-accent/10 hover:border-accent/20 hover:text-accent text-content-secondary px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all shadow-xs"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Excel</span>
             </button>
             <button
               onClick={handleExportPDF}
-              className="bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors"
+              className="bg-surface-elevated border border-edge hover:bg-accent/10 hover:border-accent/20 hover:text-accent text-content-secondary px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all shadow-xs"
             >
               <Printer className="w-3.5 h-3.5" />
               <span>PDF</span>

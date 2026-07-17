@@ -241,7 +241,7 @@ export default function CompteResultat() {
 
                   <div className="w-full bg-surface rounded-full h-1.5 mt-2">
                      <div 
-                        className={`h-1.5 rounded-full ${resultatNet >= 0 ? 'bg-linear-to-r from-status-success to-status-success' : 'bg-status-danger'}`} 
+                        className={`h-1.5 rounded-full ${resultatNet >= 0 ? 'bg-status-success' : 'bg-status-danger'}`} 
                         style={{ width: `${Math.min(Math.max(rentabilite, 0), 100)}%` }}
                      ></div>
                   </div>
