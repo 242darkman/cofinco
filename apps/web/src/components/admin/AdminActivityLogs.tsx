@@ -3,8 +3,7 @@ import {
   Search, ChevronLeft, ChevronRight, Eye,
   Download, RefreshCw, Calendar, Terminal, Activity, Clock
 } from 'lucide-react';
-import { Avatar } from '@/components/ui/Avatar';
-import { FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui';
+import { FeatureHeader, FEATURE_DESCRIPTIONS, Avatar } from '../ui';
 import { auditApi } from '../../lib/api-client';
 import { toast } from '../../lib/toast';
 
@@ -345,10 +344,7 @@ export default function AdminActivityLogs({
                   <div className="w-36 lg:w-40 shrink-0 font-mono text-content-muted text-xs truncate pr-2">{log.date}</div>
 
                   <div className="w-40 lg:w-48 shrink-0 flex items-center gap-2 overflow-hidden pr-2">
-                     <Avatar 
-                        fullName={log.user} 
-                        size="xs" 
-                     />
+                     <Avatar fullName={log.user} size="xs" />
                      <span className="truncate text-content-secondary">{log.user}</span>
                   </div>
 

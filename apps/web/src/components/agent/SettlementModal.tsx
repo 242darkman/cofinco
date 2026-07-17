@@ -1,17 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Spinner } from '@/components/ui/Spinner';
 import {
-  DollarSign,
-  CheckCircle,
-  AlertTriangle,
-  Building2,
-  ArrowUpRight,
-  Clock,
-  X,
-  WifiOff,
-  CloudOff,
-  ChevronDown,
-  Send,
+  DollarSign, CheckCircle, AlertTriangle, Building2, ArrowUpRight, Clock,
+  X, WifiOff, CloudOff, ChevronDown, Send,
 } from 'lucide-react';
 import { caisseAgentApi, caisseApi } from '@/lib/api-client';
 import { useLanguage } from '@/contexts/LanguageContext';

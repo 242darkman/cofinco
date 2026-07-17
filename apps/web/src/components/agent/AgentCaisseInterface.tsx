@@ -11,7 +11,6 @@ import { useUserProfile } from '@/hooks/useUserProfile';
 import { useNetworkStatus } from '@/contexts/NetworkContext';
 import { useOfflinePendingCount } from '@/hooks/useJournalSync';
 
-
 interface AgentCaisseInterfaceProps {
   agentId: string;
   onLogout: () => void;

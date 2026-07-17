@@ -8,27 +8,7 @@ import { useCurrency } from '@/contexts/CurrencyContext';
 import { toast } from '../../lib/toast';
 import { loadPDFLibraries } from '@/lib/lazy-export';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
-
-interface Rapport {
-  id: string;
-  agentId: string;
-  periodeDebut: string;
-  periodeFin: string;
-  typeRapport: string;
-  nombreVisites: number;
-  nombreCollectes: number;
-  montantTotalCollecte: number;
-  tauxReussite: number;
-  clientsNouveaux: number;
-  incidents: number;
-  kmParcourus: number;
-  notes: string;
-  createdAt: string;
-  agent?: {
-    nom: string;
-    prenom: string;
-  };
-}
+import type { Rapport } from './AgentRapports.types';
 
 export default function AgentRapports({ agentId }: { agentId?: string }) {
   const branding = useDocumentBranding();

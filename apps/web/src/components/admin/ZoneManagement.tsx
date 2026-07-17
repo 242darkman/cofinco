@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Spinner } from '@/components/ui/Spinner';
 import { MapPin, Plus, Edit2, Trash2, ChevronDown, ChevronRight, X, Save, Building2 } from 'lucide-react';
 import { arrondissementApi, marcheApi, villeApi } from '../../lib/api-client';
 import { toast } from 'sonner';
 import { usePermissions } from '../auth/ProtectedFeature';
-import { Button, Input, Modal, SearchInput, Pagination, EmptyState } from '../ui';
-
+import { Button, Input, Modal, SearchInput, Pagination, EmptyState, Spinner } from '../ui';
 interface Arrondissement {
   id: string;
   nom: string;

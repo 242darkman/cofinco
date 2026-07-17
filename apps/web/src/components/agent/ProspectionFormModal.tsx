@@ -7,33 +7,13 @@ import SearchableSelect, { type SearchableSelectOption } from '../ui/SearchableS
 import { ANCIENNETE_ACTIVITE_OPTIONS } from '@shared/enum/status-constants';
 import { normalizePhone } from '@shared/utils/phone';
 import { formatPhoneInput, stripPhoneFormat } from '../../lib/format';
+import type { FormData } from './ProspectionFormModal.types';
 
 interface ProspectionFormModalProps {
   isOpen: boolean;
   agentId: string;
   onClose: () => void;
   onSuccess: () => void;
-}
-
-interface FormData {
-  nomProspect: string;
-  prenomProspect: string;
-  telephoneProspect: string;
-  sexe: string;
-  adresseProspect: string;
-  villeId: string;
-  arrondissementId: string;
-  marcheId: string;
-  typeActivite: string;
-  activitePrincipale: string;
-  ancienneteActivite: string;
-  descriptionActivite: string;
-  typeRevenu: string;
-  revenuEstime: string;
-  revenuJournalier: string;
-  chiffreAffairesMensuel: string;
-  commentairesAgent: string;
-  observations: string;
 }
 
 const OFFLINE_STORAGE_KEY = 'offline_prospections';

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Spinner } from '@/components/ui/Spinner';
 import { Plus, Trash2, AlertCircle, AlertTriangle, Info, Edit2, Save, X, MessageSquare, ChevronLeft, ChevronRight, CheckSquare, Square, ListTodo } from 'lucide-react';
-import { Card, Badge } from '../ui';
+import { Card, Badge, Spinner } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
 
 const NOTES_PER_PAGE = 10;

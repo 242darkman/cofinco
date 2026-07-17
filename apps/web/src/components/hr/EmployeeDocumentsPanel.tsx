@@ -1,11 +1,10 @@
 import React, { useState, useCallback } from 'react';
-import { Spinner } from '@/components/ui/Spinner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   FileText, Upload, Download, Trash2, CheckCircle, XCircle, Clock,
   Calendar, AlertTriangle, Eye, X, Plus, Shield, File, Image, FileArchive
 } from 'lucide-react';
-import { Button, Badge, FormField, SelectField, Modal } from '../ui';
+import { Button, Badge, FormField, SelectField, Modal, Spinner } from '../ui';
 import { hrApi, EmployeeDocument } from '../../lib/api-client';
 import { toast } from '../../lib/toast';
 import { usePermissions } from '../auth/ProtectedFeature';

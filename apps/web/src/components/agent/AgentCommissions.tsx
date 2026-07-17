@@ -6,30 +6,11 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '
 import { formatMoney, currencySymbol } from '@shared/config/currency';
 import { toast } from 'sonner';
 import { formatPhoneInput, stripPhoneFormat } from '../../lib/format';
-
-interface Commission {
-  id: string;
-  agentId: string;
-  periode: string;
-  montantCollecte: number;
-  tauxCommission: number;
-  montantCommission: number;
-  primes: number;
-  avances: number;
-  montantNet: number;
-  statutPaiement: string;
-  datePaiement?: string;
-  methodePaiement?: string;
-  mouvementId?: string;
-  notes: string;
-  agent?: { nom: string; prenom: string };
-}
+import type { Commission, PaymentMethod } from './AgentCommissions.types';
 
 interface AgentCommissionsProps {
   agentId?: string;
 }
-
-type PaymentMethod = 'CASH' | 'PAYROLL' | 'MOBILE_MONEY';
 
 export default function AgentCommissions({ agentId }: AgentCommissionsProps) {
   const [commissions, setCommissions] = useState<Commission[]>([]);

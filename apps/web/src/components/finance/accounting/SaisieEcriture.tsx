@@ -3,29 +3,7 @@ import { Plus, Trash2, Save, Check, X, Search, Calculator, FileText, Calendar, A
 import { usePermissions } from '../../auth/ProtectedFeature';
 import { comptabiliteApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
-
-interface Compte {
-  id: string;
-  numeroCompte: string;
-  intitule: string;
-  sensNormal: 'Débit' | 'Crédit';
-}
-
-interface Journal {
-  id: string;
-  code: string;
-  intitule: string;
-}
-
-interface LigneEcriture {
-  id?: string;
-  compte_id: string;
-  numero_compte: string;
-  intitule: string;
-  libelle: string;
-  debit: number;
-  credit: number;
-}
+import type { Compte, Journal, LigneEcriture } from './SaisieEcriture.types';
 
 interface SaisieEcritureProps {
   onSuccess?: () => void;

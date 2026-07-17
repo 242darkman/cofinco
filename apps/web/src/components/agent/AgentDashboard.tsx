@@ -1,10 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Spinner } from '@/components/ui/Spinner';
+import { Spinner, Card, StatCard, Button, Badge } from '@/components/ui';
 import { TrendingUp, Target, Users, Banknote, Clock, MapPin, Star, Award, Calendar, CheckCircle, AlertCircle, Phone, Zap, RefreshCw, BookOpen, LayoutDashboard, UserCircle, ChevronDown, Search, UserPlus } from 'lucide-react';
-import Card from '../ui/Card';
-import StatCard from '../ui/StatCard';
-import Button from '../ui/Button';
-import Badge from '../ui/Badge';
 import { FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui/FeatureHeader';
 import { authService } from '../../lib/auth';
 import { useIsAdmin } from '../../contexts/AbilityContext';

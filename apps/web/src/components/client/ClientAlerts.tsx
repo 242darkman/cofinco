@@ -1,5 +1,4 @@
 import type { ClientWithIdentity } from '@shared/schema';
-import { Spinner } from '@/components/ui/Spinner';
 import React, { useState, useMemo } from 'react';
 import {
   AlertCircle, Info, X, ShieldAlert, BadgeCheck, Clock,
@@ -8,7 +7,7 @@ import {
   ExternalLink, CheckCheck, Filter, TrendingDown,
   Ban, Landmark, AlertOctagon, CircleSlash
 } from 'lucide-react';
-import { Card, Badge, Button, Skeleton } from '../ui';
+import { Card, Badge, Button, Skeleton, Spinner } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { toast } from '../../lib/toast';
 import { useClientAlerts, type ClientAlert } from '../../hooks/useClientAlerts';

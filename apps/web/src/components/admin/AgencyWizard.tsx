@@ -1,9 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { Spinner } from '@/components/ui/Spinner';
+import { Spinner, Modal, FormField, SelectField } from '@/components/ui';
 import { Building2, MapPin, Users, ChevronLeft, ChevronRight, Check, Eye } from 'lucide-react';
-import Modal from '../ui/Modal';
-import FormField from '../ui/FormField';
-import SelectField from '../ui/SelectField';
 import { CascadingGeoSelect, type GeoSelection } from '../shared/CascadingGeoSelect';
 import { agenceApi } from '../../lib/api-client';
 import { toast } from '../../lib/toast';

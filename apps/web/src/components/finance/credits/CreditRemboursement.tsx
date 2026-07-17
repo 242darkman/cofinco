@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Spinner } from '@/components/ui/Spinner';
 import { DollarSign, Search, Calendar, User, CreditCard, Check, X, Smartphone, Banknote, FileCheck, Building, ReceiptText, AlertTriangle, Printer, WifiOff } from 'lucide-react';
 import PaymentValidationModal from '../operations/PaymentValidationModal';
 import { useFeatureFlags, useEnabledPaymentMethods } from '../../../contexts/FeatureFlagsContext';
@@ -11,7 +10,7 @@ import { validateAmount, VALIDATION_LIMITS } from '../../../lib/validation';
 import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import ConfirmDialog from '../../ui/ConfirmDialog';
 import { SkeletonCard } from '../../ui/Skeleton';
-import { Button } from '../../ui';
+import { Button, Spinner } from '../../ui';
 import { ReceiptTemplate } from '../../ui/printable/ReceiptTemplate';
 import { InvoiceTemplate } from '../../ui/printable/InvoiceTemplate';
 import { usePrinter } from '../../../hooks/useReceiptPrinter';

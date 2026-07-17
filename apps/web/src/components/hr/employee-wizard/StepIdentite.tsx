@@ -1,9 +1,6 @@
 import React from 'react';
-import { Spinner } from '@/components/ui/Spinner';
+import { Spinner, FormField, SelectField, SearchableSelect } from '@/components/ui';
 import { User, Upload, Link, Building2, AlertTriangle, Globe, MapPin, Heart } from 'lucide-react';
-import FormField from '../../ui/FormField';
-import SelectField from '../../ui/SelectField';
-import SearchableSelect from '../../ui/SearchableSelect';
 import BirthPlaceField, { type BirthPlaceValue } from './BirthPlaceField';
 import { resolveStorageUrl, formatPhoneInput, stripPhoneFormat } from '@/lib/format';
 

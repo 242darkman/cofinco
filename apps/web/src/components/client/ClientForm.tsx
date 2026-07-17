@@ -710,11 +710,7 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
                 <div className="relative">
                   {formData.photoProfile ? (
                     <div className="relative inline-block">
-                      <Avatar
-                        photoUrl={formData.photoProfile}
-                        fullName={`${formData.prenom || ''} ${formData.nom || ''}`.trim() || 'Client'}
-                        className="w-20 h-20 text-2xl border-2 border-edge-strong shadow-lg"
-                      />
+                      <Avatar photoUrl={formData.photoProfile} fullName={`${formData.prenom || ''} ${formData.nom || ''}`.trim() || 'Client'} className="w-20 h-20 text-2xl border-2 border-edge-strong shadow-lg" />
                       <button type="button" onClick={() => { handleChange('photoProfile', ''); handleDocumentChange('AVATAR', null); }}
                         className="absolute -top-1 -right-1 p-1 bg-status-danger text-white rounded-full hover:bg-status-danger shadow z-10"><Trash2 size={10} /></button>
                       <button type="button" onClick={() => setIsLivenessOpen(true)}

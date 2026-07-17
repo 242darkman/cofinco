@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Spinner } from '@/components/ui/Spinner';
 import { Upload, FileText, CheckCircle, XCircle, Clock, Trash2, Eye, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Card, Badge, Skeleton } from '../ui';
-
+import { Card, Badge, Skeleton, Spinner } from '../ui';
 const DOCS_PER_PAGE = 8;
 import { FileUploadZone } from '../ui/FileUploadZone';
 import ConfirmDialog from '../ui/ConfirmDialog';

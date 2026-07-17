@@ -1,11 +1,10 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { Spinner } from '@/components/ui/Spinner';
 import { X, Lock, AlertTriangle, CheckCircle, Calculator, Banknote, Coins, ArrowRight, ArrowLeft, Vault, PiggyBank, FileText, UserCheck, ChevronDown, ChevronUp, Scale, FileUp, Save, Sparkles, Smartphone } from 'lucide-react';
 import WeightVerificationPanel from './WeightVerificationPanel';
 import MobileMoneyReconciliationPanel from './MobileMoneyReconciliationPanel';
 import ClosureReportButton from './ClosureReportButton';
 import { usePermissions } from '../../auth/ProtectedFeature';
-import { Button, Badge, FormField } from '@/components/ui';
+import { Button, Badge, FormField, Spinner } from '@/components/ui';
 import { sessionCaisseApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';

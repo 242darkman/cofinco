@@ -3,16 +3,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { toast } from 'sonner';
 import { Coins, AlertTriangle, Check, Globe, Plus, Pencil, Trash2, X, Save } from 'lucide-react';
 import type { CurrencyConfig } from '@shared/config/currency';
-
-type PresetWithId = CurrencyConfig & { id: string };
-
-interface PresetFormData {
-  code: string;
-  symbol: string;
-  symbolPosition: 'before' | 'after';
-  locale: string;
-  decimals: number;
-}
+import type { PresetWithId, PresetFormData } from './AdminCurrencySettings.types';
 
 const emptyForm: PresetFormData = {
   code: '',

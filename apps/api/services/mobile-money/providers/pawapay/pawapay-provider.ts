@@ -28,6 +28,7 @@ import type {
 import { ProviderApiError, MobileMoneyError } from "../../types";
 import { loadPawaPayConfig, correspondentToOperator, resolveOperatorFromPhone, type PawaPayProviderConfig } from "./pawapay-config";
 import { verifyPawaPaySignature } from "./pawapay-signature";
+import { normalizePhone, formatAmount, buildCustomerMessage, sleep } from "./pawapay-format";
 import { CircuitBreaker } from "../../circuit-breaker";
 import { createLogger } from "../../../../lib/logger";
 
@@ -83,12 +84,12 @@ export class PawaPayProvider implements IMobileMoneyProvider {
     }
 
     const depositId = externalRef;
-    const normalizedPhone = this.normalizePhone(phone);
-    const customerMsg = this.buildCustomerMessage(description);
+    const normalizedPhone = normalizePhone(phone);
+    const customerMsg = buildCustomerMessage(this.config.statementPrefix, description);
 
     const payload: Record<string, unknown> = {
       depositId,
-      amount: this.formatAmount(amount),
+      amount: formatAmount(amount, this.config.currency),
       currency: currency || this.config.currency,
       payer: {
         type: "MMO",
@@ -168,12 +169,12 @@ export class PawaPayProvider implements IMobileMoneyProvider {
     }
 
     const payoutId = externalRef;
-    const normalizedPhone = this.normalizePhone(phone);
-    const customerMsg = this.buildCustomerMessage(description);
+    const normalizedPhone = normalizePhone(phone);
+    const customerMsg = buildCustomerMessage(this.config.statementPrefix, description);
 
     const payload: Record<string, unknown> = {
       payoutId,
-      amount: this.formatAmount(amount),
+      amount: formatAmount(amount, this.config.currency),
       currency: currency || this.config.currency,
       recipient: {
         type: "MMO",
@@ -238,7 +239,7 @@ export class PawaPayProvider implements IMobileMoneyProvider {
     const payload = {
       refundId,
       depositId,
-      amount: this.formatAmount(amount),
+      amount: formatAmount(amount, this.config.currency),
       currency: currency || this.config.currency,
     };
 
@@ -677,7 +678,7 @@ export class PawaPayProvider implements IMobileMoneyProvider {
             if (attempt < maxRetries) {
               const delay = this.config.retryDelayMs * Math.pow(2, attempt - 1);
               const jitter = Math.random() * 0.3 + 0.85;
-              await this.sleep(delay * jitter);
+              await sleep(delay * jitter);
               continue;
             }
             return response;
@@ -690,7 +691,7 @@ export class PawaPayProvider implements IMobileMoneyProvider {
 
           if (attempt < maxRetries) {
             const delay = this.config.retryDelayMs * Math.pow(2, attempt - 1);
-            await this.sleep(delay);
+            await sleep(delay);
             continue;
           }
         }
@@ -706,52 +707,6 @@ export class PawaPayProvider implements IMobileMoneyProvider {
     });
   }
 
-  /**
-   * Normalise le numéro de téléphone au format MSISDN pour le Congo
-   */
-  private normalizePhone(phone: string): string {
-    let cleaned = phone.replace(/[^\d+]/g, "");
-    if (cleaned.startsWith("+")) {
-      cleaned = cleaned.substring(1);
-    }
-    // Congo Brazzaville: assurer le préfixe 242
-    if (!cleaned.startsWith("242")) {
-      if (cleaned.startsWith("0")) {
-        cleaned = cleaned.substring(1);
-      }
-      cleaned = "242" + cleaned;
-    }
-    return cleaned;
-  }
-
-  /**
-   * Formate le montant selon les contraintes pawaPay
-   * XAF = pas de décimales
-   */
-  private formatAmount(amount: number): string {
-    if (this.config.currency === "XAF") {
-      return Math.round(amount).toString();
-    }
-    return amount.toString();
-  }
-
-  /**
-   * Construit le statementDescription (4-22 chars alphanumériques)
-   */
-  private buildCustomerMessage(description?: string): string {
-    const prefix = this.config.statementPrefix;
-    if (!description) return prefix;
-
-    // Nettoyer: garder uniquement alphanumériques et espaces
-    const clean = `${prefix} ${description}`.replace(/[^a-zA-Z0-9 ]/g, "").trim();
-    // Tronquer à 22 chars
-    return clean.substring(0, 22) || prefix;
-  }
-
-  private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
   // ============================================
   // PREDICT CORRESPONDENT (Toolkit API)
   // ============================================
@@ -764,7 +719,7 @@ export class PawaPayProvider implements IMobileMoneyProvider {
    * @returns Le code correspondant (ex: MTN_MOMO_COG, AIRTEL_COG) ou null
    */
   async predictCorrespondent(msisdn: string): Promise<string | null> {
-    const normalizedPhone = this.normalizePhone(msisdn);
+    const normalizedPhone = normalizePhone(msisdn);
 
     // 1. Essayer l'API pawaPay toolkit
     try {

@@ -8,20 +8,7 @@ import { toast, handleApiError } from '../../../lib/toast';
 import { ALL_STATUS_LABELS } from '../../../lib/status-labels';
 // P4.1: Lazy-load heavy export libraries
 import { loadPDFLibraries } from '@/lib/lazy-export';
-
-interface AuditLog {
-  id: string;
-  timestamp?: string;
-  createdAt?: string;
-  userEmail?: string;
-  action?: string;
-  entityType?: string;
-  entityId?: string;
-  resource?: string;
-  status?: string;
-  ipAddress?: string;
-  errorMessage?: string;
-}
+import type { AuditLog } from './AuditLogs.types';
 
 const formatLogDate = (log: any) => {
   const value = log?.timestamp ?? log?.createdAt;

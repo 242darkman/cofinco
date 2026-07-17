@@ -4,20 +4,7 @@ import { Calendar, Clock, MapPin, Plus, Check, X, List, Grid3X3, ChevronLeft, Ch
 import { toast } from 'sonner';
 import { StatutPlanning, STATUT_PLANNING_LABELS } from '@shared/enum/status-constants';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
-
-interface Planning {
-  id: string;
-  agentId: string;
-  datePlanning: string;
-  heureDebut: string;
-  heureFin: string;
-  typeActivite: string;
-  zone: string;
-  statut: string;
-  notes: string;
-}
-
-type ViewMode = 'list' | 'calendar';
+import type { Planning, ViewMode } from './AgentPlanning.types';
 
 interface AgentPlanningProps {
   agentId?: string;

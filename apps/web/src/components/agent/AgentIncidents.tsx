@@ -8,6 +8,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '
 import { toast } from '@/lib/toast';
 import { agentKeys } from '@/lib/query-keys';
 import { authService } from '@/lib/auth';
+import type { Incident } from './AgentIncidents.types';
 
 // SLA thresholds in hours by severity
 const SLA_HOURS: Record<string, number> = {
@@ -41,23 +42,6 @@ function getSlaStatus(incident: Incident): { overdue: boolean; remaining: string
     remaining: remaining >= 24 ? `${Math.floor(remaining / 24)}j restants` : `${Math.floor(remaining)}h restants`,
     pct,
   };
-}
-
-interface Incident {
-  id: string;
-  agent_id: string;
-  type_incident: string;
-  gravite: string;
-  description: string;
-  date_incident: string;
-  localisation: string;
-  statut: string;
-  resolution: string;
-  date_resolution?: string;
-  pieces_jointes?: string[];
-  escalade_par?: string;
-  date_escalade?: string;
-  agent?: { nom: string; prenom: string };
 }
 
 export default function AgentIncidents({ agentId }: { agentId?: string }) {

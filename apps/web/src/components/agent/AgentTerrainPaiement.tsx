@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Spinner } from '@/components/ui/Spinner';
 import { DollarSign, Phone, FileText, CheckCircle, Users, CheckCircle2, AlertCircle, AlertTriangle, X, ChevronDown, Banknote, Smartphone } from 'lucide-react';
-import { SelectField, SearchableSelect } from '../ui';
+import { SelectField, SearchableSelect, Spinner } from '../ui';
 import { toast } from 'sonner';
 import AccountHolderPresenceModal, { PresenceConfirmationData } from '../auth/AccountHolderPresenceModal';
 import { usePermissions } from '../auth/ProtectedFeature';

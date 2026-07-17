@@ -12,6 +12,7 @@ import { useNetworkStatus } from '../../../contexts/NetworkContext';
 import { useEnabledPaymentMethods } from '../../../contexts/FeatureFlagsContext';
 import { executeOfflineOperation } from '../../../lib/offline-treasury';
 import { useUserProfile } from '../../../hooks/useUserProfile';
+import type { Compte, ModePaiement } from './CompteTransactionForm.types';
 
 // Mapping EN -> FR pour les types de compte
 const TYPE_COMPTE_LABELS: Record<string, string> = {
@@ -24,28 +25,12 @@ const getTypeCompteLabel = (type: string): string => {
   return TYPE_COMPTE_LABELS[type] || type;
 };
 
-interface Compte {
-  id: string;
-  numeroCompte?: string;
-  numero_compte?: string;
-  typeCompte?: string;
-  type_compte?: string;
-  solde: number;
-  statut?: string;
-  clients: {
-    nom: string;
-    id: string;
-  };
-}
-
 interface CompteTransactionFormProps {
   compte: Compte;
   type: 'Dépôt' | 'Retrait';
   onClose: () => void;
   onSuccess: () => void;
 }
-
-type ModePaiement = 'CASH' | 'MOBILE_MONEY' | 'CHECK' | 'TRANSFER';
 
 const MOBILE_OPERATORS = [
   { id: 'mtn', name: 'MTN Mobile Money', color: 'bg-status-warning-bg0', prefix: '+242 05/06' },

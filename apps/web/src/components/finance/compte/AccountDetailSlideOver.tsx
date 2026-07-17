@@ -1,6 +1,5 @@
 
 import React, { useState, useMemo } from 'react';
-import { Spinner } from '@/components/ui/Spinner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   X, User, TrendingUp, TrendingDown, Calendar,
@@ -12,7 +11,7 @@ import { toast } from 'sonner';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetClose } from '../../ui/sheet';
 import TabGroup from '../../ui/TabGroup';
 import Badge from '../../ui/Badge';
-import { Button, IconButton } from '../../ui';
+import { Button, IconButton, Spinner } from '../../ui';
 import { compteEpargneApi, transactionEpargneApi, sessionCaisseApi } from '../../../lib/api-client';
 import { TransactionRowActions } from '../shared/TransactionRowActions';
 import { ReceiptViewer } from '../shared/ReceiptViewer';

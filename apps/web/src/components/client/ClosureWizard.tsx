@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Spinner } from '@/components/ui/Spinner';
+import { Spinner, Modal } from '@/components/ui';
 import { XCircle, CheckCircle, AlertTriangle, Phone, Banknote, Smartphone, ChevronRight, ChevronLeft, Clock, X } from 'lucide-react';
-import Modal from '../ui/Modal';
 import { toast, handleApiError } from '../../lib/toast';
 import { formatPhoneInput, stripPhoneFormat } from '../../lib/format';
 import {

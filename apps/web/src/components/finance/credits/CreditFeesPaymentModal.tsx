@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Spinner } from '@/components/ui/Spinner';
 import { DollarSign, AlertCircle, CheckCircle, X, Wallet, Shield, CreditCard, Smartphone, ChevronRight, User, FileText, Banknote, Sparkles, ArrowLeft, Lock, CheckCircle2, KeyRound, Phone, Clock } from 'lucide-react';
-import { Modal, Button, Badge } from '../../ui';
+import { Modal, Button, Badge, Spinner } from '../../ui';
 import { useDemandes } from '../../../hooks/credits/useDemandes';
 import { computeSessionStatus, formatMoney, formatPhoneInput, stripPhoneFormat } from '../../../lib/format';
 import { toast } from 'sonner';

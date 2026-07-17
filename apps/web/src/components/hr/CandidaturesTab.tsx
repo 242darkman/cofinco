@@ -1,7 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { Spinner } from '@/components/ui/Spinner';
 import { Plus, Briefcase, Eye, Calendar, Mail, Phone, Upload, FileText, ExternalLink, Clock, MessageSquare, CheckCircle, XCircle, Users, ShieldCheck, UserPlus } from 'lucide-react';
-import { Card, Button, Modal, FormField, SelectField, TextareaField, Badge, ResponsiveTable } from '../ui';
+import { Card, Button, Modal, FormField, SelectField, TextareaField, Badge, ResponsiveTable, Spinner } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { StatutCandidature, STATUT_CANDIDATURE_LABELS } from '@shared/enum/status-constants';
 import { toast } from '../../lib/toast';

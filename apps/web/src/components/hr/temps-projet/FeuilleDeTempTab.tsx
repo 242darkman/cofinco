@@ -1,5 +1,4 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { Spinner } from '@/components/ui/Spinner';
 import {
   useTimesheets,
   useTimesheet,
@@ -13,7 +12,7 @@ import {
 import { useEmployes } from '../../../hooks/hr/useEmployes';
 import { useUserProfile } from '../../../hooks/useUserProfile';
 import { usePermissions } from '../../auth/ProtectedFeature';
-import { Card, Button, Badge, SelectField, SearchableSelect, EmptyState, FilterBar } from '../../ui';
+import { Card, Button, Badge, SelectField, SearchableSelect, EmptyState, FilterBar, Spinner } from '../../ui';
 import {
   ChevronLeft,
   ChevronRight,

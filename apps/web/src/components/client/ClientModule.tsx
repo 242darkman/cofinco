@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useClientAlerts } from '../../hooks/useClientAlerts';
 import { Plus, Search, Download, Upload, Users, MapPin, RefreshCw, List, Eye, Edit2, ChevronRight, BarChart3, Send, UserPlus, ChevronDown } from 'lucide-react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { Button, IconButton, Card, ResponsiveTable, Badge, ConfirmDialog, FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui';
+import { Button, IconButton, Card, ResponsiveTable, ConfirmDialog, FeatureHeader, FEATURE_DESCRIPTIONS, LoadingSpinner, EmptyState, Pagination } from '../ui';
 import { usePermissions, ProtectedFeature } from '../auth/ProtectedFeature';
 import ClientForm from './ClientForm';
 import CreateClientModal from './CreateClientModal';
@@ -17,22 +17,11 @@ import ClientProfileTabsPanel, { CLIENT_TAB_IDS } from './tabs/ClientProfileTabs
 import ClientBulkCommunication from './ClientBulkCommunication';
 import ClientSearch from './ClientSearch';
 import SelectEmployeeForConversionModal from './SelectEmployeeForConversionModal';
+import { CLIENT_LIST_COLUMNS } from './client-list-columns';
 import type { EmployeeConversionData } from './CreateClientModal';
 import { clientService } from '../../services/clientService';
-import LoadingSpinner from '../ui/LoadingSpinner';
-import EmptyState from '../ui/EmptyState';
 import { toast, handleApiError } from '../../lib/toast';
-import { Pagination } from '../ui/Pagination';
-import { formatClientName, resolveStorageUrl, formatPhoneNumber } from '../../lib/format';
-import { StatutClient, STATUT_CLIENT_LABELS } from '@shared/enum/status-constants';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
-import {
-  getStatusLabel,
-  getStatusColor,
-  CLIENT_STATUS_COLORS,
-  CLIENT_SEGMENT_LABELS,
-  CLIENT_SEGMENT_COLORS
-} from '../../lib/status-labels';
 
 interface ClientModuleProps {
   onModuleChange?: (module: string, subModule?: string, data?: any) => void;
@@ -136,11 +125,6 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
     } finally {
       setLoading(false);
     }
-  };
-
-  const getPhotoUrl = (client: any) => {
-    const raw = client.photoProfile || '';
-    return resolveStorageUrl(raw);
   };
 
   const handleSaveClient = async (clientData: any) => {
@@ -510,120 +494,7 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
                 <ResponsiveTable
                   data={paginatedClients}
                   density="compact"
-                  columns={[
-                    {
-                      key: 'nom',
-                      label: 'Nom',
-                      primary: true,
-                      format: (_, item) => (
-                        <div className="flex items-center gap-2">
-                          {getPhotoUrl(item) ? (
-                            <img 
-                              src={getPhotoUrl(item)} 
-                              alt="" 
-                              className="w-6 h-6 rounded-full object-cover border border-edge bg-surface-muted"
-                            />
-                          ) : (
-                            <div className="w-6 h-6 rounded-full bg-surface-muted-elevated flex items-center justify-center border border-edge-strong text-[10px] font-bold text-content-muted">
-                              {`${item.prenom?.[0] || ''}${item.nom?.[0] || ''}`.toUpperCase() || '?'}
-                            </div>
-                          )}
-                          <span className="font-medium text-content-primary text-xs">
-                            {formatClientName(item.nom, item.prenom) || 'Sans nom'}
-                          </span>
-                        </div>
-                      )
-                    },
-                    {
-                      key: 'agence',
-                      label: 'Agence',
-                      hideOnMobile: true,
-                      headerAlign: 'center',
-                      align: 'center',
-                      format: (_, item) => (
-                        <div className="w-24 mx-auto">
-                          <Badge 
-                            value={item.agenceNom || item.agence_nom || 'N/A'}
-                            variant="neutral"
-                            size="sm"
-                            className="w-full justify-center text-[10px] font-medium py-0 h-5"
-                          />
-                        </div>
-                      )
-                    },
-                    {
-                      key: 'telephone',
-                      label: 'Téléphone',
-                      hideOnMobile: true,
-                      headerAlign: 'center',
-                      align: 'center',
-                      format: (val) => <span className="text-xs font-mono text-content-muted">{formatPhoneNumber(val)}</span>
-                    },
-                    {
-                      key: 'segment',
-                      label: 'Segment',
-                      hideOnMobile: true,
-                      headerAlign: 'center',
-                      align: 'center',
-                      format: (_, item) => (
-                        <div className="flex flex-col items-center gap-0.5">
-                          <Badge
-                            value={getStatusLabel(item.segment, CLIENT_SEGMENT_LABELS)}
-                            className={getStatusColor(item.segment, CLIENT_SEGMENT_COLORS)}
-                            size="sm"
-                          />
-                          {item.tags && item.tags.length > 0 && (
-                            <div className="flex items-center gap-0.5 flex-wrap justify-center">
-                              {item.tags.slice(0, 2).map((tag: any) => (
-                                <span
-                                  key={tag.id}
-                                  className="px-1.5 py-0 rounded text-[9px] font-medium leading-relaxed"
-                                  style={{ backgroundColor: `${tag.color}15`, color: tag.color }}
-                                >
-                                  {tag.name}
-                                </span>
-                              ))}
-                              {item.tags.length > 2 && (
-                                <span className="text-[9px] text-content-muted font-medium">+{item.tags.length - 2}</span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    },
-                    {
-                      key: 'score',
-                      label: 'Score',
-                      hideOnMobile: true,
-                      headerAlign: 'center',
-                      align: 'center',
-                      format: (_, item) => {
-                        const score = item.score ?? 0;
-                        const color = score >= 80 ? 'text-status-success' : score >= 65 ? 'text-status-info' : score >= 40 ? 'text-status-warning' : 'text-status-danger';
-                        return (
-                          <div className="flex items-center justify-center gap-1">
-                            <BarChart3 size={12} className={color} />
-                            <span className={`text-xs font-bold ${color}`}>{score}</span>
-                          </div>
-                        );
-                      }
-                    },
-                    {
-                      key: 'statut',
-                      label: 'Statut',
-                      headerAlign: 'center',
-                      align: 'center',
-                      format: (_, item) => (
-                        <div className="flex justify-center">
-                          <Badge
-                            value={getStatusLabel(item.statut, STATUT_CLIENT_LABELS)}
-                            className={getStatusColor(item.statut, CLIENT_STATUS_COLORS)}
-                            size="sm"
-                          />
-                        </div>
-                      )
-                    }
-                  ]}
+                  columns={CLIENT_LIST_COLUMNS}
                   actions={(client) => (
                     <div className="flex items-center gap-1">
                       <IconButton

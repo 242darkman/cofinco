@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Spinner } from '@/components/ui/Spinner';
+import { Spinner, SearchableSelect } from '@/components/ui';
 import { X, User, FileText, Users, CreditCard, ArrowDownLeft, ArrowUpRight, Banknote, CheckCircle, Building2, Wallet } from 'lucide-react';
 import mtnMomoLogo from '../../../assets/logos/mtn-logo.png';
 import airtelMoneyLogo from '../../../assets/logos/airtel-logo.png';
-import SearchableSelect from '../../ui/SearchableSelect';
 import { saveToLoge } from '../../../lib/loge-storage';
 import { usePermissions } from '../../auth/ProtectedFeature';
 import { clientApi, transactionApi, echeanceCreditApi, tontineApi } from '../../../lib/api-client';

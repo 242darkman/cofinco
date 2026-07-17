@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Spinner } from '@/components/ui/Spinner';
 import { TrendingUp, Save, AlertTriangle, Info } from 'lucide-react';
 import { clientSearchApi, demandeCreditApi, creditPlanApi, clientApi } from '../../../lib/api-client';
-import { SelectField, SearchableSelect } from '../../ui';
+import { SelectField, SearchableSelect, Spinner } from '../../ui';
 import { formatClientName, resolveStorageUrl } from '../../../lib/format';
 import { toast } from '../../../lib/toast';
 import { StatutDemande, TypeCredit, TYPE_CREDIT_OPTIONS, normalizeDureeUnite, normalizeFrequenceRemboursement } from '@shared/enum/status-constants';

@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { Spinner } from '@/components/ui/Spinner';
 import { Shield, Award, CheckCircle, AlertCircle, Search, AlertTriangle, Eye, Edit, Trash2, Save, X } from 'lucide-react';
-import { SelectField, SearchInput, Switch, Button } from '../../ui';
+import { SelectField, SearchInput, Switch, Button, Spinner } from '../../ui';
 import { Module } from '../../../hooks/admin/useModules';
 import { Permission } from '../../../hooks/admin/usePermissions';
 import { RolePermission } from '../../../hooks/admin/useRolePermissions';

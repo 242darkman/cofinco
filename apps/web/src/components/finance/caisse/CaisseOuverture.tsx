@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Spinner } from '@/components/ui/Spinner';
 import { X, Unlock, DollarSign, Lock, Shield, Check, KeyRound, AlertCircle, Monitor, Wallet, Clock, User, CheckCircle2, Send, Package, ArrowRight, Ban, Banknote, Plus, Eye, EyeOff } from 'lucide-react';
-import { Card, Button, IconButton, LoadingSpinner, Badge } from '../../ui';
+import { Card, Button, IconButton, LoadingSpinner, Badge, Spinner } from '../../ui';
 import SelectField from '../../ui/SelectField';
 import { usePermissions } from '../../auth/ProtectedFeature';
 import { authService } from '../../../lib/auth';

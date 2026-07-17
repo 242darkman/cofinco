@@ -9,26 +9,7 @@ import { useIsAdmin } from '../../contexts/AbilityContext';
 import { currencySymbol, formatMoney } from '@shared/config/currency';
 import { useAvantages, type Avantage } from '../../hooks/hr/useAvantages';
 import { toast } from '../../lib/toast';
-
-interface Objectif {
-  id: string;
-  agentId: string;
-  periode: string;
-  typeObjectif: string;
-  valeurObjectif: number;
-  valeurRealisee: number;
-  unite: string;
-  statut: string;
-  recompense: number;
-  avantageId: number | null;
-  avantageEmployeId: number | null;
-  primeStatut: string;
-  createdAt: string;
-  agent?: {
-    nom: string;
-    prenom: string;
-  };
-}
+import type { Objectif } from './AgentObjectifs.types';
 
 export default function AgentObjectifs({ agentId }: { agentId?: string }) {
   const [objectifs, setObjectifs] = useState<Objectif[]>([]);

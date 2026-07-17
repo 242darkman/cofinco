@@ -440,12 +440,7 @@ export default function GenerateCodeModal({ isOpen, onClose, onGenerate, generat
           {selectedUser ? (
             <div className="p-4 bg-surface rounded-xl flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Avatar
-                  photoUrl={selectedUser.photoProfile}
-                  fullName={`${selectedUser.nom} ${selectedUser.prenom}`}
-                  initials={`${selectedUser.prenom?.[0] || ''}${selectedUser.nom?.[0] || ''}`}
-                  size="lg"
-                />
+                <Avatar photoUrl={selectedUser.photoProfile} fullName={`${selectedUser.nom} ${selectedUser.prenom}`} initials={`${selectedUser.prenom?.[0] || ''}${selectedUser.nom?.[0] || ''}`} size="lg" />
                 <div>
                   <p className="font-medium text-content-primary">{selectedUser.prenom} {selectedUser.nom}</p>
                   <p className="text-sm text-content-muted">{selectedUser.role} {selectedUser.agence ? `• ${selectedUser.agence}` : ''}</p>
@@ -484,12 +479,7 @@ export default function GenerateCodeModal({ isOpen, onClose, onGenerate, generat
                       onClick={() => selectUser(user)}
                       className="w-full p-3 flex items-center gap-3 hover:bg-surface transition-colors text-left"
                     >
-                      <Avatar
-                        photoUrl={user.photoProfile}
-                        fullName={`${user.nom} ${user.prenom}`}
-                        initials={`${user.prenom?.[0] || ''}${user.nom?.[0] || ''}`}
-                        size="md"
-                      />
+                      <Avatar photoUrl={user.photoProfile} fullName={`${user.nom} ${user.prenom}`} initials={`${user.prenom?.[0] || ''}${user.nom?.[0] || ''}`} size="md" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-content-primary truncate">{user.prenom} {user.nom}</p>
                         <p className="text-xs text-content-muted truncate">{user.email || user.role}</p>

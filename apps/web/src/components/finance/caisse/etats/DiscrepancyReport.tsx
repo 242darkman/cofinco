@@ -1,5 +1,4 @@
 import React, { useMemo } from 'react';
-import { Spinner } from '@/components/ui/Spinner';
 import {
   AlertTriangle,
   CheckCircle,
@@ -12,7 +11,7 @@ import {
   Target,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { Card, Pagination } from '@/components/ui';
+import { Card, Pagination, Spinner } from '@/components/ui';
 import { SessionCaisse } from '@/types/finance';
 import { computeSessionStatus, getSessionStatusLabel } from '@/lib/format';
 

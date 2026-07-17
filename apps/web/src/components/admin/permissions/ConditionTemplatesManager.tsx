@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { Spinner } from '@/components/ui/Spinner';
 import { Braces, Plus, Edit2, Trash2, RefreshCw, AlertCircle, ChevronDown, ChevronRight, Lock, Variable } from 'lucide-react';
-import { Button, Badge, Modal, ConfirmDialog } from '@/components/ui';
+import { Button, Badge, Modal, ConfirmDialog, Spinner } from '@/components/ui';
 import { useConditionTemplates, type ConditionTemplate } from '@/hooks/admin/useConditionTemplates';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 

@@ -1,5 +1,4 @@
 import { useState, useMemo } from 'react';
-import { SkeletonStatsGrid } from '@/components/ui/Skeleton';
 import { useQuery } from '@tanstack/react-query';
 import {
   BarChart3, Download, Filter, TrendingUp,
@@ -7,7 +6,7 @@ import {
   ArrowUpRight, ArrowDownRight, Building2,
   Award, AlertTriangle, Search,
 } from 'lucide-react';
-import { Card, Button, Badge, SelectField, LoadingSpinner, EmptyState, FeatureHeader, StatCard } from '../ui';
+import { Card, Button, Badge, SelectField, LoadingSpinner, EmptyState, FeatureHeader, StatCard, SkeletonStatsGrid } from '../ui';
 import {
   scoringAdminApi, agencesApi, clientApi,
   type AdminScoreEventsFilter, type AdminScoreStatesFilter,

@@ -1,11 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { Spinner } from '@/components/ui/Spinner';
 import {
   Plus, FolderKanban, Users, Calendar, Clock, Banknote,
   Eye, UserPlus, UserMinus, Pencil, CheckCircle2, PauseCircle, XCircle,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { Card, Button, Modal, FormField, SelectField, TextareaField, Badge, StatCard, SearchInput, EmptyState, FilterBar } from '../../ui';
+import { Card, Button, Modal, FormField, SelectField, TextareaField, Badge, StatCard, SearchInput, EmptyState, FilterBar, Spinner } from '../../ui';
 import { useProjects, useProject, type Project, type ProjectDetail } from '../../../hooks/hr/useProjectTime';
 import { useAgence } from '../../../contexts/AgenceContext';
 import { usePermissions } from '../../auth/ProtectedFeature';

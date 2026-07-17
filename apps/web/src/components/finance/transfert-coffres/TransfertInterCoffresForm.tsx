@@ -19,28 +19,12 @@ import { Button, Badge } from '@/components/ui';
 import { toast } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
 import { currencyCode } from '@shared/config/currency';
-
-interface CoffreFort {
-  id: string;
-  code: string;
-  nom: string;
-  ownerType: 'AGENCE' | 'SIEGE';
-  solde: string;
-  plafondEncaisse?: string;
-  soldeMinimum?: string;
-  statut: string;
-  agenceNom?: string;
-}
+import type { CoffreFort, AgentTransport } from './TransfertInterCoffresForm.types';
 
 interface TransfertInterCoffresFormProps {
   coffres: CoffreFort[];
   onClose: () => void;
   onSuccess: (transfert: any) => void;
-}
-
-interface AgentTransport {
-  nom: string;
-  contact: string;
 }
 
 export default function TransfertInterCoffresForm({

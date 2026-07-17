@@ -14,19 +14,7 @@ import { currencySymbol } from '@shared/config/currency';
 import { useFeatureFlags, useEnabledPaymentMethods } from '../../../contexts/FeatureFlagsContext';
 import mtnLogo from '@/assets/logos/mtn-logo.png';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
-
-interface AccountInfo {
-  id: string;
-  numeroCompte: string;
-  typeCompte: string;
-  montantInitial: number;
-  client: {
-    id: string;
-    nom: string;
-    prenom: string;
-    photoUrl?: string;
-  };
-}
+import type { AccountInfo, FeeEstimate, ModePaiement, MmStep } from './AccountActivationModal.types';
 
 interface AccountActivationModalProps {
   account: AccountInfo;
@@ -35,18 +23,6 @@ interface AccountActivationModalProps {
   onClose: () => void;
   onSuccess: () => void;
 }
-
-interface FeeEstimate {
-  feeAmount: number;
-  feeRate: number;
-  feeFixed: number;
-  montantBrut: number;
-  montantNet: number;
-  feeOption: string;
-}
-
-type ModePaiement = 'CASH' | 'MTN' | 'AIRTEL' | 'TRANSFER';
-type MmStep = 'idle' | 'pending' | 'success' | 'failed' | 'expired';
 
 export function AccountActivationModal({
   account,

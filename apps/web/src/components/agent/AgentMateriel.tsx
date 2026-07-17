@@ -4,33 +4,7 @@ import { Package, Plus, AlertCircle, CheckCircle, DollarSign, Shield, Wrench, Tr
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
 import { authService } from '../../lib/auth';
 import { useIsAdmin } from '../../contexts/AbilityContext';
-
-interface Maintenance {
-  date: string;
-  description: string;
-  cout: number;
-}
-
-interface Materiel {
-  id: string;
-  agent_id: string;
-  type_materiel: string;
-  nom_materiel: string;
-  numero_serie: string;
-  date_attribution: string;
-  date_retour?: string;
-  etat: string;
-  valeur: number;
-  date_garantie_fin?: string;
-  duree_amortissement_mois?: number;
-  prochaine_maintenance?: string;
-  historique_maintenances?: Maintenance[];
-  notes: string;
-  agent?: {
-    nom: string;
-    prenom: string;
-  };
-}
+import type { Maintenance, Materiel } from './AgentMateriel.types';
 
 function calcDepreciation(valeur: number, dateAttribution: string, dureeMois: number): { valeurResiduelle: number; pourcentage: number } {
   const start = new Date(dateAttribution);

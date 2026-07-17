@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Spinner } from '@/components/ui/Spinner';
+import { Spinner, TabGroup, Card, Badge, Button } from '@/components/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   BookOpen, FileText, BarChart3, TrendingUp, Download, Building2,
@@ -17,12 +17,8 @@ import TAFIRE from './TAFIRE';
 import RapportsOHADA from './RapportsOHADA';
 import CoffreOperationsPanel from './CoffreOperationsPanel';
 import PayrollSummaryPanel from './PayrollSummaryPanel';
-import TabGroup from '../../ui/TabGroup';
 // jsPDF et ExcelJS sont lazy-loadés dans les composants enfants
 import { exportBilanExcel, exportBilanPDF } from './exports/bilanOHADAExports';
-import Card from '../../ui/Card';
-import Badge from '../../ui/Badge';
-import Button from '../../ui/Button';
 import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 import {
   ResponsiveContainer,
@@ -39,51 +35,11 @@ import {
   useAccountingWebSocket,
 } from '../../../hooks/accounting/useAccounting';
 import { comptabiliteKeys } from '../../../lib/query-keys';
+import type { CompteOHADA, TabKey, JournalFromApi, JournalDisplay, JournalEntryFromApi } from './ComptabiliteSageOHADA.types';
 
 // ============================================
 // INTERFACES
 // ============================================
-interface CompteOHADA {
-  id: string;
-  numeroCompte: string;
-  intitule: string;
-  classe: number;
-  typeCompte: 'Actif' | 'Passif' | 'Charge' | 'Produit' | 'Capitaux';
-  sensNormal: 'Débit' | 'Crédit';
-  niveau: number;
-  actif: boolean;
-  description: string;
-  soldeActuel: number;
-}
-
-type TabKey = 'plan' | 'journaux' | 'ecritures' | 'balance' | 'grandlivre' | 'bilan' | 'resultat' | 'tva' | 'tresorerie' | 'tafire' | 'liasse' | 'rapports';
-
-interface JournalFromApi {
-  id: string;
-  code: string;
-  intitule: string;
-  typeJournal?: string;
-  actif?: boolean;
-}
-
-interface JournalDisplay {
-  id: string;
-  code: string;
-  label: string;
-  color: string;
-  count: number;
-}
-
-interface JournalEntryFromApi {
-  id: string;
-  date: string;
-  numeroPiece: string;
-  libelle: string;
-  journalId: string;
-  totalDebit: number;
-  totalCredit: number;
-}
-
 // ============================================
 // DONNÉES ET CONSTANTES
 // ============================================

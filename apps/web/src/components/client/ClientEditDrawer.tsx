@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Spinner } from '@/components/ui/Spinner';
 import type { ClientWithIdentity } from '@shared/schema';
 import { Save, User, Mail, Phone, MapPin, Briefcase, Calendar, DollarSign, Camera, Trash2, Video, FileText, Users, Plus, X } from 'lucide-react';
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
 } from '../ui/sheet';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '../ui/accordion';
-import { FormField, SelectField, Button, Avatar } from '../ui';
+import { FormField, SelectField, Button, Avatar, Spinner } from '../ui';
 import SmartDocumentUpload, { type UploadedDocument, type DocumentType } from '../ui/SmartDocumentUpload';
 import FaceLivenessCapture from '../security/FaceLivenessCapture';
 import { useUserProfile } from '../../hooks/useUserProfile';
@@ -464,11 +463,7 @@ export default function ClientEditDrawer({ client, isOpen, onClose, onSave }: Cl
                     <div className="relative">
                       {formData.photoProfile ? (
                         <div className="relative inline-block">
-                          <Avatar
-                            photoUrl={formData.photoProfile}
-                            fullName={`${formData.prenom || ''} ${formData.nom || ''}`.trim() || 'Client'}
-                            className="w-20 h-20 text-2xl border-2 border-edge-strong shadow-lg"
-                          />
+                          <Avatar photoUrl={formData.photoProfile} fullName={`${formData.prenom || ''} ${formData.nom || ''}`.trim() || 'Client'} className="w-20 h-20 text-2xl border-2 border-edge-strong shadow-lg" />
                           <button type="button" onClick={() => handleChange('photoProfile', '')}
                             className="absolute -top-1 -right-1 p-1 bg-status-danger text-white rounded-full hover:bg-status-danger shadow z-10"><Trash2 size={10} /></button>
                           <button type="button" onClick={() => setIsLivenessOpen(true)}

@@ -9,6 +9,7 @@ import { agentTerrainApi } from '../../lib/api-client';
 import { StatutUser } from '@shared/enum/status-constants';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import type { GeoLocation, Agent } from './AgentGeolocalisation.types';
 
 // Fix Leaflet/Vite default icon
 delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl;
@@ -31,26 +32,6 @@ const endIcon = new L.DivIcon({
   iconSize: [28, 28],
   iconAnchor: [14, 14],
 });
-
-interface GeoLocation {
-  id: string;
-  agent_id: string;
-  latitude: number;
-  longitude: number;
-  accuracy: number;
-  speed?: number | null;
-  heading?: number | null;
-  timestamp: string;
-  activity_type: string;
-}
-
-interface Agent {
-  id: string;
-  nom: string;
-  prenom: string;
-  zone_affectation: string;
-  statut: string;
-}
 
 export default function AgentGeolocalisation({ agentId, embedded }: { agentId?: string; embedded?: boolean }) {
   const [locations, setLocations] = useState<GeoLocation[]>([]);
