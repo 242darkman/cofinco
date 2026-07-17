@@ -1,10 +1,10 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { X, Lock, AlertTriangle, CheckCircle, Calculator, Banknote, Coins, ArrowRight, ArrowLeft, Loader2, Vault, PiggyBank, FileText, UserCheck, ChevronDown, ChevronUp, Scale, FileUp, Save, Sparkles, Smartphone } from 'lucide-react';
+import { X, Lock, AlertTriangle, CheckCircle, Calculator, Banknote, Coins, ArrowRight, ArrowLeft, Vault, PiggyBank, FileText, UserCheck, ChevronDown, ChevronUp, Scale, FileUp, Save, Sparkles, Smartphone } from 'lucide-react';
 import WeightVerificationPanel from './WeightVerificationPanel';
 import MobileMoneyReconciliationPanel from './MobileMoneyReconciliationPanel';
 import ClosureReportButton from './ClosureReportButton';
 import { usePermissions } from '../../auth/ProtectedFeature';
-import { Button, Badge, FormField } from '@/components/ui';
+import { Button, Badge, FormField, Spinner } from '@/components/ui';
 import { sessionCaisseApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
@@ -562,7 +562,7 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
     >
       <div className="bg-surface-base border border-edge-subtle w-full max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden rounded-t-2xl sm:rounded-2xl shadow-2xl shadow-black/50 flex flex-col">
         {/* Header with Stepper */}
-        <header className="shrink-0 px-3 sm:px-5 py-2.5 sm:py-3 border-b border-edge bg-gradient-to-r from-accent/30 to-accent-secondary/30">
+        <header className="shrink-0 px-3 sm:px-5 py-2.5 sm:py-3 border-b border-edge bg-linear-to-r from-accent/30 to-accent-secondary/30">
           <div className="flex items-center justify-between mb-2.5">
             <div className="flex items-center gap-2.5">
               <div className="p-2 bg-accent/20 rounded-xl border border-accent/30">
@@ -765,7 +765,7 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
                       title="Suggestion automatique basée sur les opérations"
                     >
                       {loadingSuggestion ? (
-                        <Loader2 size={12} className="animate-spin" />
+                        <Spinner size="xs" tone="current" />
                       ) : (
                         <Sparkles size={12} />
                       )}
@@ -898,7 +898,7 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
                   {loadingMmReconciliation ? (
                     <div className="bg-surface/40 border border-edge-subtle rounded-xl p-3">
                       <div className="flex items-center gap-2 text-content-muted">
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <Spinner size="xs" tone="current" />
                         <span className="text-xs">Vérification des soldes Mobile Money...</span>
                       </div>
                     </div>
@@ -987,7 +987,7 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
                             size="sm"
                             className="border-status-info/30 text-status-info hover:bg-status-info-bg"
                           >
-                            {loadingVerification ? <Loader2 size={14} className="animate-spin" /> : <UserCheck size={14} />}
+                            {loadingVerification ? <Spinner size="xs" tone="current" /> : <UserCheck size={14} />}
                             Soumettre
                           </Button>
                         </div>
@@ -1134,7 +1134,7 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
                 disabled={!freezeConfirmed || loading || !canCloseCaisse}
                 className="w-full sm:flex-1 bg-status-warning hover:bg-status-warning"
               >
-                {loading ? <Loader2 className="animate-spin mr-2" size={16} /> : <Lock size={16} className="mr-2" />}
+                {loading ? <Spinner size="xs" tone="current" className="mr-2" /> : <Lock size={16} className="mr-2" />}
                 Geler et Commencer
               </Button>
             </>
@@ -1151,7 +1151,7 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
                 disabled={loading || (soldeCalcule <= 0 && soldeTheorique > 0) || (Math.abs(soldeCalcule - soldeTheorique) > 0 && !ecartJustification.trim())}
                 className={`w-full sm:flex-1 ${soldeCalcule - soldeTheorique === 0 ? 'bg-status-success hover:bg-status-success' : 'bg-accent-secondary hover:bg-accent-secondary-hover'}`}
               >
-                {loading ? <Loader2 className="animate-spin mr-2" size={16} /> : <ArrowRight size={16} className="mr-2" />}
+                {loading ? <Spinner size="xs" tone="current" className="mr-2" /> : <ArrowRight size={16} className="mr-2" />}
                 Valider le Comptage
               </Button>
             </>
@@ -1179,7 +1179,7 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
                 disabled={loading || !isTransferValid || !canCloseCaisse}
                 className="w-full sm:flex-1 bg-status-success hover:bg-status-success"
               >
-                {loading ? <Loader2 className="animate-spin mr-2" size={16} /> : <Lock size={16} className="mr-2" />}
+                {loading ? <Spinner size="xs" tone="current" className="mr-2" /> : <Lock size={16} className="mr-2" />}
                 Finaliser la Fermeture
               </Button>
             </>
@@ -1315,7 +1315,7 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
                 disabled={loadingTemplates || !templateName.trim()}
                 className="bg-accent-secondary hover:bg-accent-secondary-hover"
               >
-                {loadingTemplates ? <Loader2 size={14} className="animate-spin mr-2" /> : <Save size={14} className="mr-2" />}
+                {loadingTemplates ? <Spinner size="xs" tone="current" className="mr-2" /> : <Save size={14} className="mr-2" />}
                 Sauvegarder
               </Button>
             </div>

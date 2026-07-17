@@ -62,12 +62,12 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
           disabled={disabled}
           className={`
             w-full h-[40px] pl-[38px] pr-${hasValue && showClearButton ? '12' : '[14px]'}
-            bg-white border border-[#E5E7EB] rounded-lg
-            text-[#111827] text-[13px]
-            placeholder:text-[#9CA3AF] placeholder:font-normal
+            bg-input-bg border border-input-border rounded-lg
+            text-input-text text-[13px]
+            placeholder:text-input-placeholder placeholder:font-normal
             transition-colors duration-200
-            hover:border-gray-400
-            focus:outline-none focus:ring-[3px] focus:border-[#059669] focus:ring-[#059669]/30
+            hover:border-content-muted
+            focus:outline-none focus:ring-[3px] focus:border-accent focus:ring-accent/30
             disabled:opacity-50 disabled:cursor-not-allowed
             ${className}
           `}

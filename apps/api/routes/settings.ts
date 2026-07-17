@@ -18,7 +18,7 @@ import {
 const logger = createLogger('Routes:Settings');
 import { storage } from "../storage";
 import { requireAuth } from "../auth";
-import { attachAbility, requireAbility } from "../authorization";
+import { attachAbility, requireAbility, requirePlatformOperator } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
 import { logAudit } from "../audit";
 import { auditTrailService } from "../services/audit-trail-service";
@@ -542,7 +542,7 @@ export function registerSettingsRoutes(app: Express) {
   });
 
   // ========== RÉINITIALISATION PAR AGENCE (Admin Only) ==========
-  app.post("/api/admin/reset-agence/:agenceId", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.SETTINGS), async (req, res) => {
+  app.post("/api/admin/reset-agence/:agenceId", requireAuth, requirePlatformOperator(), attachAbility, requireAbility(Actions.MANAGE, Subjects.SETTINGS), async (req, res) => {
     const { agenceId } = req.params;
     const { confirmation, deleteEmployees } = req.body;
 
@@ -1163,7 +1163,7 @@ export function registerSettingsRoutes(app: Express) {
   });
 
   // Create maintenance schedule
-  app.post("/api/settings/maintenance-schedules", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.SETTINGS), async (req, res) => {
+  app.post("/api/settings/maintenance-schedules", requireAuth, requirePlatformOperator(), attachAbility, requireAbility(Actions.MANAGE, Subjects.SETTINGS), async (req, res) => {
     try {
       const { title, description, scheduledStart, scheduledEnd, affectedModules, notifyAt } = req.body;
       const userId = req.session?.userId;
@@ -1194,7 +1194,7 @@ export function registerSettingsRoutes(app: Express) {
   });
 
   // Update maintenance schedule
-  app.put("/api/settings/maintenance-schedules/:id", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.SETTINGS), async (req, res) => {
+  app.put("/api/settings/maintenance-schedules/:id", requireAuth, requirePlatformOperator(), attachAbility, requireAbility(Actions.MANAGE, Subjects.SETTINGS), async (req, res) => {
     try {
       const { id } = req.params;
       const updates = req.body;

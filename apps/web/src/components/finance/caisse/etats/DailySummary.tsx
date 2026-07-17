@@ -26,7 +26,7 @@ import {
   CheckCircle,
   AlertTriangle,
 } from 'lucide-react';
-import { Card } from '@/components/ui';
+import { Card, Spinner } from '@/components/ui';
 import { SessionCaisse, CaisseTransaction } from '@/types/finance';
 import { computeSessionStatus, getSessionStatusLabel } from '@/lib/format';
 
@@ -161,7 +161,7 @@ export function DailySummary({ sessions, transactions, loading = false }: DailyS
     return (
       <Card className="bg-surface-base/80 border-edge p-8">
         <div className="flex items-center justify-center gap-3">
-          <div className="animate-spin w-5 h-5 border-2 border-accent border-t-transparent rounded-full" />
+          <Spinner size="sm" />
           <span className="text-content-muted">Chargement des statistiques...</span>
         </div>
       </Card>

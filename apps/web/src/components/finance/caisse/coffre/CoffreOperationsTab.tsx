@@ -3,12 +3,13 @@
  * caisse en attente et tableau des transferts avec actions.
  */
 import React, { useCallback, useState } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
   CheckCircle2,
   XCircle,
-  Loader2,
+  RefreshCw,
   ArrowRightLeft,
   Wallet,
   Clock,
@@ -63,35 +64,39 @@ export function CoffreOperationsTab({
 }: CoffreOperationsTabProps) {
   return (
           <>
-          {/* Header Stats - Compact & Responsive */}
-          <div className="grid grid-cols-1 xs:grid-cols-3 gap-2">
-             <div className="bg-surface/40 border border-edge-subtle rounded-lg p-2.5 sm:p-3 flex items-center xs:flex-col xs:items-start justify-between xs:justify-center gap-1">
-                <span className="text-[9px] sm:text-[10px] font-bold text-content-muted uppercase tracking-widest xs:mb-0.5">Solde Coffre</span>
-                <div className="flex items-center gap-1.5">
-                   <Wallet className="text-status-info shrink-0" size={15} />
-                   <div className="text-sm sm:text-base lg:text-lg font-bold text-content-primary font-mono tabular-nums max-w-full truncate" title={isLoadingStats ? "..." : `${(statsData?.solde || 0).toLocaleString()} ${currencySymbol}`}>
-                      {isLoadingStats ? "..." : <>{(statsData?.solde || 0).toLocaleString()} <span className="text-[10px] sm:text-xs text-content-muted font-sans">{currencySymbol}</span></>}
-                   </div>
+          {/* Header Stats - Premium Responsive Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+             <div className="bg-surface-elevated border border-edge rounded-xl p-3 sm:p-4 flex flex-col items-start gap-1 sm:gap-2 shadow-xs transition-colors hover:border-accent/30">
+                <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-content-muted uppercase tracking-wider">
+                   <Wallet size={14} className="text-status-info" />
+                   <span>Solde Coffre</span>
+                </div>
+                <div className="text-base sm:text-lg lg:text-xl font-black text-content-primary tabular-nums break-words w-full" title={isLoadingStats ? "..." : `${(statsData?.solde || 0).toLocaleString()} ${currencySymbol}`}>
+                   {isLoadingStats ? "..." : <>{(statsData?.solde || 0).toLocaleString()} <span className="text-xs sm:text-sm text-content-muted font-sans font-medium">{currencySymbol}</span></>}
                 </div>
              </div>
              {(() => {
                 const totalPending = pendingCount + (pendingOpeningRequests?.length || 0);
                 const hasPending = totalPending > 0;
                 return (
-                  <div className={`rounded-lg p-2.5 sm:p-3 flex items-center xs:flex-col xs:items-start justify-between xs:justify-center gap-1 border transition-colors ${hasPending ? 'bg-status-warning-bg border-status-warning/40' : 'bg-surface/40 border-edge-subtle'}`}>
-                     <span className="text-[9px] sm:text-[10px] font-bold text-content-muted uppercase tracking-widest xs:mb-0.5">Opérations en attente</span>
-                     <div className="flex items-center gap-1.5">
-                        <Clock className={`shrink-0 ${hasPending ? 'text-status-warning' : 'text-content-muted'}`} size={15} />
-                        <div className={`text-sm sm:text-base lg:text-lg font-bold font-mono tabular-nums ${hasPending ? 'text-status-warning' : 'text-content-primary'}`}>{totalPending}</div>
+                  <div className={`rounded-xl p-3 sm:p-4 flex flex-col items-start gap-1 sm:gap-2 shadow-xs transition-colors border ${hasPending ? 'bg-status-warning-bg/50 border-status-warning/40 hover:border-status-warning' : 'bg-surface-elevated border-edge hover:border-accent/30'}`}>
+                     <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-content-muted uppercase tracking-wider">
+                        <Clock size={14} className={hasPending ? 'text-status-warning' : 'text-content-muted'} />
+                        <span>Opérations en attente</span>
+                     </div>
+                     <div className={`text-base sm:text-lg lg:text-xl font-black tabular-nums break-words w-full ${hasPending ? 'text-status-warning' : 'text-content-primary'}`}>
+                        {totalPending}
                      </div>
                   </div>
                 );
              })()}
-             <div className="bg-surface/40 border border-edge-subtle rounded-lg p-2.5 sm:p-3 flex items-center xs:flex-col xs:items-start justify-between xs:justify-center gap-1">
-                <span className="text-[9px] sm:text-[10px] font-bold text-content-muted uppercase tracking-widest xs:mb-0.5">Mouvements du Jour</span>
-                <div className="flex items-center gap-1.5">
-                   <ArrowRightLeft className="text-status-success shrink-0" size={15} />
-                   <div className="text-sm sm:text-base lg:text-lg font-bold text-content-primary font-mono tabular-nums max-w-full truncate">{todayVolume.toLocaleString()} <span className="text-[10px] sm:text-xs text-content-muted font-sans">{currencySymbol}</span></div>
+             <div className="bg-surface-elevated border border-edge rounded-xl p-3 sm:p-4 flex flex-col items-start gap-1 sm:gap-2 shadow-xs transition-colors hover:border-accent/30">
+                <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-content-muted uppercase tracking-wider">
+                   <ArrowRightLeft size={14} className="text-status-success" />
+                   <span>Mouvements du Jour</span>
+                </div>
+                <div className="text-base sm:text-lg lg:text-xl font-black text-content-primary tabular-nums break-words w-full">
+                   {todayVolume.toLocaleString()} <span className="text-xs sm:text-sm text-content-muted font-sans font-medium">{currencySymbol}</span>
                 </div>
              </div>
           </div>
@@ -123,17 +128,18 @@ export function CoffreOperationsTab({
                   disabled={isLoadingOpeningRequests}
                   className="h-6 px-2 text-[10px] border-status-warning/30 text-status-warning hover:bg-status-warning-bg shrink-0"
                 >
-                  <Loader2
-                    size={10}
-                    className={isLoadingOpeningRequests ? 'animate-spin' : ''}
-                  />
-                  <span className="hidden sm:inline ml-1">Actualiser</span>
+                  {isLoadingOpeningRequests ? (
+                    <Spinner size="xs" tone="current" />
+                  ) : (
+                    <RefreshCw size={10} />
+                  )}
+                  <span className="ml-1">Actualiser</span>
                 </Button>
               </div>
     
               {isLoadingOpeningRequests ? (
                 <div className="p-2 text-center">
-                  <Loader2 className="w-4 h-4 animate-spin text-status-warning mx-auto" />
+                  <Spinner size="xs" tone="current" className="text-status-warning mx-auto" />
                   <p className="text-content-muted mt-1 text-[10px]">Chargement...</p>
                 </div>
               ) : (
@@ -196,7 +202,7 @@ export function CoffreOperationsTab({
                                   disabled={actionLoading === request.transfert?.id}
                                 >
                                   {actionLoading === request.transfert?.id ? (
-                                    <Loader2 size={10} className="animate-spin" />
+                                    <Spinner size="xs" tone="current" />
                                   ) : (
                                     <>
                                       <CheckCircle2 size={10} className="mr-1" />
@@ -296,29 +302,28 @@ export function CoffreOperationsTab({
                  </div>
                  <div className="flex items-center gap-1">
                    <Button
-                      variant="ghost"
+                      variant="secondary"
                       size="sm"
                       onClick={handleExportTransferts}
                       disabled={transferts.length === 0}
-                      className="h-7 px-2 text-[10px] text-content-muted hover:text-content-primary"
-                      title="Exporter en CSV"
+                      className="h-8 px-3 text-[11px] font-medium bg-surface-subtle text-content-primary hover:bg-surface-elevated border border-edge shadow-xs transition-all"
                    >
-                      <Download size={12} className="mr-1" />
-                      <span className="hidden xs:inline">CSV</span>
+                      <Download size={13} className="mr-1.5" />
+                      <span>Exporter CSV</span>
                    </Button>
                    <Button
-                      variant="ghost"
+                      variant="secondary"
                       size="sm"
                       onClick={() => refetch()}
                       disabled={isRefetchingTransferts}
-                      className="h-7 px-2 text-[10px] text-content-muted hover:text-content-primary"
+                      className="h-8 px-3 text-[11px] font-medium bg-surface-subtle text-content-primary hover:bg-surface-elevated border border-edge shadow-xs transition-all"
                    >
-                      <Loader2
-                          size={12}
-                          className={`mr-1 ${isRefetchingTransferts ? 'animate-spin text-status-info' : 'text-content-muted'}`}
-                      />
-                      <span className="hidden xs:inline">Actualiser</span>
-                      <span className="xs:hidden">Act.</span>
+                      {isRefetchingTransferts ? (
+                          <Spinner size="xs" tone="accent" className="mr-1.5" />
+                      ) : (
+                          <RefreshCw size={13} className="mr-1.5 text-content-muted" />
+                      )}
+                      <span>Actualiser</span>
                    </Button>
                  </div>
             </div>

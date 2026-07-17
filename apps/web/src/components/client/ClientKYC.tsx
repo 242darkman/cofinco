@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Upload, FileText, CheckCircle, XCircle, Clock, Trash2, Eye, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Card, Badge, Skeleton } from '../ui';
-
+import { Card, Badge, Skeleton, Spinner } from '../ui';
 const DOCS_PER_PAGE = 8;
 import { FileUploadZone } from '../ui/FileUploadZone';
 import ConfirmDialog from '../ui/ConfirmDialog';
@@ -565,7 +564,7 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
       {/* Document List */}
         {loading ? (
            <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
+            <Spinner size="md" />
           </div>
         ) : documents.length === 0 ? (
           <Card variant="default" padding="lg" className="border-dashed border-edge bg-transparent text-center">

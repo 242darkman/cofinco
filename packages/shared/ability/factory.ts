@@ -154,6 +154,8 @@ export function isAgencyScopedSubject(subject: Subject): boolean {
     Subjects.TONTINE,
     Subjects.TONTINE_MEMBRE,
     Subjects.TONTINE_CONTRIBUTION,
+    Subjects.CARTE_POINTAGE,
+    Subjects.CARTE_POINTAGE_TRANSACTION,
     Subjects.CAISSE_SESSION,
     Subjects.CAISSE_OPERATION,
     Subjects.CAISSE_AGENT,

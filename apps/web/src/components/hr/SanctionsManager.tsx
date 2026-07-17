@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, AlertTriangle, Calendar, ArrowRight, MessageSquare, Check, Gavel, Pencil, Trash2, X, User, Paperclip, Upload, FileText, ExternalLink, Settings, Zap, TrendingUp } from 'lucide-react';
-import { Card, Button, Modal, FormField, SelectField, TextareaField, Badge, ResponsiveTable, TabGroup } from '../ui';
+import { Card, Button, Modal, FormField, SelectField, TextareaField, Badge, ResponsiveTable, TabGroup, Spinner } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { toast } from '../../lib/toast';
 import { hrApi } from '../../lib/api-client';
@@ -486,7 +486,7 @@ export default function SanctionsManager({
           <div className="flex-1 overflow-auto p-4 space-y-3">
             {loadingRules ? (
               <div className="flex items-center justify-center py-8">
-                <div className="w-6 h-6 border-2 border-status-warning border-t-transparent rounded-full animate-spin" />
+                <Spinner size="sm" tone="current" className="text-status-warning" />
               </div>
             ) : escalationRules.length === 0 ? (
               <div className="text-center py-8">
@@ -773,7 +773,7 @@ export default function SanctionsManager({
 
                 {loadingDocs ? (
                   <div className="flex items-center justify-center py-3">
-                    <div className="w-4 h-4 border-2 border-status-info border-t-transparent rounded-full animate-spin"></div>
+                    <Spinner size="xs" />
                   </div>
                 ) : sanctionDocs.length > 0 ? (
                   <div className="space-y-1.5">

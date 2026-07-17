@@ -3,30 +3,7 @@
  */
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import {
-  CheckCircle2,
-  XCircle,
-  Loader2,
-  ArrowRightLeft,
-  Wallet,
-  Clock,
-  ArrowUpRight,
-  ArrowDownRight,
-  Shield,
-  AlertTriangle,
-  AlertCircle,
-  Settings,
-  Download,
-  MoreHorizontal,
-  Play,
-  Ban,
-  Eye,
-  Vault,
-  User,
-  KeyRound,
-  Info,
-  X
-} from "lucide-react";
+import { CheckCircle2, XCircle, ArrowRightLeft, Wallet, Clock, ArrowUpRight, ArrowDownRight, Shield, AlertTriangle, AlertCircle, Settings, Download, MoreHorizontal, Play, Ban, Eye, Vault, User, KeyRound, Info, X } from 'lucide-react';
 import { Card, Button, Badge, StatCard, ResponsiveTable, TabGroup, ConfirmDialog, IconButton } from "@/components/ui";
 import { StatutTransfertCoffre, getMouvementCoffreLabel } from "@shared/enum/status-constants";
 import { useCurrency } from '@/contexts/CurrencyContext';

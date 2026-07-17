@@ -289,7 +289,7 @@ export default function ClientOverviewTab({ client, onNavigateToTab }: ClientOve
                 <div className="flex items-center gap-2">
                   <div className="flex-1 h-1.5 bg-surface-subtle-elevated rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-gradient-to-r from-status-success to-accent rounded-full transition-all duration-500"
+                      className="h-full bg-linear-to-r from-status-success to-accent rounded-full transition-all duration-500"
                       style={{ width: `${Math.min(summary.repaymentRate, 100)}%` }}
                     />
                   </div>

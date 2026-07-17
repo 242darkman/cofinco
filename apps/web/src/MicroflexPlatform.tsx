@@ -1,6 +1,7 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { FileText, CheckCircle, AlertCircle, Zap } from 'lucide-react';
 import { useLanguage } from './contexts/LanguageContext';
+import { useTenant } from './contexts/TenantContext';
 import { useAppNavigation } from './hooks/useAppNavigation';
 import { tontineApi } from './lib/api-client';
 import { clientService } from './services/clientService';
@@ -11,6 +12,7 @@ import { clientService } from './services/clientService';
 
 // Finance modules (heaviest - load on demand)
 const Tontines = lazy(() => import('./components/finance/tontine/Tontines'));
+const CartesPointage = lazy(() => import('./components/finance/carte-pointage/CartesPointage'));
 const Credits = lazy(() => import('./components/finance/credits/Credits'));
 const TransfertArgent = lazy(() => import('./components/finance/transfert/TransfertArgent'));
 const CreditRequestForm = lazy(() => import('./components/finance/credits/CreditRequestForm'));
@@ -67,7 +69,7 @@ import PlatformSidebarContent from './components/layout/PlatformSidebarContent';
 import PlatformHeader from './components/layout/PlatformHeader';
 import MobileBottomNav from './components/layout/MobileBottomNav';
 import { PLATFORM_MENU_ITEMS } from './constants/menuItems';
-import { getRouteByKey, canAccessRoute } from './lib/routes-config';
+import { getRouteByKey, canAccessRoute, isRouteEnabledForTenant } from './lib/routes-config';
 import ForcePasswordChange from './components/auth/ForcePasswordChange';
 import { useAbilityContext } from './contexts/AbilityContext';
 import { SystemRole } from '@shared/types/roles';
@@ -105,33 +107,38 @@ export default function MicroflexPlatform({ currentUser, onLogout, onUserUpdate 
   const { permissionsVersion, ability, isAdmin } = useAbilityContext();
   const normalizedRole = (currentUser?.role as string) || SystemRole.CLIENT;
   const { createRequest: createPermRequest } = useMyPermissionRequests();
-  
-  // Security: Check if user still has access to current module
+  const { config: tenantConfig } = useTenant();
+
+  // Garde d'accès au module courant.
+  //
+  // Deux causes de perte d'accès, traitées différemment :
+  //  - module *non provisionné / désactivé* pour l'organisation : c'est un état
+  //    de configuration normal, pas un événement. On redirige silencieusement
+  //    vers le dashboard, sans notification.
+  //  - *permissions* de l'utilisateur révoquées (RBAC/ABAC) sur un module
+  //    pourtant provisionné : là c'est bien une révocation d'accès, on le signale.
   useEffect(() => {
-    // Skip check for dashboard (always accessible)
-    if (currentModule === 'dashboard') return;
+    if (currentModule === 'dashboard') return; // toujours accessible
 
-    // We can use getRouteByKey logic here or direct check
-    // Ideally we check if canAllAccessRoute(currentModule)
-    // For simplicity, we assume module name mapping is handled or we use authService directly if we know the module name
-    // But currentModule is a route key, not necessarily a module name.
-    // Let's use ROUTES config to check access.
-
-    // Find the route config for currentModule
     const route = getRouteByKey(currentModule);
+    if (!route) return;
 
-    if (route && !canAccessRoute(route, ability)) {
-       // Access revoked!
-       console.warn(`[Security] Access to module ${currentModule} revoked. Redirecting...`);
-       
-       // Get human readable module name
-       const menuItem = PLATFORM_MENU_ITEMS.find(item => item.key === currentModule);
-       const moduleName = menuItem ? t(menuItem.labelKey) : currentModule;
-       
-       showNotification('error', `Votre accès au module "${moduleName}" a été révoqué.`);
-       navigateToModule('dashboard');
+    const enabledForTenant = isRouteEnabledForTenant(route, tenantConfig.features);
+    const permitted = canAccessRoute(route, ability);
+    if (enabledForTenant && permitted) return; // accès toujours valide
+
+    if (!enabledForTenant) {
+      // Désactivé par provisioning : redirection silencieuse, aucun toast.
+      console.info(`[Tenant] Module ${currentModule} non disponible pour l'organisation. Redirection dashboard.`);
+    } else {
+      // Révocation réelle de permissions : on informe l'utilisateur.
+      const menuItem = PLATFORM_MENU_ITEMS.find(item => item.key === currentModule);
+      const moduleName = menuItem ? t(menuItem.labelKey) : currentModule;
+      console.warn(`[Security] Accès au module ${currentModule} révoqué. Redirection dashboard.`);
+      showNotification('error', `Votre accès au module « ${moduleName} » a été révoqué.`);
     }
-  }, [currentModule, permissionsVersion, currentUser, ability, navigateToModule]);
+    navigateToModule('dashboard');
+  }, [currentModule, permissionsVersion, currentUser, ability, tenantConfig.features, navigateToModule]);
   
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 1023px)');
@@ -320,6 +327,12 @@ export default function MicroflexPlatform({ currentUser, onLogout, onUserUpdate 
         return (
           <Suspense fallback={<ModuleLoadingFallback moduleName="Tontines" />}>
             <Tontines />
+          </Suspense>
+        );
+      case 'cartes-pointage':
+        return (
+          <Suspense fallback={<ModuleLoadingFallback moduleName="Cartes de Pointage" />}>
+            <CartesPointage />
           </Suspense>
         );
       case 'credits':
@@ -624,11 +637,11 @@ export default function MicroflexPlatform({ currentUser, onLogout, onUserUpdate 
       )}
 
       {notification && (
-        <div className={`fixed top-4 right-4 z-50 px-6 py-4 rounded-lg shadow-2xl border ${
+        <div className={`fixed top-4 right-4 z-50 px-6 py-4 rounded-lg shadow-2xl border text-white flex items-center gap-3 animate-fade-in ${
           notification.type === 'success'
-            ? 'bg-status-success border-status-success text-white'
-            : 'bg-status-info border-status-info text-white'
-        } flex items-center gap-3 animate-fade-in`}>
+            ? 'bg-status-success border-status-success'
+            : 'bg-status-danger border-status-danger'
+        }`}>
           {notification.type === 'success' ? <CheckCircle size={20} /> : <AlertCircle size={20} />}
           <span className="font-semibold">{notification.message}</span>
         </div>

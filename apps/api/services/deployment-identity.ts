@@ -32,6 +32,38 @@ export class DeploymentIdentityError extends Error {
   }
 }
 
+/** Origine de l'autorisation de réassignation, pour la journalisation. */
+export type RebindReason = "explicit" | "auto-dev" | "none";
+
+/**
+ * Environnements où la réassignation automatique est autorisée : uniquement le
+ * développement local et les tests. Toute valeur inconnue ou prod-like
+ * (`production`, `staging`, `preprod`, `uat`, ou `NODE_ENV` absent) reste
+ * strictement protégée — un environnement prod-like ne doit JAMAIS se
+ * réassigner silencieusement.
+ */
+const AUTO_REBIND_ENVS = new Set(["development", "test"]);
+
+/**
+ * Politique de réassignation d'identité (enterprise-grade + ergonomie dev).
+ *
+ * - **Prod / preprod / staging / inconnu** : réassignation refusée par défaut ;
+ *   uniquement via `TENANT_IDENTITY_REBIND=true` (opération exceptionnelle,
+ *   tracée en warn — à retirer après le démarrage).
+ * - **Développement / test** : réassignation automatique, pour basculer de
+ *   tenant sur une base locale sans manipulation ni renommage d'objets.
+ *
+ * Le tampon d'identité est une simple ligne (`deployment_identity`) : aucune
+ * table ni base n'est jamais renommée.
+ */
+export function resolveRebindPolicy(
+  env: NodeJS.ProcessEnv,
+): { allowed: boolean; reason: RebindReason } {
+  if (env.TENANT_IDENTITY_REBIND === "true") return { allowed: true, reason: "explicit" };
+  if (AUTO_REBIND_ENVS.has(env.NODE_ENV ?? "")) return { allowed: true, reason: "auto-dev" };
+  return { allowed: false, reason: "none" };
+}
+
 /**
  * Vérifie l'identité du déploiement au démarrage (modèle 1 instance = 1 client).
  *
@@ -46,7 +78,7 @@ export async function verifyDeploymentIdentity(
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<void> {
   const configuredTenantId = getTenantConfig().id;
-  const rebindAllowed = env.TENANT_IDENTITY_REBIND === "true";
+  const rebindPolicy = resolveRebindPolicy(env);
   // Import paresseux : évite d'exiger DATABASE_URL pour les tests unitaires purs.
   const { db } = await import("../db");
 
@@ -64,7 +96,7 @@ export async function verifyDeploymentIdentity(
     );
   }
 
-  const decision = decideIdentityAction(rows[0]?.tenantId, configuredTenantId, rebindAllowed);
+  const decision = decideIdentityAction(rows[0]?.tenantId, configuredTenantId, rebindPolicy.allowed);
 
   switch (decision) {
     case "claim":
@@ -91,11 +123,20 @@ export async function verifyDeploymentIdentity(
         .update(deploymentIdentity)
         .set({ tenantId: configuredTenantId, claimedAt: sql`now()`, lastVerifiedAt: sql`now()` })
         .where(eq(deploymentIdentity.id, 1));
-      logger.warn(
-        { previousTenantId: rows[0]?.tenantId, tenantId: configuredTenantId },
-        "⚠️  RÉASSIGNATION D'IDENTITÉ — la base a été réassignée à un autre tenant " +
-          "(TENANT_IDENTITY_REBIND=true). Retirer cette variable après ce démarrage.",
-      );
+      if (rebindPolicy.reason === "auto-dev") {
+        // Bascule de tenant sur une base locale : ergonomie dev, jamais en prod.
+        logger.info(
+          { previousTenantId: rows[0]?.tenantId, tenantId: configuredTenantId },
+          "Réassignation automatique de l'identité (hors production) — bascule de tenant " +
+            "sur base locale. En production, un tel écart resterait bloquant.",
+        );
+      } else {
+        logger.warn(
+          { previousTenantId: rows[0]?.tenantId, tenantId: configuredTenantId },
+          "⚠️  RÉASSIGNATION D'IDENTITÉ — la base a été réassignée à un autre tenant " +
+            "(TENANT_IDENTITY_REBIND=true). Retirer cette variable après ce démarrage.",
+        );
+      }
       return;
 
     case "mismatch":

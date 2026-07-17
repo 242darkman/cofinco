@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { CheckCircle, Clock, XCircle, UserCheck, MapPin, Loader2, BarChart3, Calendar, ClipboardEdit } from 'lucide-react';
+import { CheckCircle, Clock, XCircle, UserCheck, MapPin, BarChart3, Calendar, ClipboardEdit } from 'lucide-react';
 import { Employe } from '../../hooks/hr/useEmployes';
 import { Card, StatCard, Badge, Button, ResponsiveTable } from '../ui';
 import { useUserProfile } from '../../hooks/useUserProfile';
@@ -8,36 +8,9 @@ import { hrPresenceApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
 import { useGeolocation } from '../../hooks/useGeolocation';
 import AttendanceAnalytics from './AttendanceAnalytics';
+import type { PresenceRecord, PresenceStats, EmployePresenceData } from './PresenceTracker.types';
 
 // Interfaces typées pour remplacer les `any`
-interface PresenceRecord {
-  id: number;
-  employeId: string;
-  nom?: string;
-  prenom?: string;
-  poste?: string;
-  statut: string;
-  heureArrivee: string | null;
-  heureDepart: string | null;
-  pauseDebut: string | null;
-  pauseFin: string | null;
-}
-
-interface PresenceStats {
-  totalEmployes: number;
-  presents: number;
-  retards: number;
-  absents: number;
-  tauxPresence: number;
-  liste: PresenceRecord[];
-}
-
-interface EmployePresenceData extends Employe {
-  presenceStatus: string;
-  presenceColor: 'success' | 'warning' | 'danger' | 'neutral';
-  arrivalTime: string;
-}
-
 interface PresenceTrackerProps {
   employes: Employe[];
 }
@@ -332,12 +305,14 @@ export default function PresenceTracker({ employes }: PresenceTrackerProps) {
                 variant="primary"
                 size="sm"
                 fullWidth
-                icon={isCapturingGps ? Loader2 : UserCheck}
+                icon={UserCheck}
+                isLoading={isCapturingGps}
+                loadingText="Localisation..."
                 onClick={handleCheckIn}
                 disabled={isCapturingGps}
-                className={`h-8 text-xs ${isCapturingGps ? '[&_svg]:animate-spin' : ''}`}
+                className="h-8 text-xs"
               >
-                {isCapturingGps ? 'Localisation...' : 'Pointer Arrivée'}
+                Pointer Arrivée
               </Button>
             )}
             {userPresence?.heureArrivee && !userPresence?.pauseDebut && !userPresence?.heureDepart && (
@@ -562,10 +537,10 @@ export default function PresenceTracker({ employes }: PresenceTrackerProps) {
                 size="sm"
                 onClick={handleManualSubmit}
                 disabled={!manualForm.heureArrivee || submittingManual}
-                icon={submittingManual ? Loader2 : undefined}
-                className={submittingManual ? '[&_svg]:animate-spin' : ''}
+                isLoading={submittingManual}
+                loadingText="Enregistrement..."
               >
-                {submittingManual ? 'Enregistrement...' : 'Enregistrer'}
+                Enregistrer
               </Button>
             </div>
           </div>

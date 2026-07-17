@@ -7,6 +7,7 @@ import {
   type TenantFeatureKey,
 } from '@shared/tenant-config';
 import { applyTenantTheme } from '@/lib/tenant-theme';
+import { Spinner } from '@/components/ui/Spinner';
 
 interface TenantContextType {
   config: TenantConfig;
@@ -39,6 +40,17 @@ function applyTenantBranding(config: TenantConfig) {
     }
     link.href = config.theme.faviconUrl;
   }
+
+  // Couleur de thème (barre navigateur / splash mobile) alignée sur la marque.
+  if (config.theme.primaryColor) {
+    let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.name = 'theme-color';
+      document.head.appendChild(meta);
+    }
+    meta.content = config.theme.primaryColor;
+  }
 }
 
 export function TenantProvider({ children }: { children: ReactNode }) {
@@ -54,21 +66,62 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     staleTime: 60 * 1000,
     refetchInterval: 5 * 60 * 1000,
     refetchOnWindowFocus: true,
-    initialData: defaultTenantConfig,
-    initialDataUpdatedAt: 0,
+    // Toujours re-valider au montage (le QueryClient global est en
+    // refetchOnMount: false). Pas d'`initialData` : on ne veut PAS peindre la
+    // marque MicroFlex par défaut avant l'arrivée de la vraie config — ça
+    // provoquait un flash de branding peu professionnel. Tant que la config
+    // réelle n'est pas là, on affiche un écran de bootstrap neutre (ci-dessous).
+    refetchOnMount: 'always',
   });
 
-  // Apply CSS variables whenever config changes
+  // Config à appliquer : la vraie config du réseau, ou — uniquement si le
+  // réseau/serveur est injoignable — un repli par défaut pour ne pas rester
+  // bloqué. Dans le cas nominal, on n'applique jamais de marque avant la vraie.
+  const activeConfig: TenantConfig | undefined = config ?? (error ? defaultTenantConfig : undefined);
+
+  // On applique la charte (CSS, titre, favicon, theme-color) seulement quand une
+  // config est réellement disponible — jamais pendant le bootstrap neutre.
   React.useEffect(() => {
-    if (config) {
-      applyTenantBranding(config);
+    if (activeConfig) {
+      applyTenantBranding(activeConfig);
     }
-  }, [config]);
+  }, [activeConfig]);
+
+  // Bootstrap : pas encore de config (et pas d'erreur) → écran neutre, sans
+  // marque, le temps du premier fetch. Évite tout flash d'un branding tiers.
+  if (!activeConfig) {
+    return <TenantBootstrapScreen />;
+  }
 
   return (
-    <TenantContext.Provider value={{ config: config || defaultTenantConfig, isLoading, error }}>
+    <TenantContext.Provider value={{ config: activeConfig, isLoading, error }}>
       {children}
     </TenantContext.Provider>
+  );
+}
+
+/**
+ * Écran d'amorçage neutre affiché tant que l'identité du tenant n'est pas
+ * chargée. Volontairement sans logo, sans nom et sans couleur de marque, mais
+ * utilisant le MÊME `Spinner` premium que le reste de l'application (en ton
+ * blanc neutre) pour une expérience de chargement cohérente partout.
+ */
+function TenantBootstrapScreen() {
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#0B0F19',
+        // Au-dessus de la TopProgressBar (z-100) : un seul loader visible au boot.
+        zIndex: 200,
+      }}
+    >
+      <Spinner size="xl" tone="onAccent" />
+    </div>
   );
 }
 

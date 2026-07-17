@@ -1,16 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import {
-  DollarSign,
-  CheckCircle,
-  AlertTriangle,
-  Building2,
-  ArrowUpRight,
-  Clock,
-  X,
-  WifiOff,
-  CloudOff,
-  ChevronDown,
-  Send,
+  DollarSign, CheckCircle, AlertTriangle, Building2, ArrowUpRight, Clock,
+  X, WifiOff, CloudOff, ChevronDown, Send,
 } from 'lucide-react';
 import { caisseAgentApi, caisseApi } from '@/lib/api-client';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -386,13 +378,13 @@ export default function SettlementModal({ isOpen, onClose, onSuccess, agentId, a
                 flex items-center justify-center gap-2 transition-all
                 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]
                 ${canSubmitNormally
-                  ? 'bg-gradient-to-r from-accent to-status-success hover:from-accent hover:to-status-success shadow-lg shadow-accent/20'
-                  : 'bg-gradient-to-r from-status-warning to-status-warning hover:from-status-warning hover:to-status-warning shadow-lg shadow-status-warning/20'
+                  ? 'bg-linear-to-r from-accent to-status-success hover:from-accent hover:to-status-success shadow-lg shadow-accent/20'
+                  : 'bg-linear-to-r from-status-warning to-status-warning hover:from-status-warning hover:to-status-warning shadow-lg shadow-status-warning/20'
                 }
               `}
             >
               {submitting ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <Spinner size="sm" tone="onAccent" />
               ) : (
                 <>
                   {canSubmitNormally ? <Send size={18} /> : <CloudOff size={18} />}

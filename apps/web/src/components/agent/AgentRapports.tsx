@@ -1,33 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { requestListAll, caisseAgentApi } from '../../lib/api-client';
-import { FileText, Download, Users, DollarSign, Activity, BarChart3, Filter, ChevronLeft, ChevronRight, Eye, Loader2 } from 'lucide-react';
+import { FileText, Download, Users, DollarSign, Activity, BarChart3, Filter, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
 import { addPdfLogoHeader } from '@/lib/pdf-logo';
 import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { toast } from '../../lib/toast';
 import { loadPDFLibraries } from '@/lib/lazy-export';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
-
-interface Rapport {
-  id: string;
-  agentId: string;
-  periodeDebut: string;
-  periodeFin: string;
-  typeRapport: string;
-  nombreVisites: number;
-  nombreCollectes: number;
-  montantTotalCollecte: number;
-  tauxReussite: number;
-  clientsNouveaux: number;
-  incidents: number;
-  kmParcourus: number;
-  notes: string;
-  createdAt: string;
-  agent?: {
-    nom: string;
-    prenom: string;
-  };
-}
+import type { Rapport } from './AgentRapports.types';
 
 export default function AgentRapports({ agentId }: { agentId?: string }) {
   const branding = useDocumentBranding();
@@ -256,7 +237,7 @@ export default function AgentRapports({ agentId }: { agentId?: string }) {
                 disabled={generating || !selectedAgent}
                 className="flex-1 px-3 py-1.5 bg-status-info hover:bg-status-info text-white rounded-lg font-bold text-xs transition disabled:opacity-50 flex items-center justify-center gap-1.5"
               >
-                {generating ? <Loader2 size={14} className="animate-spin" /> : <Filter size={14} />}
+                {generating ? <Spinner size="xs" tone="current" /> : <Filter size={14} />}
                 Générer
               </button>
               <button
@@ -283,7 +264,7 @@ export default function AgentRapports({ agentId }: { agentId?: string }) {
         </div>
         
         {loading ? (
-          <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent" /></div>
+          <div className="flex justify-center py-12"><Spinner size="sm" /></div>
         ) : rapports.length === 0 ? (
           <div className="text-center py-12 opacity-50">
             <FileText size={32} className="mx-auto mb-2 text-content-muted" />

@@ -1,11 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { treasuryKeys } from '../../lib/query-keys';
-import {
-  RefreshCw, Wallet, Building2, Smartphone, Banknote,
-  Loader2, ChevronDown, ChevronUp, CreditCard, Landmark, Signal,
-  CheckCircle2, AlertCircle, Link2, Vault
-} from 'lucide-react';
+import { RefreshCw, Wallet, Building2, Smartphone, Banknote, ChevronDown, ChevronUp, CreditCard, Landmark, Signal, CheckCircle2, AlertCircle, Link2, Vault } from 'lucide-react';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
 import mtnLogo from '@/assets/logos/mtn-logo.png';
 import { currencyCode } from '@shared/config/currency';
@@ -269,7 +266,7 @@ export default function TresoreriePage() {
       {isLoading ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="flex flex-col items-center gap-2">
-            <Loader2 size={28} className="text-accent animate-spin" />
+            <Spinner size="md" tone="accent" />
             <span className="text-xs text-content-muted">Chargement de la trésorerie...</span>
           </div>
         </div>

@@ -5,7 +5,8 @@
  */
 
 import { useCallback } from 'react';
-import { Wifi, WifiOff, WifiLow, ServerCrash, RefreshCw, X, CloudUpload, Loader2 } from 'lucide-react';
+import { Wifi, WifiOff, WifiLow, ServerCrash, RefreshCw, X, CloudUpload } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
 import { useNetwork, useNetworkStatus, useLastSyncAt, useNextRetryIn } from '../../contexts/NetworkContext';
 import { useSyncMonitor } from '../../hooks/useSyncMonitor';
 import CountdownTimer from './CountdownTimer';
@@ -98,9 +99,8 @@ export default function NetworkBanner({ dismissible = false, onDismiss }: Networ
   // If online but just showing sync info, use a subtle style
   const isOnlineWithSync = !config.show && showSyncInfo;
 
-  const Icon = isOnlineWithSync
-    ? (isSyncing ? Loader2 : CloudUpload)
-    : config.icon;
+  const Icon = isOnlineWithSync ? CloudUpload : config.icon;
+  const showSyncSpinner = isSyncing && isOnlineWithSync;
 
   const bgClass = isOnlineWithSync ? 'bg-status-info-bg' : config.bg;
   const borderClass = isOnlineWithSync ? 'border-status-info/30' : config.border;
@@ -126,7 +126,7 @@ export default function NetworkBanner({ dismissible = false, onDismiss }: Networ
             bg-surface-base/50 ${textClass}
           `}
         >
-          <Icon className={`w-4 h-4 ${isSyncing && isOnlineWithSync ? 'animate-spin' : ''}`} />
+          {showSyncSpinner ? <Spinner size="xs" tone="current" /> : <Icon className="w-4 h-4" />}
         </div>
 
         <div className="flex flex-col min-w-0">

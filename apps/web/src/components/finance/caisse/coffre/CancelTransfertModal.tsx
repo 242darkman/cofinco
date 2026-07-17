@@ -3,10 +3,10 @@
  * statuts REQUESTED/VALIDATED, compensation (transfert inverse) sous 24 h
  * pour un transfert exécuté non verrouillé.
  */
+import { Spinner } from '@/components/ui/Spinner';
 import {
   CheckCircle2,
   XCircle,
-  Loader2,
   ArrowRightLeft,
   Wallet,
   Clock,
@@ -128,7 +128,7 @@ export function CancelTransfertModal({
             >
               {isCancelling ? (
                 <>
-                  <Loader2 size={14} className="mr-1.5 animate-spin" />
+                  <Spinner size="xs" tone="current" className="mr-1.5" />
                   Annulation...
                 </>
               ) : (

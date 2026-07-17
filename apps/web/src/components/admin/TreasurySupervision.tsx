@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { useQuery } from '@tanstack/react-query';
 import {
   TrendingUp, X,
@@ -208,7 +209,7 @@ export function TreasurySupervision() {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center space-y-4">
-          <div className="animate-spin w-8 h-8 border-4 border-accent border-t-transparent rounded-full mx-auto" />
+          <Spinner size="md" className="mx-auto" />
           <p className="text-content-muted">Synchronisation de la supervision...</p>
         </div>
       </div>

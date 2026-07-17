@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { TrendingUp, Save, AlertTriangle, Loader2, Info } from 'lucide-react';
+import { TrendingUp, Save, AlertTriangle, Info } from 'lucide-react';
 import { clientSearchApi, demandeCreditApi, creditPlanApi, clientApi } from '../../../lib/api-client';
-import { SelectField, SearchableSelect } from '../../ui';
+import { SelectField, SearchableSelect, Spinner } from '../../ui';
 import { formatClientName, resolveStorageUrl } from '../../../lib/format';
 import { toast } from '../../../lib/toast';
 import { StatutDemande, TypeCredit, TYPE_CREDIT_OPTIONS, normalizeDureeUnite, normalizeFrequenceRemboursement } from '@shared/enum/status-constants';
@@ -966,7 +966,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId }: Cred
                 <div className="bg-gradient-to-br from-surface-base to-surface-base border border-edge p-5 rounded-xl shadow-inner mt-auto">
                    {scheduleLoading ? (
                      <div className="flex items-center justify-center gap-3 py-6">
-                       <Loader2 size={20} className="animate-spin text-accent" />
+                       <Spinner size="sm" tone="accent" />
                        <span className="text-sm text-content-muted">Calcul de l'échéancier...</span>
                      </div>
                    ) : scheduleError ? (

@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { Upload, X, File, FileText, Image as ImageIcon, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Upload, X, File, FileText, Image as ImageIcon, CheckCircle2, AlertCircle } from 'lucide-react';
 import { validateFileSize } from '../../lib/file-validation';
 
 interface UploadedFile {
@@ -309,7 +310,7 @@ export function FileUploadZone({
                 {/* Status Icon */}
                 <div className="flex-shrink-0">
                   {uploadedFile.status === 'uploading' && (
-                    <Loader2 className="w-5 h-5 text-accent animate-spin" />
+                    <Spinner size="sm" tone="accent" />
                   )}
                   {uploadedFile.status === 'success' && (
                     <CheckCircle2 className="w-5 h-5 text-status-success" />

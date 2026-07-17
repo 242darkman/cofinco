@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { SkeletonList } from '@/components/ui/Skeleton';
 import { useQuery } from '@tanstack/react-query';
 import { Card } from '../ui';
 import { FileText, Download, Calendar, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -85,9 +86,7 @@ export default function MesBulletinsTab() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
-      </div>
+      <SkeletonList items={5} />
     );
   }
 

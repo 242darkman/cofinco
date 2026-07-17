@@ -19,28 +19,12 @@ import { Button, Badge } from '@/components/ui';
 import { toast } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
 import { currencyCode } from '@shared/config/currency';
-
-interface CoffreFort {
-  id: string;
-  code: string;
-  nom: string;
-  ownerType: 'AGENCE' | 'SIEGE';
-  solde: string;
-  plafondEncaisse?: string;
-  soldeMinimum?: string;
-  statut: string;
-  agenceNom?: string;
-}
+import type { CoffreFort, AgentTransport } from './TransfertInterCoffresForm.types';
 
 interface TransfertInterCoffresFormProps {
   coffres: CoffreFort[];
   onClose: () => void;
   onSuccess: (transfert: any) => void;
-}
-
-interface AgentTransport {
-  nom: string;
-  contact: string;
 }
 
 export default function TransfertInterCoffresForm({
@@ -244,12 +228,12 @@ export default function TransfertInterCoffresForm({
 
   return (
     <div className="fixed inset-0 bg-surface-base/90 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
-      <div className="bg-surface-base border border-edge w-full max-w-2xl max-h-[95vh] sm:rounded-2xl rounded-t-3xl shadow-2xl flex flex-col animate-in slide-in-from-bottom-5 duration-300">
+      <div className="bg-surface-base border border-edge w-full max-w-5xl max-h-[95vh] sm:rounded-2xl rounded-t-3xl shadow-2xl flex flex-col animate-in slide-in-from-bottom-5 duration-300">
         {/* Header */}
         <header className="p-5 border-b border-edge flex items-center justify-between sticky top-0 bg-surface-base/95 backdrop-blur z-10 rounded-t-3xl sm:rounded-t-2xl">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-gradient-to-br from-status-success/20 to-accent/20 border border-status-success/30">
-              <Vault size={20} className="text-status-success" />
+            <div className="p-2 rounded-xl bg-accent/10 border border-accent/20">
+              <Vault size={20} className="text-accent" />
             </div>
             <div>
               <h2 className="text-lg font-bold text-content-primary">Nouveau Transfert Inter-Coffres</h2>
@@ -267,25 +251,29 @@ export default function TransfertInterCoffresForm({
         </header>
 
         {/* Form */}
-        <form onSubmit={(e) => handleSubmit(e, false)} className="flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar">
-          {/* Source & Destination */}
-          <section className="space-y-4">
-            <h3 className="text-sm font-semibold text-content-secondary uppercase tracking-wide flex items-center gap-2">
-              <ArrowRight size={16} className="text-accent" />
-              Coffres Source et Destination
-            </h3>
+        <form onSubmit={(e) => handleSubmit(e, false)} className="flex-1 overflow-y-auto p-5 sm:p-6 custom-scrollbar">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
+            
+            {/* Colonne Gauche */}
+            <div className="space-y-6">
+              {/* Source & Destination */}
+              <section className="space-y-4">
+                <h3 className="text-sm font-semibold text-content-secondary uppercase tracking-wide flex items-center gap-2">
+                  <ArrowRight size={16} className="text-accent" />
+                  Coffres Source et Destination
+                </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Source */}
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-content-muted uppercase">Coffre Source *</label>
-                <select
-                  value={coffreSourceId}
-                  onChange={(e) => setCoffreSourceId(e.target.value)}
-                  className={`w-full px-4 py-3 bg-surface-base border rounded-xl text-content-primary focus:ring-2 focus:ring-accent/30 outline-none transition-all ${
-                    errors.coffreSource ? 'border-status-danger' : 'border-edge focus:border-accent'
-                  }`}
-                >
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Source */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-content-muted uppercase">Coffre Source *</label>
+                    <select
+                      value={coffreSourceId}
+                      onChange={(e) => setCoffreSourceId(e.target.value)}
+                      className={`w-full px-4 py-3 bg-input-bg border rounded-xl text-content-primary focus:ring-2 focus:ring-accent/30 outline-none transition-all ${
+                        errors.coffreSource ? 'border-status-danger' : 'border-edge focus:border-accent'
+                      }`}
+                    >
                   <option value="">Sélectionner...</option>
                   {activeCoffres.map((coffre) => (
                     <option key={coffre.id} value={coffre.id} disabled={coffre.id === coffreDestinationId}>
@@ -304,13 +292,13 @@ export default function TransfertInterCoffresForm({
               {/* Destination */}
               <div className="space-y-2">
                 <label className="text-xs font-medium text-content-muted uppercase">Coffre Destination *</label>
-                <select
-                  value={coffreDestinationId}
-                  onChange={(e) => setCoffreDestinationId(e.target.value)}
-                  className={`w-full px-4 py-3 bg-surface-base border rounded-xl text-content-primary focus:ring-2 focus:ring-accent/30 outline-none transition-all ${
-                    errors.coffreDestination ? 'border-status-danger' : 'border-edge focus:border-accent'
-                  }`}
-                >
+                    <select
+                      value={coffreDestinationId}
+                      onChange={(e) => setCoffreDestinationId(e.target.value)}
+                      className={`w-full px-4 py-3 bg-input-bg border rounded-xl text-content-primary focus:ring-2 focus:ring-accent/30 outline-none transition-all ${
+                        errors.coffreDestination ? 'border-status-danger' : 'border-edge focus:border-accent'
+                      }`}
+                    >
                   <option value="">Sélectionner...</option>
                   {activeCoffres.map((coffre) => (
                     <option key={coffre.id} value={coffre.id} disabled={coffre.id === coffreSourceId}>
@@ -337,16 +325,16 @@ export default function TransfertInterCoffresForm({
           <section className="space-y-2">
             <label className="text-xs font-medium text-content-muted uppercase">Montant ({currencyCode()}) *</label>
             <div className="relative">
-              <input
-                inputMode="numeric"
-                pattern="[0-9]*"
-                value={montant}
-                onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setMontant(v); }}
-                placeholder="0"
-                className={`w-full pl-4 pr-16 py-4 bg-surface-base border rounded-xl text-2xl font-bold text-content-primary focus:ring-2 focus:ring-accent/30 outline-none transition-all ${
-                  errors.montant ? 'border-status-danger' : 'border-edge focus:border-accent'
-                }`}
-              />
+                <input
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={montant}
+                  onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setMontant(v); }}
+                  placeholder="0"
+                  className={`w-full pl-4 pr-16 py-4 bg-input-bg border rounded-xl text-2xl font-bold text-content-primary focus:ring-2 focus:ring-accent/30 outline-none transition-all ${
+                    errors.montant ? 'border-status-danger' : 'border-edge focus:border-accent'
+                  }`}
+                />
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-content-muted">{currencyCode()}</span>
             </div>
             {errors.montant && <p className="text-xs text-status-danger">{errors.montant}</p>}
@@ -375,15 +363,15 @@ export default function TransfertInterCoffresForm({
           {/* Motif */}
           <section className="space-y-2">
             <label className="text-xs font-medium text-content-muted uppercase">Motif du transfert *</label>
-            <textarea
-              value={motif}
-              onChange={(e) => setMotif(e.target.value)}
-              placeholder="Décrivez la raison de ce transfert (min. 10 caractères)..."
-              rows={3}
-              className={`w-full px-4 py-3 bg-surface-base border rounded-xl text-content-primary placeholder-content-muted focus:ring-2 focus:ring-accent/30 outline-none resize-none transition-all ${
-                errors.motif ? 'border-status-danger' : 'border-edge focus:border-accent'
-              }`}
-            />
+                <textarea
+                  value={motif}
+                  onChange={(e) => setMotif(e.target.value)}
+                  placeholder="Décrivez la raison de ce transfert (min. 10 caractères)..."
+                  rows={4}
+                  className={`w-full px-4 py-3 bg-input-bg border rounded-xl text-content-primary placeholder-content-muted focus:ring-2 focus:ring-accent/30 outline-none resize-none transition-all ${
+                    errors.motif ? 'border-status-danger' : 'border-edge focus:border-accent'
+                  }`}
+                />
             <div className="flex justify-between text-xs">
               {errors.motif && <p className="text-status-danger">{errors.motif}</p>}
               <p className={`ml-auto ${motif.length >= 10 ? 'text-status-success' : 'text-content-muted'}`}>
@@ -391,10 +379,13 @@ export default function TransfertInterCoffresForm({
               </p>
             </div>
           </section>
+            </div>
 
-          {/* Date & Heure */}
-          <section className="space-y-4">
-            <h3 className="text-sm font-semibold text-content-secondary uppercase tracking-wide flex items-center gap-2">
+            {/* Colonne Droite */}
+            <div className="space-y-6">
+              {/* Date & Heure */}
+              <section className="space-y-4">
+                <h3 className="text-sm font-semibold text-content-secondary uppercase tracking-wide flex items-center gap-2">
               <Calendar size={16} className="text-accent" />
               Date et Heure
             </h3>
@@ -402,21 +393,21 @@ export default function TransfertInterCoffresForm({
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-xs font-medium text-content-muted uppercase">Date du transfert *</label>
-                <input
-                  type="date"
-                  value={dateTransfert}
-                  onChange={(e) => setDateTransfert(e.target.value)}
-                  className="w-full px-4 py-3 bg-surface-base border border-edge rounded-xl text-content-primary focus:ring-2 focus:ring-accent/30 focus:border-accent outline-none"
-                />
+                  <input
+                    type="date"
+                    value={dateTransfert}
+                    onChange={(e) => setDateTransfert(e.target.value)}
+                    className="w-full px-4 py-3 bg-input-bg border border-edge rounded-xl text-content-primary focus:ring-2 focus:ring-accent/30 focus:border-accent outline-none transition-all"
+                  />
               </div>
               <div className="space-y-2">
                 <label className="text-xs font-medium text-content-muted uppercase">Heure de départ prévue</label>
-                <input
-                  type="time"
-                  value={heureDepart}
-                  onChange={(e) => setHeureDepart(e.target.value)}
-                  className="w-full px-4 py-3 bg-surface-base border border-edge rounded-xl text-content-primary focus:ring-2 focus:ring-accent/30 focus:border-accent outline-none"
-                />
+                  <input
+                    type="time"
+                    value={heureDepart}
+                    onChange={(e) => setHeureDepart(e.target.value)}
+                    className="w-full px-4 py-3 bg-input-bg border border-edge rounded-xl text-content-primary focus:ring-2 focus:ring-accent/30 focus:border-accent outline-none transition-all"
+                  />
               </div>
             </div>
           </section>
@@ -433,16 +424,16 @@ export default function TransfertInterCoffresForm({
                 <label className="text-xs font-medium text-content-muted uppercase">Type de conditionnement *</label>
                 <div className="grid grid-cols-2 gap-2">
                   {TYPE_CONDITIONNEMENT_OPTIONS.map(({ value, label }) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => setTypeConditionnement(value)}
-                      className={`px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                        typeConditionnement === value
-                          ? 'bg-accent/10 text-accent border border-accent/50'
-                          : 'bg-surface text-content-muted border border-edge hover:border-edge-strong'
-                      }`}
-                    >
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => setTypeConditionnement(value)}
+                          className={`px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                            typeConditionnement === value
+                              ? 'bg-accent/10 text-accent border border-accent/50'
+                              : 'bg-input-bg text-content-muted border border-edge hover:border-edge-strong'
+                          }`}
+                        >
                       {label}
                     </button>
                   ))}
@@ -452,15 +443,15 @@ export default function TransfertInterCoffresForm({
               {typeConditionnement === TypeConditionnement.SAC_SCELLE && (
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-content-muted uppercase">Numéro de scellé *</label>
-                  <input
-                    type="text"
-                    value={numeroScelle}
-                    onChange={(e) => setNumeroScelle(e.target.value)}
-                    placeholder="Ex: SC-2026-00123"
-                    className={`w-full px-4 py-3 bg-surface-base border rounded-xl text-content-primary placeholder-content-muted focus:ring-2 focus:ring-accent/30 outline-none ${
-                      errors.numeroScelle ? 'border-status-danger' : 'border-edge focus:border-accent'
-                    }`}
-                  />
+                      <input
+                        type="text"
+                        value={numeroScelle}
+                        onChange={(e) => setNumeroScelle(e.target.value)}
+                        placeholder="Ex: SC-2026-00123"
+                        className={`w-full px-4 py-3 bg-input-bg border rounded-xl text-content-primary placeholder-content-muted focus:ring-2 focus:ring-accent/30 outline-none transition-all ${
+                          errors.numeroScelle ? 'border-status-danger' : 'border-edge focus:border-accent'
+                        }`}
+                      />
                   {errors.numeroScelle && <p className="text-xs text-status-danger">{errors.numeroScelle}</p>}
                 </div>
               )}
@@ -495,20 +486,20 @@ export default function TransfertInterCoffresForm({
               {agentsTransport.map((agent, index) => (
                 <div key={index} className="flex gap-3 items-start">
                   <div className="flex-1 grid grid-cols-2 gap-3">
-                    <input
-                      type="text"
-                      value={agent.nom}
-                      onChange={(e) => updateAgent(index, 'nom', e.target.value)}
-                      placeholder="Nom complet"
-                      className="w-full px-3 py-2.5 bg-surface-base border border-edge rounded-xl text-sm text-content-primary placeholder-content-muted focus:ring-2 focus:ring-accent/30 focus:border-accent outline-none"
-                    />
-                    <input
-                      type="text"
-                      value={agent.contact}
-                      onChange={(e) => updateAgent(index, 'contact', e.target.value)}
-                      placeholder="Téléphone"
-                      className="w-full px-3 py-2.5 bg-surface-base border border-edge rounded-xl text-sm text-content-primary placeholder-content-muted focus:ring-2 focus:ring-accent/30 focus:border-accent outline-none"
-                    />
+                        <input
+                          type="text"
+                          value={agent.nom}
+                          onChange={(e) => updateAgent(index, 'nom', e.target.value)}
+                          placeholder="Nom complet"
+                          className="w-full px-3 py-2.5 bg-input-bg border border-edge rounded-xl text-sm text-content-primary placeholder-content-muted focus:ring-2 focus:ring-accent/30 focus:border-accent outline-none transition-all"
+                        />
+                        <input
+                          type="text"
+                          value={agent.contact}
+                          onChange={(e) => updateAgent(index, 'contact', e.target.value)}
+                          placeholder="Téléphone"
+                          className="w-full px-3 py-2.5 bg-input-bg border border-edge rounded-xl text-sm text-content-primary placeholder-content-muted focus:ring-2 focus:ring-accent/30 focus:border-accent outline-none transition-all"
+                        />
                   </div>
                   {agentsTransport.length > 2 && (
                     <Button
@@ -541,17 +532,20 @@ export default function TransfertInterCoffresForm({
                 {numeroScelle && ` - Scellé: ${numeroScelle}`}
               </div>
             </section>
-          )}
+              )}
+
+            </div>
+          </div>
         </form>
 
         {/* Footer */}
-        <footer className="p-5 border-t border-edge bg-surface-base/95 backdrop-blur sticky bottom-0">
+        <footer className="p-5 border-t border-edge bg-surface-base/95 backdrop-blur sticky bottom-0 rounded-b-2xl">
           <div className="flex flex-col sm:flex-row gap-3">
             <Button
               type="button"
               variant="outline"
               onClick={onClose}
-              className="w-full sm:w-auto border-edge text-content-secondary hover:bg-surface"
+              className="w-full sm:w-auto"
               disabled={loading}
             >
               Annuler
@@ -559,18 +553,20 @@ export default function TransfertInterCoffresForm({
             <div className="flex-1 flex gap-3">
               <Button
                 type="button"
+                variant="secondary"
                 onClick={(e) => handleSubmit(e, false)}
                 disabled={loading || !validation.valid}
-                className="flex-1 bg-surface-elevated hover:bg-surface-subtle text-content-primary"
+                className="flex-1"
               >
                 <FileText size={18} className="mr-2" />
                 Sauvegarder brouillon
               </Button>
               <Button
                 type="button"
+                variant="primary"
                 onClick={(e) => handleSubmit(e, true)}
                 disabled={loading || !validation.valid}
-                className="flex-1 bg-gradient-to-r from-status-success to-accent hover:from-status-success hover:to-accent text-white shadow-lg shadow-status-success/20"
+                className="flex-1"
               >
                 <Send size={18} className="mr-2" />
                 {loading ? 'Traitement...' : 'Soumettre'}

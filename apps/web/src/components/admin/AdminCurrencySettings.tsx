@@ -1,17 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { toast } from 'sonner';
 import { Coins, AlertTriangle, Check, Globe, Plus, Pencil, Trash2, X, Save } from 'lucide-react';
 import type { CurrencyConfig } from '@shared/config/currency';
-
-type PresetWithId = CurrencyConfig & { id: string };
-
-interface PresetFormData {
-  code: string;
-  symbol: string;
-  symbolPosition: 'before' | 'after';
-  locale: string;
-  decimals: number;
-}
+import type { PresetWithId, PresetFormData } from './AdminCurrencySettings.types';
 
 const emptyForm: PresetFormData = {
   code: '',
@@ -163,13 +155,13 @@ export default function AdminCurrencySettings() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
+        <Spinner size="md" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6">
       {/* En-tete */}
       <div className="flex items-start gap-3">
         <div className="p-2 bg-accent/10 rounded-lg">
@@ -220,7 +212,7 @@ export default function AdminCurrencySettings() {
           </button>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
           {presets.map((preset) => (
             <button
               key={preset.id}
@@ -254,7 +246,7 @@ export default function AdminCurrencySettings() {
                     className="p-1 rounded hover:bg-status-danger-bg text-content-muted hover:text-status-danger"
                   >
                     {deletingId === preset.id
-                      ? <div className="animate-spin rounded-full h-3 w-3 border-b border-status-danger" />
+                      ? <Spinner size="xs" tone="current" className="text-status-danger" />
                       : <Trash2 size={12} />
                     }
                   </span>

@@ -1,14 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { Drawer } from 'vaul';
-import {
-    X,
-    Play,
-    Edit2,
-    Code,
-    Clock,
-    ArrowRight,
-    Loader2
-} from 'lucide-react';
+import { X, Play, Edit2, Code, Clock, ArrowRight } from 'lucide-react';
 import { Button, Badge, IconButton, Switch } from '../ui';
 import { formatDate, formatMoney } from '../../lib/format';
 import { compteEpargneApi } from '../../lib/api-client';
@@ -248,7 +241,7 @@ export default function ScheduledTransferDetails({
                         </h3>
                         {loadingHistory ? (
                             <div className="flex items-center justify-center py-8">
-                                <Loader2 className="w-5 h-5 animate-spin text-content-muted" />
+                                <Spinner size="sm" tone="current" className="text-content-muted" />
                             </div>
                         ) : history.length === 0 ? (
                             <p className="text-sm text-content-muted text-center py-4">Aucune exécution enregistrée</p>

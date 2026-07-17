@@ -14,12 +14,8 @@
  */
 
 import React, { useEffect, useRef, useCallback } from 'react';
-import {
-  Search, ChevronRight, X, Loader2, Lock,
-  Users, CreditCard, DollarSign, MapPin,
-  Landmark, Clock, Trash2, CornerDownLeft,
-  ArrowUp, ArrowDown,
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Search, ChevronRight, X, Lock, Users, CreditCard, DollarSign, MapPin, Landmark, Clock, Trash2, CornerDownLeft, ArrowUp, ArrowDown } from 'lucide-react';
 import { Card, IconButton } from '../ui';
 import { useGlobalSearch } from '@/search';
 import type { SearchResult } from '@/search';
@@ -173,7 +169,7 @@ export default function GlobalSearchModal({ isOpen, onClose, onNavigate }: Globa
         <div className="p-3 border-b border-edge shrink-0">
           <div className="relative" role="combobox" aria-expanded={hasResults} aria-haspopup="listbox" aria-owns="search-results">
             {loading ? (
-              <Loader2 size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-accent animate-spin" />
+              <Spinner size="sm" tone="accent" className="absolute left-3 top-1/2 -translate-y-1/2" />
             ) : (
               <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" />
             )}

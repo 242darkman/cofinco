@@ -1,22 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Calendar, Clock, MapPin, Plus, Check, X, List, Grid3X3, ChevronLeft, ChevronRight, AlertTriangle, Repeat, Eye, Trash2, Edit, ClipboardCheck, Play, Loader2, Banknote } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Calendar, Clock, MapPin, Plus, Check, X, List, Grid3X3, ChevronLeft, ChevronRight, AlertTriangle, Repeat, Eye, Trash2, Edit, ClipboardCheck, Play, Banknote } from 'lucide-react';
 import { toast } from 'sonner';
 import { StatutPlanning, STATUT_PLANNING_LABELS } from '@shared/enum/status-constants';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
-
-interface Planning {
-  id: string;
-  agentId: string;
-  datePlanning: string;
-  heureDebut: string;
-  heureFin: string;
-  typeActivite: string;
-  zone: string;
-  statut: string;
-  notes: string;
-}
-
-type ViewMode = 'list' | 'calendar';
+import type { Planning, ViewMode } from './AgentPlanning.types';
 
 interface AgentPlanningProps {
   agentId?: string;
@@ -479,7 +467,7 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
           </div>
           <div className="p-3 space-y-3">
             {loading ? (
-              <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent" /></div>
+              <div className="flex justify-center py-12"><Spinner size="sm" /></div>
             ) : allListItems.length === 0 ? (
               <div className="text-center py-12 opacity-50">
                 <Calendar size={32} className="mx-auto mb-2 text-content-muted" />
@@ -561,7 +549,7 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
       {viewMode === 'calendar' && (
         <div className="bg-surface rounded-xl border border-edge overflow-hidden">
           {loading ? (
-            <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
+            <div className="flex justify-center py-12"><Spinner size="md" /></div>
           ) : calendarCompact ? (
             /* ── COMPACT: vertical day list (POS / mobile) ── */
             <div className="divide-y divide-edge/50">
@@ -945,7 +933,7 @@ function EnqueteCard({ enquete, onStart, starting }: { enquete: any; onStart?: (
           disabled={starting}
           className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 bg-accent-secondary hover:bg-accent-secondary-hover disabled:bg-surface-elevated text-content-primary text-xs font-bold rounded-lg transition-colors"
         >
-          {starting ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
+          {starting ? <Spinner size="xs" tone="current" /> : <Play size={12} />}
           Démarrer l'enquête
         </button>
       ) : (

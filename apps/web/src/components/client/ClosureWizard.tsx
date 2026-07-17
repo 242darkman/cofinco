@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { XCircle, CheckCircle, AlertTriangle, Phone, Banknote, Smartphone, ChevronRight, ChevronLeft, Loader2, Clock, X } from 'lucide-react';
-import Modal from '../ui/Modal';
+import { Spinner, Modal } from '@/components/ui';
+import { XCircle, CheckCircle, AlertTriangle, Phone, Banknote, Smartphone, ChevronRight, ChevronLeft, Clock, X } from 'lucide-react';
 import { toast, handleApiError } from '../../lib/toast';
 import { formatPhoneInput, stripPhoneFormat } from '../../lib/format';
 import {
@@ -248,7 +248,7 @@ export default function ClosureWizard({
               className="px-4 py-2.5 bg-status-danger hover:bg-status-danger disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition flex items-center gap-2 text-sm font-bold"
             >
               {cancelling ? (
-                <Loader2 size={16} className="animate-spin" />
+                <Spinner size="xs" tone="current" />
               ) : (
                 <X size={16} />
               )}
@@ -372,7 +372,7 @@ export default function ClosureWizard({
               className="px-4 py-2.5 bg-status-danger hover:bg-status-danger disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition flex items-center gap-2 text-sm font-bold"
             >
               {loading ? (
-                <Loader2 size={16} className="animate-spin" />
+                <Spinner size="xs" tone="current" />
               ) : (
                 <XCircle size={16} />
               )}
@@ -427,7 +427,7 @@ export default function ClosureWizard({
                 className="flex items-center gap-3 p-3 bg-surface-base border border-edge rounded-lg"
               >
                 {check.loading ? (
-                  <Loader2 size={16} className="animate-spin text-content-muted" />
+                  <Spinner size="xs" tone="current" className="text-content-muted" />
                 ) : check.ok ? (
                   <CheckCircle size={16} className="text-status-success" />
                 ) : (

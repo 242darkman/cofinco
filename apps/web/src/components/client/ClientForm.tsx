@@ -1,4 +1,5 @@
 import type { ClientWithIdentity } from '@shared/schema';
+import { Spinner } from '@/components/ui/Spinner';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Save, User, Mail, Phone, MapPin, FileText, Video, Lock, KeyRound, Trash2, Camera, CreditCard, BookUser, FileQuestion, Briefcase, Calendar, DollarSign } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -7,6 +8,7 @@ import Modal from '../ui/Modal';
 import FormField from '../ui/FormField';
 import SelectField from '../ui/SelectField';
 import Button from '../ui/Button';
+import { Avatar } from '@/components/ui/Avatar';
 import SmartDocumentUpload, { type UploadedDocument, type DocumentType } from '../ui/SmartDocumentUpload';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { SystemRole } from '@shared/types/roles';
@@ -707,15 +709,12 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
               <div className="flex items-start gap-3">
                 <div className="relative">
                   {formData.photoProfile ? (
-                    <div className="relative">
-                      <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-edge-strong shadow-lg">
-                        <img src={getFileDisplayUrl(formData.photoProfile)} className="w-full h-full object-cover" alt="Profil"
-                          onError={(e) => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(`${formData.prenom || ''} ${formData.nom || ''}`.trim() || 'Client')}&size=80&background=1e293b&color=94a3b8`; }} />
-                      </div>
+                    <div className="relative inline-block">
+                      <Avatar photoUrl={formData.photoProfile} fullName={`${formData.prenom || ''} ${formData.nom || ''}`.trim() || 'Client'} className="w-20 h-20 text-2xl border-2 border-edge-strong shadow-lg" />
                       <button type="button" onClick={() => { handleChange('photoProfile', ''); handleDocumentChange('AVATAR', null); }}
-                        className="absolute -top-1 -right-1 p-1 bg-status-danger text-white rounded-full hover:bg-status-danger shadow"><Trash2 size={10} /></button>
+                        className="absolute -top-1 -right-1 p-1 bg-status-danger text-white rounded-full hover:bg-status-danger shadow z-10"><Trash2 size={10} /></button>
                       <button type="button" onClick={() => setIsLivenessOpen(true)}
-                        className="absolute bottom-0 right-0 p-1.5 bg-accent-secondary hover:bg-accent-secondary-hover text-content-primary rounded-full shadow"><Camera size={12} /></button>
+                        className="absolute bottom-0 right-0 p-1.5 bg-accent-secondary hover:bg-accent-secondary-hover text-content-primary rounded-full shadow z-10"><Camera size={12} /></button>
                     </div>
                   ) : (
                     <div className="relative">
@@ -794,7 +793,7 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
         <div className="flex justify-end gap-2 pt-4 border-t border-edge mt-4">
           <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting} size="sm">Annuler</Button>
           <Button type="submit" variant="primary" icon={isSubmitting ? undefined : Save} disabled={isSubmitting} size="sm">
-            {isSubmitting ? <span className="flex items-center gap-1.5"><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Traitement...</span> : client ? 'Mettre à jour' : 'Enregistrer'}
+            {isSubmitting ? <span className="flex items-center gap-1.5"><Spinner size="xs" tone="onAccent" />Traitement...</span> : client ? 'Mettre à jour' : 'Enregistrer'}
           </Button>
         </div>
       </form>

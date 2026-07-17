@@ -145,27 +145,26 @@ export default function RapportsOHADA() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="bg-gradient-to-r from-status-warning to-status-danger rounded-xl p-3">
-        <div className="flex items-center gap-3 overflow-x-auto">
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <FileText className="w-5 h-5 text-white" />
-            <div>
-              <h2 className="text-sm font-bold text-white leading-tight whitespace-nowrap">États Financiers OHADA</h2>
-              <p className="text-[10px] text-white/80 whitespace-nowrap">Téléchargement Excel & PDF</p>
-            </div>
+      <div className="bg-surface border border-edge rounded-xl p-4 flex items-center justify-between shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-accent/10 border border-accent/20 rounded-xl">
+            <FileText className="w-5 h-5 text-accent" />
           </div>
-          <div className="w-px h-10 bg-white/20 flex-shrink-0" />
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <div className="bg-white/15 rounded-lg px-3 py-1.5">
-              <div className="text-base font-bold text-white leading-none">4</div>
-              <div className="text-[9px] text-white/70">Rapports</div>
-            </div>
+          <div>
+            <h2 className="text-sm font-bold text-content-primary leading-tight">États Financiers OHADA</h2>
+            <p className="text-[10px] text-content-muted">Téléchargement Excel & PDF</p>
           </div>
-          <div className="flex-1 min-w-4" />
+        </div>
+        
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 bg-surface-elevated px-3 py-2 rounded-lg border border-edge">
+            <div className="text-base font-bold text-accent leading-none">4</div>
+            <div className="text-[10px] font-medium text-content-muted uppercase">Rapports</div>
+          </div>
           <button
             onClick={() => { jcRefetch(); bilanRefetch(); crRefetch(); liRefetch(); }}
             disabled={isAnyLoading}
-            className="bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-50 flex-shrink-0"
+            className="bg-accent text-white px-4 py-2 rounded-lg text-xs font-medium flex items-center gap-2 hover:bg-accent/90 transition-all disabled:opacity-50 shadow-xs"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isAnyLoading ? 'animate-spin' : ''}`} />
             Actualiser
@@ -177,22 +176,24 @@ export default function RapportsOHADA() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
         {/* 1. Journal Centralisateur */}
-        <div className="bg-surface rounded-xl overflow-hidden">
-          <div className="bg-gradient-to-r from-status-info to-accent p-3">
+        <div className="bg-surface border border-edge rounded-xl shadow-xs hover:shadow-md transition-shadow flex flex-col">
+          <div className="p-4 border-b border-edge">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <BookOpen className="w-4 h-4 text-white" />
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-status-info/10 rounded-lg">
+                  <BookOpen className="w-4 h-4 text-status-info" />
+                </div>
                 <div>
-                  <h3 className="text-xs font-bold text-white">Journal Centralisateur</h3>
-                  <p className="text-[9px] text-white/70">Synthèse mensuelle par journal</p>
+                  <h3 className="text-xs font-bold text-content-primary">Journal Centralisateur</h3>
+                  <p className="text-[9px] text-content-muted">Synthèse mensuelle par journal</p>
                 </div>
               </div>
               <div className="flex gap-1.5">
-                <button onClick={handleJCExcel} disabled={jcLoading} className="bg-white/20 hover:bg-white/30 text-white p-1.5 rounded-lg transition-colors disabled:opacity-50" title="Excel">
-                  <Download className="w-3.5 h-3.5" />
+                <button onClick={handleJCExcel} disabled={jcLoading} className="text-content-secondary hover:text-accent hover:bg-accent/10 p-1.5 rounded-lg transition-colors disabled:opacity-50" title="Excel">
+                  <Download className="w-4 h-4" />
                 </button>
-                <button onClick={handleJCPDF} disabled={jcLoading} className="bg-white/20 hover:bg-white/30 text-white p-1.5 rounded-lg transition-colors disabled:opacity-50" title="PDF">
-                  <Printer className="w-3.5 h-3.5" />
+                <button onClick={handleJCPDF} disabled={jcLoading} className="text-content-secondary hover:text-accent hover:bg-accent/10 p-1.5 rounded-lg transition-colors disabled:opacity-50" title="PDF">
+                  <Printer className="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -236,22 +237,24 @@ export default function RapportsOHADA() {
         </div>
 
         {/* 2. Bilan OHADA */}
-        <div className="bg-surface rounded-xl overflow-hidden">
-          <div className="bg-gradient-to-r from-accent to-status-info p-3">
+        <div className="bg-surface border border-edge rounded-xl shadow-xs hover:shadow-md transition-shadow flex flex-col">
+          <div className="p-4 border-b border-edge">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <ClipboardList className="w-4 h-4 text-white" />
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-accent/10 rounded-lg">
+                  <ClipboardList className="w-4 h-4 text-accent" />
+                </div>
                 <div>
-                  <h3 className="text-xs font-bold text-white">Bilan OHADA</h3>
-                  <p className="text-[9px] text-white/70">Situation patrimoniale</p>
+                  <h3 className="text-xs font-bold text-content-primary">Bilan OHADA</h3>
+                  <p className="text-[9px] text-content-muted">Situation patrimoniale</p>
                 </div>
               </div>
               <div className="flex gap-1.5">
-                <button onClick={handleBilanExcel} disabled={bilanLoading} className="bg-white/20 hover:bg-white/30 text-white p-1.5 rounded-lg transition-colors disabled:opacity-50" title="Excel">
-                  <Download className="w-3.5 h-3.5" />
+                <button onClick={handleBilanExcel} disabled={bilanLoading} className="text-content-secondary hover:text-accent hover:bg-accent/10 p-1.5 rounded-lg transition-colors disabled:opacity-50" title="Excel">
+                  <Download className="w-4 h-4" />
                 </button>
-                <button onClick={handleBilanPDF} disabled={bilanLoading} className="bg-white/20 hover:bg-white/30 text-white p-1.5 rounded-lg transition-colors disabled:opacity-50" title="PDF">
-                  <Printer className="w-3.5 h-3.5" />
+                <button onClick={handleBilanPDF} disabled={bilanLoading} className="text-content-secondary hover:text-accent hover:bg-accent/10 p-1.5 rounded-lg transition-colors disabled:opacity-50" title="PDF">
+                  <Printer className="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -281,22 +284,24 @@ export default function RapportsOHADA() {
         </div>
 
         {/* 3. Compte de Résultat OHADA */}
-        <div className="bg-surface rounded-xl overflow-hidden">
-          <div className="bg-gradient-to-r from-status-success to-status-success p-3">
+        <div className="bg-surface border border-edge rounded-xl shadow-xs hover:shadow-md transition-shadow flex flex-col">
+          <div className="p-4 border-b border-edge">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4 text-white" />
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-status-success/10 rounded-lg">
+                  <FileText className="w-4 h-4 text-status-success" />
+                </div>
                 <div>
-                  <h3 className="text-xs font-bold text-white">Compte de Résultat OHADA</h3>
-                  <p className="text-[9px] text-white/70">Charges & Produits</p>
+                  <h3 className="text-xs font-bold text-content-primary">Compte de Résultat OHADA</h3>
+                  <p className="text-[9px] text-content-muted">Charges & Produits</p>
                 </div>
               </div>
               <div className="flex gap-1.5">
-                <button onClick={handleCRExcel} disabled={crLoading} className="bg-white/20 hover:bg-white/30 text-white p-1.5 rounded-lg transition-colors disabled:opacity-50" title="Excel">
-                  <Download className="w-3.5 h-3.5" />
+                <button onClick={handleCRExcel} disabled={crLoading} className="text-content-secondary hover:text-accent hover:bg-accent/10 p-1.5 rounded-lg transition-colors disabled:opacity-50" title="Excel">
+                  <Download className="w-4 h-4" />
                 </button>
-                <button onClick={handleCRPDF} disabled={crLoading} className="bg-white/20 hover:bg-white/30 text-white p-1.5 rounded-lg transition-colors disabled:opacity-50" title="PDF">
-                  <Printer className="w-3.5 h-3.5" />
+                <button onClick={handleCRPDF} disabled={crLoading} className="text-content-secondary hover:text-accent hover:bg-accent/10 p-1.5 rounded-lg transition-colors disabled:opacity-50" title="PDF">
+                  <Printer className="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -336,22 +341,24 @@ export default function RapportsOHADA() {
         </div>
 
         {/* 4. Livre d'Inventaire */}
-        <div className="bg-surface rounded-xl overflow-hidden">
-          <div className="bg-gradient-to-r from-status-warning to-status-warning p-3">
+        <div className="bg-surface border border-edge rounded-xl shadow-xs hover:shadow-md transition-shadow flex flex-col">
+          <div className="p-4 border-b border-edge">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <ClipboardList className="w-4 h-4 text-white" />
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-status-warning/10 rounded-lg">
+                  <ClipboardList className="w-4 h-4 text-status-warning" />
+                </div>
                 <div>
-                  <h3 className="text-xs font-bold text-white">Livre d'Inventaire</h3>
-                  <p className="text-[9px] text-white/70">Inventaire comptable OHADA</p>
+                  <h3 className="text-xs font-bold text-content-primary">Livre d'Inventaire</h3>
+                  <p className="text-[9px] text-content-muted">Inventaire comptable OHADA</p>
                 </div>
               </div>
               <div className="flex gap-1.5">
-                <button onClick={handleLIExcel} disabled={liLoading} className="bg-white/20 hover:bg-white/30 text-white p-1.5 rounded-lg transition-colors disabled:opacity-50" title="Excel">
-                  <Download className="w-3.5 h-3.5" />
+                <button onClick={handleLIExcel} disabled={liLoading} className="text-content-secondary hover:text-accent hover:bg-accent/10 p-1.5 rounded-lg transition-colors disabled:opacity-50" title="Excel">
+                  <Download className="w-4 h-4" />
                 </button>
-                <button onClick={handleLIPDF} disabled={liLoading} className="bg-white/20 hover:bg-white/30 text-white p-1.5 rounded-lg transition-colors disabled:opacity-50" title="PDF">
-                  <Printer className="w-3.5 h-3.5" />
+                <button onClick={handleLIPDF} disabled={liLoading} className="text-content-secondary hover:text-accent hover:bg-accent/10 p-1.5 rounded-lg transition-colors disabled:opacity-50" title="PDF">
+                  <Printer className="w-4 h-4" />
                 </button>
               </div>
             </div>

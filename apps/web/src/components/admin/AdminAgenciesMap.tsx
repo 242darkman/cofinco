@@ -4,21 +4,11 @@
  */
 
 import React, { useEffect, useMemo, useRef } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
-import {
-  Building2,
-  MapPin,
-  Phone,
-  Users,
-  Loader2,
-  AlertTriangle,
-  Navigation,
-  ZoomIn,
-  ZoomOut,
-  UserCheck,
-} from 'lucide-react';
+import { Building2, MapPin, Phone, Users, AlertTriangle, Navigation, ZoomIn, ZoomOut, UserCheck } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 import {
   TypeAgence,
@@ -220,7 +210,7 @@ export default function AdminAgenciesMap({
         style={{ height }}
       >
         <div className="text-center">
-          <Loader2 className="animate-spin text-accent mx-auto mb-3" size={40} />
+          <Spinner size="lg" tone="accent" className="mx-auto mb-3" />
           <p className="text-content-muted">Chargement de la carte...</p>
         </div>
       </div>

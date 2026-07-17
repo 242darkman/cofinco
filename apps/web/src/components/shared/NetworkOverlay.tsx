@@ -1,11 +1,12 @@
 import React from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { CloudOff, RefreshCw } from 'lucide-react';
 import Button from '../ui/Button';
 
 interface NetworkOverlayProps {
-  isOpen: boolean;
-  isChecking?: boolean;
-  onRetry: () => void;
+  readonly isOpen: boolean;
+  readonly isChecking?: boolean;
+  readonly onRetry: () => void;
 }
 
 export default function NetworkOverlay({ isOpen, isChecking = false, onRetry }: NetworkOverlayProps) {
@@ -31,7 +32,7 @@ export default function NetworkOverlay({ isOpen, isChecking = false, onRetry }: 
           </div>
 
           <div className="mt-6 flex items-center gap-3 text-content-secondary">
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-accent/40 border-t-cyan-300" />
+            <Spinner size="sm" />
             <span className="text-sm">
               {isChecking ? 'Verification en cours...' : 'En attente du serveur.'}
             </span>
@@ -39,7 +40,7 @@ export default function NetworkOverlay({ isOpen, isChecking = false, onRetry }: 
 
           <div className="mt-4 h-1 w-full overflow-hidden rounded-full bg-white/10">
             <div
-              className="h-full w-1/3 rounded-full bg-gradient-to-r from-accent via-blue-400 to-status-success"
+              className="h-full w-1/3 rounded-full bg-linear-to-r from-accent via-accent-secondary to-accent"
               style={{ animation: 'network-bar 1.6s ease-in-out infinite' }}
             />
           </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
-import { X, Users } from "lucide-react";
+import { Users, X, Search } from 'lucide-react';
+import { Avatar } from '@/components/ui/Avatar';
 import type { StepComponentProps, MemberEntry } from "../types";
 import { clientApi } from "../../../../lib/api-client";
 import { formatClientName, formatPhoneNumber, resolveStorageUrl } from "../../../../lib/format";
@@ -79,19 +80,15 @@ export default function StepMembers({ formData, updateField }: StepComponentProp
         <label className="text-xs font-semibold text-content-muted uppercase mb-2 block">
           Participants ({formData.members.length} / {maxMembers})
         </label>
-
         <div className="space-y-2">
           {memberClients.map(({ clientId, groupRole, client }) => {
-            const photoUrl = client ? resolveStorageUrl(client.photoProfile) : null;
             return (
               <div key={clientId} className="flex items-center gap-3 p-3 bg-accent/5 border border-accent/20 rounded-lg">
-                <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-xs font-bold text-white shrink-0 overflow-hidden">
-                  {photoUrl ? (
-                    <img src={photoUrl} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <span>{client?.prenom?.charAt(0) || client?.nom?.charAt(0) || "?"}</span>
-                  )}
-                </div>
+                <Avatar
+                  photoUrl={client?.photoProfile}
+                  fullName={client ? `${client.nom} ${client.prenom}` : clientId}
+                  size="sm"
+                />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-content-primary truncate">
                     {client ? formatClientName(client.nom, client.prenom) : clientId}

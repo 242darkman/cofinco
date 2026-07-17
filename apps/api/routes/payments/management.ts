@@ -122,6 +122,13 @@ export function registerPaymentsManagementRoutes(app: Express): void {
       const pawaPayProvider = providerRegistry.getPawaPay() as PawaPayProvider;
       const checkedAt = new Date().toISOString();
 
+      // Provider non configuré (dev/local sans token) : dégradation propre
+      // plutôt qu'un 500 réseau bruyant côté console.
+      if (typeof pawaPayProvider.isConfigured === "function" && !pawaPayProvider.isConfigured()) {
+        res.json({ success: true, gateway: "PAWAPAY", configured: false, providers: [], checkedAt });
+        return;
+      }
+
       if (typeof pawaPayProvider.getBalancePerCorrespondent === "function") {
         const balances = await pawaPayProvider.getBalancePerCorrespondent();
         const providers = balances.map(b => ({

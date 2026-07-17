@@ -1288,7 +1288,7 @@ export default function CaisseSupervision({
         {selectedUser && (
           <div className="space-y-5 -mx-2 sm:mx-0">
             {/* Header avec avatar et statut */}
-            <div className="flex items-start gap-4 p-4 bg-gradient-to-r from-surface/50 to-surface/30 rounded-xl border border-edge-subtle">
+            <div className="flex items-start gap-4 p-4 bg-linear-to-r from-surface/50 to-surface/30 rounded-xl border border-edge-subtle">
               <div className={`
                 w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center shrink-0
                 font-bold text-lg sm:text-xl

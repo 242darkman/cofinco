@@ -1,25 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { Drawer } from 'vaul';
-import {
-  X,
-  Copy,
-  CheckCircle,
-  XCircle,
-  Hourglass,
-  FileText,
-  ArrowUpRight,
-  ArrowDownLeft,
-  User,
-  Calendar,
-  AlertTriangle,
-  Hash,
-  CreditCard,
-  Building,
-  ArrowRight,
-  RotateCcw,
-  Loader2,
-  Users
-} from 'lucide-react';
+import { X, Copy, CheckCircle, XCircle, Hourglass, FileText, ArrowUpRight, ArrowDownLeft, User, Calendar, AlertTriangle, Hash, CreditCard, Building, ArrowRight, RotateCcw, Users } from 'lucide-react';
 import { toast } from '../../../lib/toast';
 import { currencySymbol } from '@shared/config/currency';
 import { formatMoney, formatDate } from '../../../lib/format';
@@ -467,7 +449,7 @@ const DrawerContent = React.memo(function DrawerContent({
                 >
                   {isCancelling ? (
                     <>
-                      <Loader2 size={14} className="animate-spin" />
+                      <Spinner size="xs" tone="current" />
                       Annulation...
                     </>
                   ) : (

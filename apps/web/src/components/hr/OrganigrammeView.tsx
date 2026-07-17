@@ -1,10 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { OrgChart } from 'd3-org-chart';
-import {
-  Building2, Search, RefreshCw, Minus, Plus, Download, ZoomIn, ZoomOut,
-  Maximize2, FileImage, FileText, Code, ShieldAlert, ChevronDown, ChevronRight,
-  Users, Loader2, UserCog
-} from 'lucide-react';
+import { Building2, Search, RefreshCw, Minus, Plus, Download, ZoomIn, ZoomOut, Maximize2, FileImage, FileText, Code, ShieldAlert, ChevronDown, ChevronRight, Users, UserCog } from 'lucide-react';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { Employe } from '../../hooks/hr/useEmployes';
 import { resolveStorageUrl } from '@/lib/format';
@@ -158,7 +155,7 @@ const ReassignModal = ({
             className="px-4 py-2 rounded-lg text-sm bg-accent-secondary text-content-primary hover:bg-accent-secondary transition-colors disabled:opacity-50 flex items-center gap-1.5"
           >
             {isSubmitting ? (
-              <Loader2 size={14} className="animate-spin" />
+              <Spinner size="xs" tone="current" />
             ) : (
               <ChevronRight size={14} />
             )}
@@ -946,7 +943,7 @@ export default function OrganigrammeView({ employes }: OrganigrammeViewProps) {
       <div className="flex-1 relative min-h-0 bg-surface-base/50 rounded-lg border border-edge overflow-hidden">
         {loading && data.length === 0 ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
-            <div className="w-10 h-10 border-3 border-accent/30 border-t-indigo-500 rounded-full animate-spin" />
+            <Spinner size="lg" />
             <p className="text-xs text-content-muted">Chargement de la structure...</p>
           </div>
         ) : data.length === 0 ? (
@@ -973,7 +970,7 @@ export default function OrganigrammeView({ employes }: OrganigrammeViewProps) {
         {/* Loading overlay */}
         {loading && data.length > 0 && (
           <div className="absolute top-2 right-2 bg-surface/90 backdrop-blur-sm px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 text-xs text-content-muted">
-            <Loader2 size={12} className="animate-spin" />
+            <Spinner size="xs" tone="current" />
             Actualisation...
           </div>
         )}

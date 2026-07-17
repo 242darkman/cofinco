@@ -135,7 +135,7 @@ export default function Header({
 
             {showUserMenu && (
               <div className="absolute right-0 mt-2 w-72 bg-surface-base rounded-xl shadow-xl border border-edge overflow-hidden">
-                <div className="px-4 py-4 bg-gradient-to-r from-surface to-surface-base border-b border-edge">
+                <div className="px-4 py-4 bg-linear-to-r from-surface to-surface-base border-b border-edge">
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-status-info to-status-info flex items-center justify-center">
                       <User size={24} className="text-white" />

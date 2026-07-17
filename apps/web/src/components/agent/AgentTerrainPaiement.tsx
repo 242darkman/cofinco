@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { DollarSign, Phone, FileText, CheckCircle, Users, CheckCircle2, AlertCircle, AlertTriangle, X, ChevronDown, Banknote, Smartphone, Loader2 } from 'lucide-react';
-import { SelectField, SearchableSelect } from '../ui';
+import { DollarSign, Phone, FileText, CheckCircle, Users, CheckCircle2, AlertCircle, AlertTriangle, X, ChevronDown, Banknote, Smartphone } from 'lucide-react';
+import { SelectField, SearchableSelect, Spinner } from '../ui';
 import { toast } from 'sonner';
 import AccountHolderPresenceModal, { PresenceConfirmationData } from '../auth/AccountHolderPresenceModal';
 import { usePermissions } from '../auth/ProtectedFeature';
@@ -911,7 +911,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                       </div>
                       {loadingTontines ? (
                         <div className="py-4 flex items-center justify-center">
-                          <div className="w-5 h-5 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
+                          <Spinner size="sm" />
                         </div>
                       ) : clientTontines.length === 0 ? (
                         <p className="text-[13px] text-status-warning flex items-center gap-2">
@@ -1211,7 +1211,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                       )}
                       {feeOption && loadingFeeEstimate && (
                         <div className="mt-2 flex items-center gap-2 text-[12px] text-content-muted">
-                          <Loader2 size={12} className="animate-spin" />
+                          <Spinner size="xs" tone="current" />
                           Calcul des frais...
                         </div>
                       )}
@@ -1265,10 +1265,10 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                   type="button"
                   onClick={handleSubmit}
                   disabled={loading || montantNum <= 0}
-                  className="w-full py-4 rounded-xl font-semibold text-white bg-gradient-to-r from-status-success to-accent hover:from-status-success/90 hover:to-accent/90 shadow-lg shadow-status-success/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
+                  className="w-full py-4 rounded-xl font-semibold text-white bg-linear-to-r from-status-success to-accent hover:from-status-success/90 hover:to-accent/90 shadow-lg shadow-status-success/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
                 >
                   {loading ? (
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <Spinner size="sm" tone="onAccent" />
                   ) : (
                     <>
                       <CheckCircle size={20} />
@@ -1332,7 +1332,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
 
             {/* Spinner */}
             <div className="mb-4">
-              <Loader2 size={32} className={`mx-auto animate-spin ${
+              <Spinner size="md" tone="current" className={`mx-auto ${
                 mmPaymentIntent.provider === 'MTN' ? 'text-status-warning' : 'text-status-danger'
               }`} />
             </div>

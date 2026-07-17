@@ -1,38 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Loader2, UserPlus, Phone, Briefcase, WifiOff, MapPin, User, TrendingUp, Clock, ArrowRight, ArrowLeft, Check, FileText, Building2, Store } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { X, UserPlus, Phone, Briefcase, WifiOff, MapPin, User, TrendingUp, Clock, ArrowRight, ArrowLeft, Check, FileText, Building2, Store } from 'lucide-react';
 import { prospectionApi, arrondissementApi, marcheApi, villeApi } from '../../lib/api-client';
 import { useToast } from '@/hooks/use-toast';
 import SearchableSelect, { type SearchableSelectOption } from '../ui/SearchableSelect';
 import { ANCIENNETE_ACTIVITE_OPTIONS } from '@shared/enum/status-constants';
 import { normalizePhone } from '@shared/utils/phone';
 import { formatPhoneInput, stripPhoneFormat } from '../../lib/format';
+import type { FormData } from './ProspectionFormModal.types';
 
 interface ProspectionFormModalProps {
   isOpen: boolean;
   agentId: string;
   onClose: () => void;
   onSuccess: () => void;
-}
-
-interface FormData {
-  nomProspect: string;
-  prenomProspect: string;
-  telephoneProspect: string;
-  sexe: string;
-  adresseProspect: string;
-  villeId: string;
-  arrondissementId: string;
-  marcheId: string;
-  typeActivite: string;
-  activitePrincipale: string;
-  ancienneteActivite: string;
-  descriptionActivite: string;
-  typeRevenu: string;
-  revenuEstime: string;
-  revenuJournalier: string;
-  chiffreAffairesMensuel: string;
-  commentairesAgent: string;
-  observations: string;
 }
 
 const OFFLINE_STORAGE_KEY = 'offline_prospections';
@@ -535,7 +516,7 @@ export default function ProspectionFormModal({ isOpen, agentId, onClose, onSucce
           ) : (
             <button type="button" onClick={handleSubmit} disabled={loading}
               className="flex-1 py-3 bg-accent hover:bg-accent active:bg-accent rounded-xl text-white font-bold text-sm shadow-lg shadow-accent/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-              {loading ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
+              {loading ? <Spinner size="xs" tone="current" /> : <UserPlus size={16} />}
               Valider la prospection
             </button>
           )}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, Suspense } from 'react';
 import {
   Shield, Users, Key, Settings, BarChart3, Activity, Monitor, Power, Building2, MapPin,
   MessageSquare, KeyRound, Clock, UserPlus, Award, Package, CreditCard, CalendarClock,
@@ -7,44 +7,20 @@ import {
 } from 'lucide-react';
 
 // Constants
-import { ADMIN_TABS, ADMIN_TAB_TENANT_FEATURE, AdminTabId } from '../../constants/admin-constants';
+import { ADMIN_TABS, ADMIN_TAB_TENANT_FEATURE, isAdminTabInScope } from '../../constants/admin-constants';
 import { useAbility } from '../../contexts/AbilityContext';
 import { Actions, Subjects } from '@/lib/casl';
 import { getPermissionMapping } from '@shared/ability/mappings';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { useTenant } from '@/contexts/TenantContext';
+import { useUserProfile } from '../../hooks/useUserProfile';
 
-// Sub-components
-import AdminGestionProfils from './AdminGestionProfils';
-import AdminDashboard from './AdminDashboard';
-import AdminActivityLogs from './AdminActivityLogs';
-import AdminSessionsManager from './AdminSessionsManager';
-import AdminMaintenanceMode from './AdminMaintenanceMode';
-import AdminTontinesGestion from './AdminTontinesGestion';
-import AdminGestionAgences from './AdminGestionAgences';
-import AdminGestionZones from './AdminGestionZones';
-import AdminNotificationsMonitor from './AdminNotificationsMonitor';
-import NotificationTemplatesAdmin from './notifications/NotificationTemplatesAdmin';
-import AdminVersionInfo from './AdminVersionInfo';
-import AdminCaisseAccessCodes from './AdminCaisseAccessCodes';
-import AdminGestionCaisses from './AdminGestionCaisses';
-import AdminCreditsGestion from './AdminCreditsGestion';
-import AccessManagement from './AccessManagement';
-import RegularizationDashboard from './RegularizationDashboard';
-import AdminClientCredentials from './AdminClientCredentials';
-import AdminProductRates from './AdminProductRates';
-import ZoneManagement from './ZoneManagement';
-import AdminCurrencySettings from './AdminCurrencySettings';
-import AdminCompanyInfoSettings from './AdminCompanyInfoSettings';
-import AdminTenantSettings from './AdminTenantSettings';
-import AdminAgencyReset from './AdminAgencyReset';
-import AdminScoring from './AdminScoring';
-import AdminPaymentMethodToggles from './AdminPaymentMethodToggles';
-import AdminSyncPanel from './AdminSyncPanel';
+// Le rendu des onglets vient de la source unique `admin-tabs` (composants lazy).
+import { Spinner } from '@/components/ui/Spinner';
 
 
 interface AdminModuleCompletProps {
-  activeView?: string;
+  readonly activeView?: string;
 }
 
 export default function AdminModuleComplet({ activeView }: AdminModuleCompletProps) {
@@ -52,21 +28,26 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
   const { currentSubModule, navigateToModule } = useAppNavigation();
   const { config: tenantConfig } = useTenant();
   const tenantFeatures = tenantConfig.features;
+  const { user } = useUserProfile();
+  const role = user?.role;
 
   // Dérive l'onglet actif depuis l'URL (source de vérité)
   const VALID_TAB_IDS = ADMIN_TABS.map(t => t.id) as string[];
-  const activeTab = useMemo<AdminTabId>(() => {
+  const activeTab = useMemo<string>(() => {
     if (currentSubModule && VALID_TAB_IDS.includes(currentSubModule)) {
-      const tabId = currentSubModule as AdminTabId;
-      // Onglet lié à une feature désactivée : inaccessible même en accès direct
+      const tabId = currentSubModule as string;
+      const tab = ADMIN_TABS.find((t) => t.id === tabId);
+      // Onglet d'exploitation plateforme : inaccessible côté tenant, même en URL directe.
+      if (tab && !isAdminTabInScope(tab, role)) return 'dashboard';
+      // Onglet lié à une feature désactivée : inaccessible même en accès direct.
       const feature = ADMIN_TAB_TENANT_FEATURE[tabId];
       if (feature && !tenantFeatures[feature]) return 'dashboard';
       return tabId;
     }
     return 'dashboard';
-  }, [currentSubModule, tenantFeatures]);
+  }, [currentSubModule, tenantFeatures, role]);
 
-  const setActiveTab = useCallback((tab: AdminTabId) => {
+  const setActiveTab = useCallback((tab: string) => {
     navigateToModule('administrateur', tab);
   }, [navigateToModule]);
 
@@ -147,6 +128,9 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
     'CloudUpload': CloudUpload,
   };
 
+  // Onglet actif issu de la source unique.
+  const activeTabDef = useMemo(() => ADMIN_TABS.find((t) => t.id === activeTab), [activeTab]);
+
   return (
     <div className="flex flex-col h-full overflow-y-auto overflow-x-hidden bg-surface-base">
       {/* TOP NAVIGATION BAR */}
@@ -166,7 +150,7 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
         <div className="flex-1 relative overflow-hidden flex items-center group/nav">
            
            {/* Left Shadow / Button */}
-           <div className={`absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-surface-base to-transparent z-10 pointer-events-none transition-opacity duration-300 ${showLeftShadow ? 'opacity-100' : 'opacity-0'}`} />
+           <div className={`absolute left-0 top-0 bottom-0 w-16 bg-linear-to-r from-surface-base to-transparent z-10 pointer-events-none transition-opacity duration-300 ${showLeftShadow ? 'opacity-100' : 'opacity-0'}`} />
             {showLeftShadow && (
                 <button 
                   onClick={() => scroll('left')}
@@ -183,6 +167,9 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
                 className="flex-1 flex items-center gap-1 overflow-x-auto no-scrollbar scroll-smooth px-2"
             >
                {ADMIN_TABS.filter(tab => {
+                  // Onglet d'exploitation plateforme : réservé à l'opérateur, jamais
+                  // visible côté tenant — vérifié AVANT le raccourci « manage all ».
+                  if (!isAdminTabInScope(tab, role)) return false;
                   // Masqué si la feature tenant associée est désactivée
                   const feature = ADMIN_TAB_TENANT_FEATURE[tab.id];
                   if (feature && !tenantFeatures[feature]) return false;
@@ -199,6 +186,13 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
                   const isActive = activeTab === tab.id;
                   const isDisabled = 'disabled' in tab && !!(tab as any).disabled;
                   
+                  let tabClasses = 'text-content-muted hover:text-content-secondary hover:bg-surface hover:border-edge';
+                  if (isActive) {
+                    tabClasses = 'bg-accent text-white shadow-sm shadow-accent/20 border-accent/50';
+                  } else if (isDisabled) {
+                    tabClasses = 'opacity-40 cursor-not-allowed text-content-muted';
+                  }
+                  
                   return (
                     <button
                       key={tab.id}
@@ -207,12 +201,7 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
                       disabled={isDisabled}
                       className={`
                         flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap shrink-0 border border-transparent
-                        ${isActive 
-                          ? 'bg-accent text-white shadow-sm shadow-accent/20 border-accent/50' 
-                          : isDisabled 
-                            ? 'opacity-40 cursor-not-allowed text-content-muted' 
-                            : 'text-content-muted hover:text-content-secondary hover:bg-surface hover:border-edge'
-                        }
+                        ${tabClasses}
                       `}
                     >
                       <Icon size={14} className={isActive ? "text-white" : "text-content-muted"} />
@@ -224,7 +213,7 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
             </nav>
 
             {/* Right Shadow / Button */}
-            <div className={`absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-surface-base to-transparent z-10 pointer-events-none transition-opacity duration-300 ${showRightShadow ? 'opacity-100' : 'opacity-0'}`} />
+            <div className={`absolute right-0 top-0 bottom-0 w-16 bg-linear-to-l from-surface-base to-transparent z-10 pointer-events-none transition-opacity duration-300 ${showRightShadow ? 'opacity-100' : 'opacity-0'}`} />
             {showRightShadow && (
                 <button 
                   onClick={() => scroll('right')}
@@ -254,36 +243,11 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
                 </div>
               )}
 
-              {/* Component Render */}
+              {/* Rendu de l'onglet actif — dérivé de la source unique ADMIN_TABS. */}
               <div className="flex-1 relative overflow-hidden flex flex-col">
-                  {activeTab === 'dashboard' && <AdminDashboard />}
-                  {activeTab === 'profils' && <AdminGestionProfils />}
-                  {activeTab === 'logs' && <AdminActivityLogs />}
-                  {activeTab === 'sessions' && <AdminSessionsManager />}
-                  {activeTab === 'agences' && <AdminGestionAgences />}
-                  {activeTab === 'zones' && <AdminGestionZones />}
-                  {activeTab === 'tontines' && <AdminTontinesGestion />}
-                  {activeTab === 'caisses' && <AdminGestionCaisses />}
-                  {activeTab === 'credits' && <AdminCreditsGestion />}
-                  {activeTab === 'codes' && <AdminCaisseAccessCodes onClose={() => setActiveTab('dashboard')} />}
-                  {activeTab === 'maintenance' && <AdminMaintenanceMode />}
-                  {activeTab === 'notifications' && (
-                    <NotificationsSection />
-                  )}
-                  {activeTab === 'updates' && <AdminVersionInfo />}
-                  {activeTab === 'regularisation' && <RegularizationDashboard />}
-                  {activeTab === 'client-credentials' && <AdminClientCredentials />}
-                  {activeTab === 'product-rates' && <AdminProductRates />}
-                  {activeTab === 'zones-commerciales' && <ZoneManagement />}
-                  {activeTab === 'payment-methods' && <AdminPaymentMethodToggles />}
-                  {activeTab === 'currency' && <AdminCurrencySettings />}
-                  {activeTab === 'company-info' && <AdminCompanyInfoSettings />}
-                  {activeTab === 'tenant' && <AdminTenantSettings />}
-                  {activeTab === 'reset-agence' && <AdminAgencyReset />}
-                  {activeTab === 'scoring' && <AdminScoring />}
-                  {activeTab === 'sync' && <AdminSyncPanel />}
-
-                  {activeTab === 'roles' && <AccessManagement />}
+                <Suspense fallback={<div className="flex-1 flex items-center justify-center py-16"><Spinner size="lg" /></div>}>
+                  {activeTabDef?.render({ goToDashboard: () => setActiveTab('dashboard') })}
+                </Suspense>
               </div>
            </div>
         </div>
@@ -292,46 +256,3 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
   );
 }
 
-// Internal component for notifications section with tabs
-function NotificationsSection() {
-  const [notifView, setNotifView] = useState<'monitor' | 'templates'>('monitor');
-
-  return (
-    <div className="flex flex-col h-full space-y-4">
-      {/* Sub-tabs for notifications */}
-      <div className="flex items-center gap-4 border-b border-edge pb-2 shrink-0">
-        <span className="text-sm text-content-muted font-medium">Vue :</span>
-        <div className="flex bg-surface-base rounded-lg p-1 border border-edge">
-          <button
-            onClick={() => setNotifView('monitor')}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              notifView === 'monitor'
-                ? 'bg-surface text-content-primary'
-                : 'text-content-muted hover:text-content-primary'
-            }`}
-          >
-            <Activity size={14} />
-            Monitoring
-          </button>
-          <button
-            onClick={() => setNotifView('templates')}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              notifView === 'templates'
-                ? 'bg-surface text-content-primary'
-                : 'text-content-muted hover:text-content-primary'
-            }`}
-          >
-            <MessageSquare size={14} />
-            Templates
-          </button>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 overflow-auto">
-        {notifView === 'monitor' && <AdminNotificationsMonitor />}
-        {notifView === 'templates' && <NotificationTemplatesAdmin />}
-      </div>
-    </div>
-  );
-}

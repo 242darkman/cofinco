@@ -10,23 +10,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  Key,
-  Plus,
-  Trash2,
-  RefreshCw,
-  Copy,
-  Check,
-  AlertTriangle,
-  Clock,
-  Shield,
-  Settings,
-  BarChart3,
-  Eye,
-  EyeOff,
-  Calendar,
-  Loader2,
-} from 'lucide-react';
+import { Key, Plus, Trash2, RefreshCw, Copy, Check, AlertTriangle, Clock, Shield, Settings, BarChart3, Eye, EyeOff, Calendar } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Button from '../../ui/Button';
 import Card from '../../ui/Card';

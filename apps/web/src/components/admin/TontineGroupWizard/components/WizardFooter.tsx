@@ -1,4 +1,5 @@
-import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
 import { TOTAL_STEPS } from "../constants";
 
 interface WizardFooterProps {
@@ -63,7 +64,7 @@ export default function WizardFooter({
               bg-btn-success text-white hover:bg-btn-success/90
               disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+            {isSubmitting && <Spinner size="xs" tone="current" />}
             {isEditMode ? "Enregistrer" : "Creer la tontine"}
           </button>
         ) : (

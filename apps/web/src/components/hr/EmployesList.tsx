@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Avatar } from '../ui';
 import {
   Search, Filter, MoreVertical,
   Briefcase, Building2, Phone, Eye, EyeOff,
@@ -91,15 +93,6 @@ export default function EmployesList({
     return `${(nom || '').charAt(0)}${(prenom || '').charAt(0)}`.toUpperCase();
   };
 
-  const getGradientColors = (nom: string) => {
-    const colors = [
-      'from-accent to-accent-secondary', 'from-status-info to-accent', 'from-accent to-status-success',
-      'from-status-info to-status-info', 'from-status-success to-accent', 'from-accent-secondary to-accent',
-      'from-accent to-accent',
-    ];
-    const index = (nom || 'A').charCodeAt(0) % colors.length;
-    return colors[index];
-  };
 
   const getStatusLabel = (status: string) => {
     const statusMap: Record<string, string> = {
@@ -252,7 +245,7 @@ export default function EmployesList({
               <tr>
                 <td colSpan={5} className="px-4 py-12 text-center">
                   <div className="flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
+                    <Spinner size="md" />
                   </div>
                 </td>
               </tr>
@@ -273,19 +266,12 @@ export default function EmployesList({
                   {/* 1. EMPLOYÉ (Alignement Flex) */}
                   <td className="px-4 py-2 align-middle">
                     <div className="flex items-center gap-3">
-                      {emp.photoProfile ? (
-                        <div className="w-8 h-8 flex-shrink-0 rounded-full bg-surface border border-edge overflow-hidden">
-                          <img 
-                            src={resolveStorageUrl(emp.photoProfile)} 
-                            alt={`${emp.nom} ${emp.prenom}`}
-                            className="w-full h-full object-cover" 
-                          />
-                        </div>
-                      ) : (
-                        <div className={`w-8 h-8 flex-shrink-0 rounded-full bg-gradient-to-br ${getGradientColors(emp.nom)} border border-edge flex items-center justify-center`}>
-                          <span className="font-bold text-white text-xs">{getInitials(emp.nom, emp.prenom)}</span>
-                        </div>
-                      )}
+                      <Avatar
+                        photoUrl={emp.photoProfile}
+                        fullName={`${emp.nom} ${emp.prenom}`}
+                        initials={getInitials(emp.nom, emp.prenom)}
+                        size="sm"
+                      />
                       <div>
                         <div className="font-bold text-content-primary text-xs group-hover:text-accent transition-colors">
                           {emp.nom} {emp.prenom}
@@ -350,7 +336,7 @@ export default function EmployesList({
       <div className="md:hidden space-y-3 pb-20 px-2">
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div>
+            <Spinner size="xl" />
           </div>
         ) : paginatedEmployes.length === 0 ? (
           <div className="text-center py-12 text-content-muted">
@@ -367,17 +353,12 @@ export default function EmployesList({
                {/* Card Header */}
                <div className="flex justify-between items-start">
                  <div className="flex items-center gap-3">
-                    {emp.photoProfile ? (
-                      <img 
-                        src={resolveStorageUrl(emp.photoProfile)} 
-                        alt={`${emp.nom} ${emp.prenom}`}
-                        className="w-10 h-10 rounded-full object-cover border border-edge"
-                      />
-                    ) : (
-                      <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${getGradientColors(emp.nom)} flex items-center justify-center font-bold text-white`}>
-                        {getInitials(emp.nom, emp.prenom)}
-                      </div>
-                    )}
+                    <Avatar
+                      photoUrl={emp.photoProfile}
+                      fullName={`${emp.nom} ${emp.prenom}`}
+                      initials={getInitials(emp.nom, emp.prenom)}
+                      size="md"
+                    />
                     <div>
                       <div className="font-bold text-content-primary">{emp.nom} {emp.prenom}</div>
                       <div className="text-xs text-content-muted">{emp.poste || 'Non défini'}</div>

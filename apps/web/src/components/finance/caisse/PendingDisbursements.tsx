@@ -379,7 +379,7 @@ export default function PendingDisbursements({
                       <button
                         onClick={(e) => { e.stopPropagation(); handlePayout(credit); }}
                         disabled={isPaying}
-                        className="flex-[2] py-2.5 px-3 text-xs font-bold text-white bg-gradient-to-r from-status-warning to-status-warning rounded-lg hover:from-status-warning hover:to-status-warning transition flex items-center justify-center gap-1.5 shadow-lg shadow-status-warning/20"
+                        className="flex-[2] py-2.5 px-3 text-xs font-bold text-white bg-linear-to-r from-status-warning to-status-warning rounded-lg hover:from-status-warning hover:to-status-warning transition flex items-center justify-center gap-1.5 shadow-lg shadow-status-warning/20"
                       >
                         {isPaying ? (
                           <><RefreshCw size={14} className="animate-spin" /> Traitement...</>

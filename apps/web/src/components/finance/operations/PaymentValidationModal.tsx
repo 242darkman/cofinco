@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { X, Smartphone, Phone, Hash, CheckCircle, Banknote, Wallet } from 'lucide-react';
 import { toast } from '../../../lib/toast';
 import { formatPhoneInput, stripPhoneFormat } from '../../../lib/format';
@@ -217,7 +218,7 @@ export default function PaymentValidationModal({
                 } text-content-primary rounded-lg font-semibold transition disabled:opacity-50 flex items-center justify-center gap-2`}
               >
                 {loading ? (
-                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                  <Spinner size="sm" tone="onAccent" />
                 ) : (
                   <>
                     <CheckCircle size={20} />
@@ -346,7 +347,7 @@ export default function PaymentValidationModal({
               className="flex-1 px-4 py-3 bg-status-success hover:bg-status-success text-white rounded-lg font-semibold transition disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading ? (
-                <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                <Spinner size="sm" tone="onAccent" />
               ) : (
                 <>
                   <CheckCircle size={20} />

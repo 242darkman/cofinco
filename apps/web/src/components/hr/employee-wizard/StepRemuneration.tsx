@@ -1,17 +1,6 @@
 import React from 'react';
-import {
-  Banknote,
-  Wallet,
-  ArrowRightLeft,
-  Smartphone,
-  FileText,
-  Building2,
-  Users,
-  Check,
-  Loader2,
-  AlertCircle,
-  Info,
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Banknote, Wallet, ArrowRightLeft, Smartphone, FileText, Building2, Users, Check, AlertCircle, Info } from 'lucide-react';
 import { FormField, SelectField } from '../../ui';
 
 interface StepRemunerationProps {
@@ -248,7 +237,7 @@ const StepRemuneration: React.FC<StepRemunerationProps> = ({
               <div className="mt-2">
                 {checkingCnss && (
                   <div className="flex items-center gap-2 text-sm text-content-muted">
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <Spinner size="xs" tone="current" />
                     <span>Vérification...</span>
                   </div>
                 )}

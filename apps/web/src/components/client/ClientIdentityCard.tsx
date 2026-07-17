@@ -1,7 +1,7 @@
 import React from 'react';
 import type { ClientWithIdentity } from '@shared/schema';
 import { Edit2, Trash2, Phone, Mail, User, Calendar, MapPin, Globe, BarChart3 } from 'lucide-react';
-import { Card, Badge, Button } from '../ui';
+import { Card, Badge, Button, Avatar } from '../ui';
 import { usePermissions, ProtectedFeature } from '../auth/ProtectedFeature';
 import { Actions, Subjects } from '../../lib/casl';
 import { formatClientName, resolveStorageUrl, iso2ToFlag, formatPhoneNumber } from '../../lib/format';
@@ -52,34 +52,23 @@ export default function ClientIdentityCard({ client, onEdit, onDelete }: ClientI
   return (
     <Card variant="default" padding="none" className="overflow-hidden">
       {/* Top accent bar */}
-      <div className="h-1 bg-gradient-to-r from-accent via-status-info to-accent" />
+      <div className="h-1 bg-linear-to-r from-accent via-status-info to-accent" />
 
       <div className="p-5">
         {/* Avatar + Name */}
         <div className="flex flex-col items-center text-center mb-5">
           {/* Avatar with status ring */}
-          <div className="relative mb-3">
-            {photoUrl ? (
-              <img
-                src={photoUrl}
-                alt={client.nom || ''}
-                className={`w-24 h-24 rounded-full object-cover ring-4 shadow-lg ${
-                  client.statut === StatutClient.ACTIVE
-                    ? 'ring-status-success/40'
-                    : 'ring-edge'
-                }`}
-              />
-            ) : (
-              <div className={`w-24 h-24 rounded-full bg-gradient-to-br from-accent/20 to-status-info/20 flex items-center justify-center ring-4 shadow-lg ${
+          <div className="relative mb-3 inline-block">
+            <Avatar
+              photoUrl={photoUrl}
+              fullName={`${client.prenom || ''} ${client.nom || ''}`}
+              initials={`${client.prenom?.charAt(0) || ''}${client.nom?.charAt(0) || ''}`}
+              className={`w-24 h-24 text-3xl ring-4 shadow-lg ${
                 client.statut === StatutClient.ACTIVE
                   ? 'ring-status-success/40'
                   : 'ring-edge'
-              }`}>
-                <span className="text-3xl font-bold text-accent">
-                  {client.prenom?.charAt(0)}{client.nom?.charAt(0)}
-                </span>
-              </div>
-            )}
+              }`}
+            />
           </div>
 
           {/* Name */}

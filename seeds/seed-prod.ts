@@ -256,6 +256,7 @@ const PLAN_COMPTABLE_DATA = [
   { num: '419000', label: 'Clients - Avances et acomptes', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
   { num: '4191', label: 'Fonds tontine — cotisations', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
   { num: '4192', label: 'Fonds tontine — pénalités', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
+  { num: '4193', label: 'Fonds cartes de pointage — versements', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
   { num: '42', label: 'Personnel', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
   { num: '421', label: 'Personnel — rémunérations dues', classe: 4, type: 'Passif', sens: 'Crédit', isSystem: true },
   { num: '4211', label: 'Avances et acomptes au personnel', classe: 4, type: 'Actif', sens: 'Débit', isSystem: true },
@@ -1250,6 +1251,134 @@ const ACCOUNTING_RULES_DATA = [
     debitAccount: '521',   // Caisse centrale
     creditAccount: '4192', // Fonds tontine - Pénalités
     descriptionTemplate: 'Pénalité tontine {tontineName} - {clientName}',
+    priority: 10,
+  },
+
+  // ============================================================================
+  // CARTES DE POINTAGE (épargne libre par cases)
+  // ============================================================================
+
+  {
+    code: 'CARTE_POINTAGE_DEPOT_CASH',
+    name: 'Versement carte de pointage espèces',
+    description: 'Versement (pointage d\'une case) en espèces',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CARTE_POINTAGE_DEPOT',
+    paymentMethod: 'CASH',
+    journalCode: 'OD',
+    debitAccount: '521',   // Caisse centrale
+    creditAccount: '4193', // Fonds cartes de pointage - Versements
+    descriptionTemplate: 'Versement carte de pointage {cardReference} - {clientName}',
+    priority: 10,
+  },
+  {
+    code: 'CARTE_POINTAGE_DEPOT_MTN',
+    name: 'Versement carte de pointage MTN',
+    description: 'Versement (pointage d\'une case) via MTN Mobile Money',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CARTE_POINTAGE_DEPOT',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'MTN',
+    journalCode: 'OD',
+    debitAccount: '5781',  // Mobile Money MTN
+    creditAccount: '4193', // Fonds cartes de pointage - Versements
+    descriptionTemplate: 'Versement carte de pointage {cardReference} MTN - {clientName}',
+    priority: 10,
+  },
+  {
+    code: 'CARTE_POINTAGE_DEPOT_AIRTEL',
+    name: 'Versement carte de pointage Airtel',
+    description: 'Versement (pointage d\'une case) via Airtel Money',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CARTE_POINTAGE_DEPOT',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'AIRTEL',
+    journalCode: 'OD',
+    debitAccount: '5782',  // Mobile Money Airtel
+    creditAccount: '4193', // Fonds cartes de pointage - Versements
+    descriptionTemplate: 'Versement carte de pointage {cardReference} Airtel - {clientName}',
+    priority: 10,
+  },
+  {
+    // Repli générique : versement MM sans provider identifié (priorité plus basse
+    // que les règles MTN/AIRTEL ci-dessus, qui restent prioritaires si le provider est connu).
+    code: 'CARTE_POINTAGE_DEPOT_MM',
+    name: 'Versement carte de pointage Mobile Money',
+    description: 'Versement (pointage d\'une case) via Mobile Money (provider non précisé)',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CARTE_POINTAGE_DEPOT',
+    paymentMethod: 'MOBILE_MONEY',
+    journalCode: 'OD',
+    debitAccount: '5781',  // Mobile Money (défaut MTN)
+    creditAccount: '4193', // Fonds cartes de pointage - Versements
+    descriptionTemplate: 'Versement carte de pointage {cardReference} Mobile Money - {clientName}',
+    priority: 20,
+  },
+  {
+    code: 'CARTE_POINTAGE_RETRAIT_CASH',
+    name: 'Retrait carte de pointage espèces',
+    description: 'Restitution au client (M×N − M) en espèces à la clôture de la carte',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CARTE_POINTAGE_RETRAIT',
+    paymentMethod: 'CASH',
+    journalCode: 'OD',
+    debitAccount: '4193',  // Fonds cartes de pointage - Versements
+    creditAccount: '521',  // Caisse centrale
+    descriptionTemplate: 'Retrait carte de pointage {cardReference} - {clientName}',
+    priority: 10,
+  },
+  {
+    code: 'CARTE_POINTAGE_RETRAIT_MTN',
+    name: 'Retrait carte de pointage MTN',
+    description: 'Restitution au client (M×N − M) via MTN Mobile Money',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CARTE_POINTAGE_RETRAIT',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'MTN',
+    journalCode: 'OD',
+    debitAccount: '4193',  // Fonds cartes de pointage - Versements
+    creditAccount: '5781', // Mobile Money MTN
+    descriptionTemplate: 'Retrait carte de pointage {cardReference} MTN - {clientName}',
+    priority: 10,
+  },
+  {
+    code: 'CARTE_POINTAGE_RETRAIT_AIRTEL',
+    name: 'Retrait carte de pointage Airtel',
+    description: 'Restitution au client (M×N − M) via Airtel Money',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CARTE_POINTAGE_RETRAIT',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'AIRTEL',
+    journalCode: 'OD',
+    debitAccount: '4193',  // Fonds cartes de pointage - Versements
+    creditAccount: '5782', // Mobile Money Airtel
+    descriptionTemplate: 'Retrait carte de pointage {cardReference} Airtel - {clientName}',
+    priority: 10,
+  },
+  {
+    // Repli générique : retrait MM sans provider identifié.
+    code: 'CARTE_POINTAGE_RETRAIT_MM',
+    name: 'Retrait carte de pointage Mobile Money',
+    description: 'Restitution au client (M×N − M) via Mobile Money (provider non précisé)',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CARTE_POINTAGE_RETRAIT',
+    paymentMethod: 'MOBILE_MONEY',
+    journalCode: 'OD',
+    debitAccount: '4193',  // Fonds cartes de pointage - Versements
+    creditAccount: '5781', // Mobile Money (défaut MTN)
+    descriptionTemplate: 'Retrait carte de pointage {cardReference} Mobile Money - {clientName}',
+    priority: 20,
+  },
+  {
+    code: 'CARTE_POINTAGE_COMMISSION',
+    name: 'Commission carte de pointage — frais de gestion',
+    description: 'Retenue d\'une échéance (M) au retrait, comptabilisée en produit',
+    sourceType: 'MOUVEMENT',
+    eventType: 'CARTE_POINTAGE_COMMISSION',
+    journalCode: 'OD',
+    debitAccount: '4193',   // Fonds cartes de pointage (le fonds se vide)
+    creditAccount: '708300', // Commissions de gestion (produit)
+    descriptionTemplate: 'Commission carte de pointage {cardReference} — frais de gestion',
     priority: 10,
   },
 

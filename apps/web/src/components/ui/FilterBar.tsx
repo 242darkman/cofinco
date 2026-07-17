@@ -69,8 +69,8 @@ export default function FilterBar({ children, className = '', maxVisible = 4 }: 
                 text-[13px] font-medium rounded-lg border
                 transition-colors duration-200
                 ${showAdvanced
-                  ? 'bg-[#059669]/10 border-[#059669]/30 text-[#059669]'
-                  : 'bg-white border-[#E5E7EB] text-gray-600 hover:border-gray-400'
+                  ? 'bg-accent/10 border-accent/30 text-accent'
+                  : 'bg-input-bg border-input-border text-content-secondary hover:border-content-muted'
                 }
               `}
             >

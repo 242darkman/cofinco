@@ -1,23 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import {
-  X,
-  Package,
-  ArrowRight,
-  AlertTriangle,
-  CheckCircle,
-  XCircle,
-  Loader2,
-  Building2,
-  Vault,
-  Clock,
-  Scale,
-  Hash,
-  User,
-  Camera,
-  MessageSquare,
-  Shield,
-  Truck,
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { X, Package, ArrowRight, AlertTriangle, CheckCircle, XCircle, Building2, Vault, Clock, Scale, Hash, User, Camera, MessageSquare, Shield, Truck } from 'lucide-react';
 import { Button, Badge, Modal } from '@/components/ui';
 import { toast } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
@@ -474,13 +457,13 @@ export default function TransfertInterCoffresReception({
               }
               className={
                 conforme
-                  ? 'bg-gradient-to-r from-status-success to-accent hover:from-status-success hover:to-accent'
-                  : 'bg-gradient-to-r from-status-warning to-status-warning hover:from-status-warning hover:to-status-warning'
+                  ? 'bg-linear-to-r from-status-success to-accent hover:from-status-success hover:to-accent'
+                  : 'bg-linear-to-r from-status-warning to-status-warning hover:from-status-warning hover:to-status-warning'
               }
             >
               {loading ? (
                 <>
-                  <Loader2 size={16} className="mr-2 animate-spin" />
+                  <Spinner size="xs" tone="current" className="mr-2" />
                   Traitement...
                 </>
               ) : (

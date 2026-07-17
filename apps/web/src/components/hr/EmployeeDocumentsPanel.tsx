@@ -4,7 +4,7 @@ import {
   FileText, Upload, Download, Trash2, CheckCircle, XCircle, Clock,
   Calendar, AlertTriangle, Eye, X, Plus, Shield, File, Image, FileArchive
 } from 'lucide-react';
-import { Button, Badge, FormField, SelectField, Modal } from '../ui';
+import { Button, Badge, FormField, SelectField, Modal, Spinner } from '../ui';
 import { hrApi, EmployeeDocument } from '../../lib/api-client';
 import { toast } from '../../lib/toast';
 import { usePermissions } from '../auth/ProtectedFeature';
@@ -227,7 +227,7 @@ export default function EmployeeDocumentsPanel({
       {/* Documents list */}
       {isLoading ? (
         <div className="flex items-center justify-center py-8">
-          <div className="w-6 h-6 border-2 border-status-info border-t-transparent rounded-full animate-spin" />
+          <Spinner size="sm" />
         </div>
       ) : documents.length === 0 ? (
         <div className="text-center py-8 bg-surface-base/50 rounded-lg border border-edge">

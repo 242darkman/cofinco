@@ -361,8 +361,8 @@ export default function TontineDistributions({ tontineId, montantContribution, t
       {/* Next beneficiary card */}
       {nextTurn && currentCycle && (
         <Card className={`p-4 ${soldeInsuffisant
-          ? 'bg-gradient-to-r from-status-warning/10 to-surface-base/40 border-status-warning/30'
-          : 'bg-gradient-to-r from-status-success/10 to-surface-base/40 border-status-success/30'}`}>
+          ? 'bg-linear-to-r from-status-warning/10 to-surface-base/40 border-status-warning/30'
+          : 'bg-linear-to-r from-status-success/10 to-surface-base/40 border-status-success/30'}`}>
           <div className="flex justify-between items-start">
             <div>
               <div className={`text-xs font-bold uppercase tracking-wider mb-1 ${soldeInsuffisant ? 'text-status-warning' : 'text-status-success'}`}>

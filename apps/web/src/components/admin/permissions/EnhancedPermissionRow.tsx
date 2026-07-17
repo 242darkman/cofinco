@@ -10,7 +10,8 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { HelpCircle, Loader2, Sparkles, RotateCcw, AlertTriangle } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { HelpCircle, Sparkles, RotateCcw, AlertTriangle } from 'lucide-react';
 import PermissionSourceBadge, { type PermissionSource } from './PermissionSourceBadge';
 import PermissionExplanationModal from './PermissionExplanationModal';
 import CriticalPermissionReasonDialog from './CriticalPermissionReasonDialog';
@@ -215,7 +216,7 @@ export default function EnhancedPermissionRow({
           {/* Toggle */}
           {loading ? (
             <div className="w-7 h-4 flex items-center justify-center">
-              <Loader2 size={10} className="animate-spin text-accent" />
+              <Spinner size="xs" tone="accent" />
             </div>
           ) : (
             <div

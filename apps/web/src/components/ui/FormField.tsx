@@ -51,16 +51,16 @@ const FormField = forwardRef<HTMLInputElement, FormFieldProps>(
       <div className={`${containerClassName} mb-4`}>
         <label
           htmlFor={name}
-          className="block font-inter font-medium text-[13px] text-[#374151] mb-[6px]"
+          className="block font-inter font-medium text-[13px] text-content-secondary mb-[6px]"
         >
           {label}
-          {required && <span className="text-[#EF4444] ml-1">*</span>}
+          {required && <span className="text-status-danger ml-1">*</span>}
         </label>
 
         <div className="relative">
           {Icon && (
             <Icon
-              className="absolute left-[14px] top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none"
+              className="absolute left-[14px] top-1/2 -translate-y-1/2 text-content-muted pointer-events-none"
               size={18}
               strokeWidth={1.5}
             />
@@ -77,15 +77,15 @@ const FormField = forwardRef<HTMLInputElement, FormFieldProps>(
               w-full px-[14px] py-[10px]
               ${Icon ? 'pl-[38px]' : ''}
               ${RightIcon ? 'pr-[38px]' : ''}
-              bg-white border rounded-lg
-              text-[#111827] text-[13px]
-              placeholder:text-[#9CA3AF] placeholder:font-normal
+              bg-input-bg border rounded-lg
+              text-input-text text-[13px]
+              placeholder:text-input-placeholder placeholder:font-normal
               transition-colors duration-200
               focus:outline-none focus:ring-[3px]
               disabled:opacity-50 disabled:cursor-not-allowed
               ${error
-                ? 'border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]/30'
-                : 'border-[#E5E7EB] hover:border-gray-400 focus:border-[#059669] focus:ring-[#059669]/30'
+                ? 'border-status-danger focus:border-status-danger focus:ring-status-danger/30'
+                : 'border-input-border hover:border-content-muted focus:border-accent focus:ring-accent/30'
               }
               ${className}
             `}
@@ -96,7 +96,7 @@ const FormField = forwardRef<HTMLInputElement, FormFieldProps>(
             <button
               type="button"
               onClick={onRightIconClick}
-              className="absolute right-[12px] top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors"
+              className="absolute right-[12px] top-1/2 -translate-y-1/2 text-content-muted hover:text-content-secondary transition-colors"
               tabIndex={-1}
             >
               <RightIcon size={18} strokeWidth={1.5} />
@@ -105,7 +105,7 @@ const FormField = forwardRef<HTMLInputElement, FormFieldProps>(
           {error && (
             <p
               id={`${name}-error`}
-              className="absolute -bottom-5 left-0 text-[11px] text-[#EF4444] flex items-center gap-1 mt-1"
+              className="absolute -bottom-5 left-0 text-[11px] text-status-danger flex items-center gap-1 mt-1"
               role="alert"
             >
               <AlertCircle size={12} strokeWidth={2} className="shrink-0" />
@@ -114,7 +114,7 @@ const FormField = forwardRef<HTMLInputElement, FormFieldProps>(
           )}
 
           {helperText && !error && (
-            <p id={`${name}-helper`} className="absolute -bottom-5 left-0 text-[11px] text-gray-500 mt-1">
+            <p id={`${name}-helper`} className="absolute -bottom-5 left-0 text-[11px] text-content-muted mt-1">
               {helperText}
             </p>
           )}

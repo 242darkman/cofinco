@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Search, User, ChevronDown, Check, X, MapPin, Phone } from 'lucide-react';
+import { ChevronDown, Search, X, MapPin, User, Check, Phone } from 'lucide-react';
+import { Avatar } from '@/components/ui/Avatar';
 import { StatutUser } from '@shared/enum/status-constants';
 import { resolveStorageUrl, formatPhoneNumber } from '../../lib/format';
 
@@ -133,16 +134,13 @@ export default function AgentSelector({
           {selectedAgent ? (
             <>
               {/* Avatar avec photo ou initiales */}
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-accent/20 to-status-success/20 border-2 border-accent/40 flex items-center justify-center flex-shrink-0 overflow-hidden">
-                {getPhotoUrl(selectedAgent) ? (
-                  <img
-                    src={getPhotoUrl(selectedAgent)}
-                    alt={`${selectedAgent.nom} ${selectedAgent.prenom}`}
-                    className="w-full h-full rounded-full object-cover"
-                  />
-                ) : (
-                  <span className="text-sm font-bold text-accent">{getInitials(selectedAgent)}</span>
-                )}
+              <div className="shrink-0">
+                <Avatar
+                  photoUrl={getPhotoUrl(selectedAgent)}
+                  fullName={`${selectedAgent.nom} ${selectedAgent.prenom}`}
+                  initials={getInitials(selectedAgent)}
+                  size="sm"
+                />
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-content-primary truncate">
@@ -224,16 +222,13 @@ export default function AgentSelector({
                     `}
                   >
                     {/* Avatar avec photo ou initiales */}
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-accent/20 to-status-success/20 border-2 border-accent/30 flex items-center justify-center flex-shrink-0 overflow-hidden">
-                      {getPhotoUrl(agent) ? (
-                        <img
-                          src={getPhotoUrl(agent)}
-                          alt={`${agent.nom} ${agent.prenom}`}
-                          className="w-full h-full rounded-full object-cover"
-                        />
-                      ) : (
-                        <span className="text-base font-bold text-accent">{getInitials(agent)}</span>
-                      )}
+                    <div className="shrink-0">
+                      <Avatar
+                        photoUrl={getPhotoUrl(agent)}
+                        fullName={`${agent.nom} ${agent.prenom}`}
+                        initials={getInitials(agent)}
+                        size="md"
+                      />
                     </div>
                     <div className="flex-1 min-w-0 text-left">
                       {/* Nom complet */}

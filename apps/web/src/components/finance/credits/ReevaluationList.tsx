@@ -4,10 +4,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import {
-  RefreshCw, Clock, CheckCircle, XCircle, AlertTriangle,
-  Users, Search, ChevronRight, Loader2, Zap
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { RefreshCw, Clock, CheckCircle, XCircle, AlertTriangle, Users, Search, ChevronRight, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatMoney, formatClientName, resolveStorageUrl } from '../../../lib/format';
 import { Pagination } from '../../ui';
@@ -55,7 +53,7 @@ type StatutFilter = 'all' | 'actionable' | 'pending' | 'approved' | 'rejected';
 // Status keys are from backend (English) — labels from centralized STATUT_REEVALUATION_LABELS
 const STATUT_CONFIG: Record<string, { color: string; bg: string; icon: React.ReactNode; label: string }> = {
   'REQUESTED': { color: 'text-status-info', bg: 'bg-status-info-bg', icon: <Clock size={13} />, label: STATUT_REEVALUATION_LABELS.REQUESTED },
-  'ELIGIBILITY_CHECK': { color: 'text-status-warning', bg: 'bg-status-warning-bg', icon: <Loader2 size={13} className="animate-spin" />, label: STATUT_REEVALUATION_LABELS.ELIGIBILITY_CHECK },
+  'ELIGIBILITY_CHECK': { color: 'text-status-warning', bg: 'bg-status-warning-bg', icon: <Spinner size="xs" tone="current" />, label: STATUT_REEVALUATION_LABELS.ELIGIBILITY_CHECK },
   'AUTHORIZED': { color: 'text-accent', bg: 'bg-accent/10', icon: <CheckCircle size={13} />, label: STATUT_REEVALUATION_LABELS.AUTHORIZED },
   'REFUSED': { color: 'text-status-danger', bg: 'bg-status-danger-bg', icon: <XCircle size={13} />, label: STATUT_REEVALUATION_LABELS.REFUSED },
   'ADDITIONAL_INVESTIGATION': { color: 'text-status-info', bg: 'bg-status-info-bg', icon: <Search size={13} />, label: STATUT_REEVALUATION_LABELS.ADDITIONAL_INVESTIGATION },
@@ -198,7 +196,7 @@ export function ReevaluationList({ onSelect, demandeId, showFilters = true }: Re
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <Loader2 className="animate-spin text-accent" size={24} />
+        <Spinner size="sm" tone="accent" />
         <span className="ml-3 text-content-muted text-sm">Chargement...</span>
       </div>
     );

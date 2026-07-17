@@ -1,35 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { Package, Plus, AlertCircle, CheckCircle, DollarSign, Shield, Wrench, TrendingDown, Calendar, ChevronLeft, ChevronRight, Eye, AlertTriangle, X } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
 import { authService } from '../../lib/auth';
 import { useIsAdmin } from '../../contexts/AbilityContext';
-
-interface Maintenance {
-  date: string;
-  description: string;
-  cout: number;
-}
-
-interface Materiel {
-  id: string;
-  agent_id: string;
-  type_materiel: string;
-  nom_materiel: string;
-  numero_serie: string;
-  date_attribution: string;
-  date_retour?: string;
-  etat: string;
-  valeur: number;
-  date_garantie_fin?: string;
-  duree_amortissement_mois?: number;
-  prochaine_maintenance?: string;
-  historique_maintenances?: Maintenance[];
-  notes: string;
-  agent?: {
-    nom: string;
-    prenom: string;
-  };
-}
+import type { Maintenance, Materiel } from './AgentMateriel.types';
 
 function calcDepreciation(valeur: number, dateAttribution: string, dureeMois: number): { valeurResiduelle: number; pourcentage: number } {
   const start = new Date(dateAttribution);
@@ -328,7 +303,7 @@ export default function AgentMateriel({ agentId }: { agentId?: string }) {
         </div>
         
         {loading ? (
-          <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent" /></div>
+          <div className="flex justify-center py-12"><Spinner size="sm" /></div>
         ) : actifs.length === 0 ? (
           <div className="text-center py-12 opacity-50">
             <Package size={32} className="mx-auto mb-2 text-content-muted" />

@@ -37,6 +37,7 @@ export * from "./device-keys";
 export * from "./kpi";
 export * from "./scoring";
 export * from "./deployment";
+export * from "./cartes-pointage";
 
 // Relations are defined in relations.ts (imports specific files to avoid circular deps)
 export * from "./relations";

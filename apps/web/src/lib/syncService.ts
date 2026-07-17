@@ -22,6 +22,7 @@ import {
   clearCompletedOperations
 } from './offline-db';
 import { networkManager, isNetworkUsable } from './networkManager';
+import { db, setCachedQuery, getCachedQuery } from './offline-db';
 import { tabLeader } from './tabLeader';
 import {
   getUnsyncedEntries,
@@ -738,7 +739,6 @@ class SyncService {
     // Store in the offline DB's cached queries table for now
     // This provides a generic storage mechanism that other components can read from
     try {
-      const { setCachedQuery } = await import('./offline-db');
       await setCachedQuery(
         `sync:${entity}:latest`,
         changes,
@@ -751,7 +751,6 @@ class SyncService {
 
   private async loadPullCursors(): Promise<void> {
     try {
-      const { getCachedQuery } = await import('./offline-db');
       const stored = await getCachedQuery('sync:cursors');
       if (stored) {
         this.pullCursors = stored as Record<string, string>;
@@ -763,7 +762,6 @@ class SyncService {
 
   private async savePullCursors(): Promise<void> {
     try {
-      const { setCachedQuery } = await import('./offline-db');
       await setCachedQuery('sync:cursors', this.pullCursors, 365 * 24 * 60 * 60 * 1000);
     } catch {
       // Non-critical
@@ -1090,7 +1088,6 @@ class SyncService {
    */
   private async markSyncedSessions(): Promise<void> {
     try {
-      const { db } = await import('./offline-db');
       const sessions = await db.agentDaySessions
         .where('syncStatus')
         .anyOf(['open', 'closed'])

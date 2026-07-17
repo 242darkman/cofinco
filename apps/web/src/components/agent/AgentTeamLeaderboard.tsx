@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { Trophy, Star, TrendingUp, Target, Users, Briefcase, ArrowUpRight } from 'lucide-react';
 import { Pagination } from '../ui';
 import { formatMoneyShort } from '@shared/config/currency';
@@ -139,7 +140,7 @@ export default function AgentTeamLeaderboard({ agentId }: Props) {
   if (loading) {
     return (
       <div className="p-6 text-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent mx-auto" />
+        <Spinner size="md" className="mx-auto" />
         <p className="text-content-muted mt-4 text-sm">Chargement du classement...</p>
       </div>
     );

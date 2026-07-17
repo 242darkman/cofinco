@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { SkeletonForm } from '@/components/ui/Skeleton';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Building2, Check, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
@@ -70,9 +71,7 @@ export default function AdminCompanyInfoSettings() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
-      </div>
+      <SkeletonForm fields={5} />
     );
   }
 
@@ -80,7 +79,7 @@ export default function AdminCompanyInfoSettings() {
     'w-full px-3 py-2 bg-surface-base/50 border border-edge-strong rounded-lg text-sm text-content-primary placeholder-content-muted focus:border-accent focus:outline-none';
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 max-w-6xl">
       <div className="flex items-start gap-3">
         <div className="p-2 bg-accent/10 rounded-lg">
           <Building2 size={24} className="text-accent" />
@@ -94,7 +93,8 @@ export default function AdminCompanyInfoSettings() {
         </div>
       </div>
 
-      <div className="bg-surface/50 border border-edge rounded-lg p-4 grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="lg:col-span-2 bg-surface/50 border border-edge rounded-lg p-4 grid grid-cols-2 gap-3">
         <div className="col-span-2 space-y-1">
           <span className="text-xs text-content-muted">Adresse</span>
           <input
@@ -145,6 +145,19 @@ export default function AdminCompanyInfoSettings() {
             className={`${inputClass} font-mono`}
           />
         </div>
+      </div>
+
+        <aside className="bg-surface/50 border border-edge rounded-lg p-4 space-y-3 self-start">
+          <h3 className="text-sm font-semibold text-content-primary">Où apparaissent ces informations ?</h3>
+          <ul className="space-y-2 text-xs text-content-muted">
+            <li className="flex gap-2"><span className="text-accent">•</span> Reçus de caisse, dépôts et retraits</li>
+            <li className="flex gap-2"><span className="text-accent">•</span> Factures et documents officiels</li>
+            <li className="flex gap-2"><span className="text-accent">•</span> Rapports et exports PDF</li>
+          </ul>
+          <p className="text-xs text-content-muted pt-2 border-t border-edge-subtle">
+            Le nom, le logo et les couleurs se règlent dans l’onglet « Tenant &amp; Modules ».
+          </p>
+        </aside>
       </div>
 
       <div className="flex items-center justify-between">

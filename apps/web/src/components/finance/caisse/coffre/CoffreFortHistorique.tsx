@@ -3,13 +3,14 @@
  * et panneau de détail par mouvement.
  */
 import React, { useCallback, useState } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
   CheckCircle2,
   XCircle,
-  Loader2,
+  RefreshCw,
   ArrowRightLeft,
   Wallet,
   Clock,
@@ -179,10 +180,11 @@ export function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
                                 disabled={isRefetching}
                                 className="h-6 px-2 text-[10px] text-content-muted hover:text-content-primary hover:bg-surface"
                             >
-                                <Loader2
-                                    size={10}
-                                    className={`mr-1 ${isRefetching ? 'animate-spin text-status-info' : 'text-content-muted'}`}
-                                />
+                                {isRefetching ? (
+                                    <Spinner size="xs" tone="accent" className="mr-1" />
+                                ) : (
+                                    <RefreshCw size={10} className="mr-1 text-content-muted" />
+                                )}
                                 Act.
                             </Button>
                         </div>

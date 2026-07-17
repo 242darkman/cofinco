@@ -5,7 +5,9 @@ if (!process.env.DATABASE_URL) {
 }
 
 export default defineConfig({
-  schema: ["./packages/shared/schema", "./packages/shared/enum/enums.ts"],
+  // Le dossier enum entier : les pgEnum sont modularisés par domaine
+  // (enums.ts n'est plus qu'une façade de ré-export).
+  schema: ["./packages/shared/schema", "./packages/shared/enum"],
   out: "./drizzle",
   dialect: "postgresql",
   dbCredentials: {

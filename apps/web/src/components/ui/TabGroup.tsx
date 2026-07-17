@@ -124,14 +124,14 @@ const TabGroup: React.FC<TabGroupProps> = ({
 
   const variantStyles = {
     pills: {
-      container: `${scrollClass} gap-1`,
+      container: `${scrollClass} gap-1 p-1 bg-surface-subtle/30 rounded-xl border border-edge`,
       tab: `
         ${sizeConfig.padding} ${sizeConfig.text}
         font-medium rounded-lg transition-all duration-200
         flex items-center ${sizeConfig.gap} whitespace-nowrap
         ${fullWidth ? 'flex-1 justify-center' : 'shrink-0'}
       `,
-      active: 'bg-status-success text-white shadow-lg shadow-status-success/20',
+      active: 'bg-surface-base text-accent shadow-sm font-semibold hover:bg-surface',
       inactive: 'text-content-muted hover:bg-surface-elevated hover:text-content-primary',
       disabled: 'opacity-50 cursor-not-allowed',
     },
@@ -144,21 +144,21 @@ const TabGroup: React.FC<TabGroupProps> = ({
         border-b-2 -mb-px
         ${fullWidth ? 'flex-1 justify-center' : 'shrink-0'}
       `,
-      active: 'border-accent text-accent',
+      active: 'border-accent text-accent font-semibold',
       inactive: 'border-transparent text-content-muted hover:text-content-primary hover:border-edge-strong',
       disabled: 'opacity-50 cursor-not-allowed',
     },
     buttons: {
-      container: `${scrollClass} gap-1`,
+      container: `${scrollClass} gap-2`,
       tab: `
         ${sizeConfig.padding} ${sizeConfig.text}
-        font-semibold rounded-lg transition-all duration-200
+        font-medium rounded-xl transition-all duration-200
         flex items-center ${sizeConfig.gap} whitespace-nowrap
         border
         ${fullWidth ? 'flex-1 justify-center' : 'shrink-0'}
       `,
-      active: 'bg-gradient-to-r from-accent/20 to-status-info/20 text-accent border-accent/50',
-      inactive: 'bg-surface/50 text-content-muted border-edge hover:bg-surface-elevated hover:text-content-primary hover:border-edge-strong',
+      active: 'bg-accent/10 text-accent border-accent/50 shadow-sm hover:bg-accent/20',
+      inactive: 'bg-surface-base text-content-muted border-edge hover:bg-surface-elevated hover:text-content-primary hover:border-edge-strong',
       disabled: 'opacity-50 cursor-not-allowed',
     },
   };
@@ -171,7 +171,7 @@ const TabGroup: React.FC<TabGroupProps> = ({
       {/* Left fade + arrow */}
       {showArrows && canScrollLeft && (
         <>
-          <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-surface-base to-transparent z-10 pointer-events-none" />
+          <div className="absolute left-0 top-0 bottom-0 w-8 bg-linear-to-r from-surface-base to-transparent z-10 pointer-events-none" />
           <button
             type="button"
             onClick={() => scroll('left')}
@@ -190,7 +190,7 @@ const TabGroup: React.FC<TabGroupProps> = ({
           const Icon = tab.icon;
 
           const defaultBadgeStyle = isActive
-               ? 'bg-white text-status-success font-bold'
+               ? 'bg-accent/20 text-accent font-bold'
                : 'bg-surface-subtle text-content-secondary';
 
           return (
@@ -228,7 +228,7 @@ const TabGroup: React.FC<TabGroupProps> = ({
       {/* Right fade + arrow */}
       {showArrows && canScrollRight && (
         <>
-          <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-surface-base to-transparent z-10 pointer-events-none" />
+          <div className="absolute right-0 top-0 bottom-0 w-8 bg-linear-to-l from-surface-base to-transparent z-10 pointer-events-none" />
           <button
             type="button"
             onClick={() => scroll('right')}

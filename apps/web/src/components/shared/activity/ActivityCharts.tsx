@@ -42,7 +42,7 @@ export default function ActivityCharts() {
               </div>
               <div className="h-2.5 bg-surface-elevated rounded-full overflow-hidden">
                 <div
-                  className={`h-full bg-gradient-to-r ${item.color} rounded-full`}
+                  className={`h-full bg-linear-to-r ${item.color} rounded-full`}
                   style={{ width: `${(item.count / 1250) * 100}%` }}
                 ></div>
               </div>

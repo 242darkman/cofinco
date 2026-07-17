@@ -1,10 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Spinner, Card, Badge, Button, StatCard, Modal } from '@/components/ui';
 import { AlertTriangle, Shield, CheckCircle, Eye, Clock, Download, FileText, FileSpreadsheet } from 'lucide-react';
-import Card from '../ui/Card';
-import Badge from '../ui/Badge';
-import Button from '../ui/Button';
-import StatCard from '../ui/StatCard';
-import Modal from '../ui/Modal';
 import { notificationApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
 import { ALL_STATUS_LABELS } from '../../lib/status-labels';
@@ -312,7 +308,7 @@ export default function SecurityAlertsPanel() {
 
         {loading ? (
           <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-status-info mx-auto"></div>
+            <Spinner size="xl" className="mx-auto" />
             <p className="text-content-muted mt-4">Chargement des alertes...</p>
           </div>
         ) : (

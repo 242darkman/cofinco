@@ -3,7 +3,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Loader2, XCircle, History } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { XCircle, History } from 'lucide-react';
 import { toast } from 'sonner';
 import { StatutReevaluation } from '@shared/enum/status-constants';
 import { useCan } from '@/contexts/AbilityContext';
@@ -222,7 +223,7 @@ export function ReevaluationCockpit({ reevaluationId, onBack, onStatusChange }: 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="animate-spin text-accent" size={32} />
+        <Spinner size="md" tone="accent" />
       </div>
     );
   }

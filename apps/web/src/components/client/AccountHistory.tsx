@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, Filter, ArrowDownLeft, ArrowUpRight, Calendar, Download, FileText, Loader2 } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { X, Search, Filter, ArrowDownLeft, ArrowUpRight, Calendar, Download, FileText } from 'lucide-react';
 import { Badge } from '../ui';
 import { ALL_STATUS_LABELS } from '../../lib/status-labels';
 import { format } from 'date-fns';
@@ -159,7 +160,7 @@ export default function AccountHistory({ compteId, numeroCompte, isOpen, onClose
                 className="p-2 border border-edge rounded-lg hover:bg-surface text-content-muted hover:text-content-primary transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Export CSV"
             >
-                {exportingCSV ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+                {exportingCSV ? <Spinner size="sm" tone="current" /> : <Download size={18} />}
                 <span className="hidden sm:inline text-xs font-medium">CSV</span>
             </button>
 
@@ -169,7 +170,7 @@ export default function AccountHistory({ compteId, numeroCompte, isOpen, onClose
                 className="p-2 border border-edge rounded-lg hover:bg-surface text-content-muted hover:text-content-primary transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Export PDF"
             >
-                {exportingPDF ? <Loader2 size={18} className="animate-spin" /> : <FileText size={18} />}
+                {exportingPDF ? <Spinner size="sm" tone="current" /> : <FileText size={18} />}
                 <span className="hidden sm:inline text-xs font-medium">PDF</span>
             </button>
           </div>
@@ -187,7 +188,7 @@ export default function AccountHistory({ compteId, numeroCompte, isOpen, onClose
              <div className="bg-surface-base/50 border border-edge rounded-xl overflow-hidden min-h-[300px]">
                 {loading ? (
                   <div className="flex items-center justify-center h-40">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
+                      <Spinner size="md" />
                   </div>
                 ) : filteredTransactions.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-content-muted">

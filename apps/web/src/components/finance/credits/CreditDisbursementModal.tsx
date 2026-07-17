@@ -1,15 +1,12 @@
 import React, { useState, useMemo } from 'react';
-import {
-  X, AlertCircle, DollarSign, Calendar, Wallet, Clock,
-  AlertTriangle, ArrowRight, Vault, RefreshCw, Phone,
-  Banknote, CreditCard, Smartphone, Info, User, Loader2
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { X, AlertCircle, DollarSign, Calendar, Wallet, Clock, AlertTriangle, ArrowRight, Vault, RefreshCw, Phone, Banknote, CreditCard, Smartphone, Info, User } from 'lucide-react';
 import { creditApi, isInsufficientFundsError, extractInsufficientFundsData, type InsufficientFundsErrorData } from '../../../lib/api-client';
 import { usePermissions } from '../../auth/ProtectedFeature';
 import { toast } from '../../../lib/toast';
 import { formatMoney, formatClientName } from '../../../lib/format';
 import ConfirmDialog from '../../ui/ConfirmDialog';
-import { Button, FormField } from '../../ui';
+import { Button, FormField, Avatar } from '../../ui';
 import { StatutCoffre, DisbursementChannel, DISBURSEMENT_CHANNEL_LABELS, type DisbursementChannelType, TypeConditionnement, type TypeConditionnementType, TYPE_CONDITIONNEMENT_OPTIONS } from '@shared/enum/status-constants';
 import mtnLogo from '@/assets/logos/mtn-logo.png';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
@@ -364,7 +361,7 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
                 <Button
                   onClick={handleOpenReplenishmentForm}
                   disabled={loadingCoffres}
-                  className="w-full bg-gradient-to-r from-status-warning to-status-warning hover:from-status-warning hover:to-status-warning text-white font-semibold py-3"
+                  className="w-full bg-linear-to-r from-status-warning to-status-warning hover:from-status-warning hover:to-status-warning text-white font-semibold py-3"
                 >
                   {loadingCoffres ? (
                     <>
@@ -426,7 +423,7 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
   return (
     <>
       <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
-        <div className="bg-surface-base rounded-xl border border-edge w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh]">
+        <div className="bg-surface-base rounded-2xl border border-edge w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh]">
           
           {/* === HEADER === */}
           <div className="bg-surface/80 border-b border-edge p-4 flex justify-between items-center shrink-0">
@@ -448,15 +445,10 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
                 <div className="flex items-center gap-3">
                     <div className="h-10 w-10 rounded-full bg-surface-elevated flex items-center justify-center text-content-muted overflow-hidden">
                         {clientAvatarUrl ? (
-                          <img
-                            src={clientAvatarUrl}
-                            alt={formatClientName(demande.clients.nom, demande.clients.prenom)}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.onerror = null;
-                              target.src = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="%2364748b" stroke-width="1.5"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>')}`;
-                            }}
+                          <Avatar
+                            photoUrl={clientAvatarUrl}
+                            fullName={formatClientName(demande.clients.nom, demande.clients.prenom)}
+                            size="md"
                           />
                         ) : (
                           <User size={20} />
@@ -558,7 +550,7 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
                           onClick={() => setMobileProvider(op.id)}
                           className={`flex items-center gap-2.5 p-3 rounded-lg border text-sm font-medium transition-all ${
                             mobileProvider === op.id
-                              ? `bg-gradient-to-r ${op.color} border-transparent text-white shadow-lg`
+                              ? `bg-linear-to-r ${op.color} border-transparent text-white shadow-lg`
                               : 'bg-surface border-edge text-content-secondary hover:bg-surface-elevated hover:border-edge-strong'
                           }`}
                         >
@@ -665,7 +657,7 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
                         : 'bg-status-success hover:bg-status-success text-white shadow-status-success/20'
                     }`}
                  >
-                    {loading ? <Loader2 className="animate-spin" size={18} /> :
+                    {loading ? <Spinner size="sm" tone="current" /> :
                      decaissementType === 'programme' ? 'Valider la Programmation' : 'Confirmer le Décaissement'}
                  </Button>
                  </OfflineGuard>
@@ -899,7 +891,7 @@ function TransfertInterCoffresFormWithPrefill({
 
   return (
     <div className="fixed inset-0 bg-surface-base/90 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
-      <div className="bg-surface-base border border-edge w-full max-w-2xl max-h-[95vh] sm:rounded-2xl rounded-t-3xl shadow-2xl flex flex-col animate-in slide-in-from-bottom-5 duration-300">
+      <div className="bg-surface-base w-full max-w-5xl max-h-[90vh] flex flex-col rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
         {/* Header */}
         <header className="p-5 border-b border-edge flex items-center justify-between sticky top-0 bg-surface-base/95 backdrop-blur z-10 rounded-t-3xl sm:rounded-t-2xl">
           <div className="flex items-center gap-3">
@@ -1163,9 +1155,10 @@ function TransfertInterCoffresFormWithPrefill({
             <div className="flex-1 flex gap-3">
               <Button
                 type="button"
+                variant="secondary"
                 onClick={(e) => handleSubmit(e, false)}
                 disabled={loading || !validation.valid}
-                className="flex-1 bg-surface-elevated hover:bg-surface-subtle text-content-primary"
+                className="flex-1"
               >
                 Sauvegarder brouillon
               </Button>
@@ -1173,7 +1166,7 @@ function TransfertInterCoffresFormWithPrefill({
                 type="button"
                 onClick={(e) => handleSubmit(e, true)}
                 disabled={loading || !validation.valid}
-                className="flex-1 bg-gradient-to-r from-status-warning to-status-warning hover:from-status-warning hover:to-status-warning text-white shadow-lg shadow-status-warning/20"
+                className="flex-1 bg-linear-to-r from-status-warning to-status-warning hover:from-status-warning hover:to-status-warning text-white shadow-lg shadow-status-warning/20"
               >
                 {loading ? 'Traitement...' : 'Soumettre la demande'}
               </Button>

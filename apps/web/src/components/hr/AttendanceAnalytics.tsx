@@ -1,9 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import {
-  Calendar, Clock, TrendingUp, Download,
-  ChevronLeft, ChevronRight, CheckCircle, XCircle, AlertCircle,
-  Coffee, Loader2
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Calendar, Clock, TrendingUp, Download, ChevronLeft, ChevronRight, CheckCircle, XCircle, AlertCircle, Coffee } from 'lucide-react';
 import { Button, Badge } from '../ui';
 import { toast } from '../../lib/toast';
 import { hrApi } from '../../lib/api-client';
@@ -147,7 +144,7 @@ export default function AttendanceAnalytics({
   if (loading && !stats) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-status-warning" />
+        <Spinner size="md" tone="current" className="text-status-warning" />
       </div>
     );
   }
@@ -203,7 +200,7 @@ export default function AttendanceAnalytics({
             className="p-1.5 hover:bg-surface rounded-lg transition text-content-muted hover:text-content-primary disabled:opacity-50 ml-1"
             title="Exporter"
           >
-            {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+            {exporting ? <Spinner size="xs" tone="current" /> : <Download size={14} />}
           </button>
         </div>
       </div>

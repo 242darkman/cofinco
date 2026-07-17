@@ -1,10 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  Building2, Users, Receipt, AlertTriangle, CheckCircle,
-  ArrowRight, Loader2, Shield, Calendar, Play, X, AlertCircle,
-  FileText, Ban, RefreshCw, Download, Eye, RotateCcw, Info, Pencil
-} from 'lucide-react';
+import { Building2, Users, Receipt, AlertTriangle, CheckCircle, ArrowRight, Shield, Calendar, Play, X, AlertCircle, FileText, Ban, RefreshCw, Download, Eye, RotateCcw, Info, Pencil } from 'lucide-react';
 import { Modal, Button, SearchableSelect, ProgressBar, Badge } from '../ui';
 import { api } from '../../lib/api-client';
 import { toast } from 'sonner';
@@ -805,7 +802,7 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
           {/* Pending State */}
           {isPending && (
             <div className="flex flex-col items-center justify-center py-10 space-y-3">
-              <Loader2 className="animate-spin text-status-info" size={36} />
+              <Spinner size="lg" tone="accent" />
               <h3 className="text-lg font-bold text-content-primary">Migration soumise</h3>
               <p className="text-content-muted text-sm text-center">
                 En attente de démarrage du traitement...
@@ -818,7 +815,7 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
             <div className="space-y-3">
               {/* Global progress */}
               <div className="flex items-center gap-3">
-                <Loader2 className="animate-spin text-status-info shrink-0" size={20} />
+                <Spinner size="sm" tone="accent" className="shrink-0" />
                 <div className="flex-1 min-w-0">
                   <h3 className="text-sm font-bold text-content-primary truncate">
                     {migrationStatus?.currentStep || 'Initialisation...'}
@@ -857,7 +854,7 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
                         ) : isPhaseError ? (
                           <AlertCircle className="text-status-danger shrink-0" size={16} />
                         ) : isPhaseActive ? (
-                          <Loader2 className="animate-spin text-status-info shrink-0" size={16} />
+                          <Spinner size="xs" tone="accent" className="shrink-0" />
                         ) : (
                           <PhaseIcon className="text-content-muted shrink-0" size={16} />
                         )}
@@ -969,7 +966,7 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
                     disabled={rollbackMigrationMutation.isPending}
                     icon={RotateCcw}
                   >
-                    {rollbackMigrationMutation.isPending ? <Loader2 className="animate-spin" size={12} /> : 'Rollback'}
+                    {rollbackMigrationMutation.isPending ? <Spinner size="xs" tone="current" /> : 'Rollback'}
                   </Button>
                 </div>
               )}
@@ -1184,7 +1181,7 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
                 <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
                   {isAnalyzing ? (
                     <div className="flex flex-col items-center justify-center p-8">
-                      <Loader2 className="animate-spin text-status-info mb-4" size={40} />
+                      <Spinner size="lg" tone="accent" className="mb-4" />
                       <p className="text-content-secondary">Analyse en cours...</p>
                     </div>
                   ) : dryRunFailed ? (
@@ -1411,7 +1408,7 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
                 icon={currentStep === 5 ? (executeNow ? Play : Calendar) : ArrowRight}
               >
                 {createMigrationMutation.isPending || dryRunMutation.isPending ? (
-                  <Loader2 className="animate-spin" size={16} />
+                  <Spinner size="xs" tone="current" />
                 ) : currentStep === 3 ? (
                   'Analyser'
                 ) : currentStep === 5 ? (
@@ -1469,7 +1466,7 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
                   icon={Ban}
                 >
                   {cancelMigrationMutation.isPending ? (
-                    <Loader2 className="animate-spin" size={14} />
+                    <Spinner size="xs" tone="current" />
                   ) : (
                     'Confirmer l\'annulation'
                   )}

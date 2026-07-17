@@ -1,9 +1,7 @@
 import React, { useState, useCallback } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  Award, Plus, Download, Trash2, CheckCircle, XCircle, Calendar,
-  User, AlertTriangle, FileText, X, Loader2, Users
-} from 'lucide-react';
+import { Award, Plus, Download, Trash2, CheckCircle, XCircle, Calendar, User, AlertTriangle, FileText, X, Users } from 'lucide-react';
 import { Button, Badge, FormField, Modal } from '../ui';
 import { hrApi, FormationCertificate } from '../../lib/api-client';
 import { toast } from '../../lib/toast';
@@ -199,7 +197,7 @@ export default function FormationCertificatesPanel({
       {/* Certificates list */}
       {isLoading ? (
         <div className="flex items-center justify-center py-8">
-          <Loader2 className="w-6 h-6 animate-spin text-status-warning" />
+          <Spinner size="sm" tone="current" className="text-status-warning" />
         </div>
       ) : certificates.length === 0 ? (
         <div className="text-center py-8 bg-surface-base/50 rounded-lg border border-edge">

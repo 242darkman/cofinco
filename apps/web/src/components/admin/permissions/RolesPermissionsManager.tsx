@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { Shield, Award, CheckCircle, AlertCircle, Search, AlertTriangle, Eye, Edit, Trash2, Save, X, Loader2 } from 'lucide-react';
-import { SelectField, SearchInput, Switch, Button } from '../../ui';
+import { Shield, Award, CheckCircle, AlertCircle, Search, AlertTriangle, Eye, Edit, Trash2, Save, X } from 'lucide-react';
+import { SelectField, SearchInput, Switch, Button, Spinner } from '../../ui';
 import { Module } from '../../../hooks/admin/useModules';
 import { Permission } from '../../../hooks/admin/usePermissions';
 import { RolePermission } from '../../../hooks/admin/useRolePermissions';
@@ -569,7 +569,7 @@ export default function RolesPermissionsManager({
               className="bg-accent hover:bg-accent-primary-hover text-white h-7 px-2 text-xs"
             >
               {isSaving ? (
-                <Loader2 size={12} className="mr-1 animate-spin" />
+                <Spinner size="xs" tone="current" className="mr-1" />
               ) : (
                 <Save size={12} className="mr-1" />
               )}

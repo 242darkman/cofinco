@@ -4,7 +4,7 @@ import {
   Eye, UserPlus, UserMinus, Pencil, CheckCircle2, PauseCircle, XCircle,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { Card, Button, Modal, FormField, SelectField, TextareaField, Badge, StatCard, SearchInput, EmptyState, FilterBar } from '../../ui';
+import { Card, Button, Modal, FormField, SelectField, TextareaField, Badge, StatCard, SearchInput, EmptyState, FilterBar, Spinner } from '../../ui';
 import { useProjects, useProject, type Project, type ProjectDetail } from '../../../hooks/hr/useProjectTime';
 import { useAgence } from '../../../contexts/AgenceContext';
 import { usePermissions } from '../../auth/ProtectedFeature';
@@ -252,7 +252,7 @@ export default function ProjetsTab() {
       {/* Loading */}
       {isLoading && (
         <div className="flex items-center justify-center py-12">
-          <div className="animate-spin w-8 h-8 border-2 border-accent border-t-transparent rounded-full" />
+          <Spinner size="md" />
         </div>
       )}
 
@@ -466,7 +466,7 @@ export default function ProjetsTab() {
       >
         {loadingDetail && (
           <div className="flex items-center justify-center py-8">
-            <div className="animate-spin w-6 h-6 border-2 border-accent border-t-transparent rounded-full" />
+            <Spinner size="sm" />
           </div>
         )}
 

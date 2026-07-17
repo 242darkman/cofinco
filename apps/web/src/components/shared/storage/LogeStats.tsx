@@ -59,7 +59,7 @@ export default function LogeStats({ stats }: LogeStatsProps) {
         </div>
         <div className="mt-2 h-2 bg-surface-subtle-elevated rounded-full overflow-hidden">
           <div 
-            className="h-full bg-gradient-to-r from-status-info to-accent rounded-full transition-all"
+            className="h-full bg-linear-to-r from-status-info to-accent rounded-full transition-all"
             style={{ width: `${Math.min(parseFloat(stats.pourcentageUtilise), 100)}%` }}
           />
         </div>

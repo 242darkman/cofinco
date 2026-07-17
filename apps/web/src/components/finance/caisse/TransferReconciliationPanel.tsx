@@ -1,9 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  ArrowLeftRight, CheckCircle, AlertTriangle, Clock, Building2,
-  ArrowRight, RefreshCw, Loader2, Search, Filter, Calendar,
-  CheckSquare, XCircle
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { ArrowLeftRight, CheckCircle, AlertTriangle, Clock, Building2, ArrowRight, RefreshCw, Search, Filter, Calendar, CheckSquare, XCircle } from 'lucide-react';
 import { Button, Badge, type BadgeVariant, FormField, SelectField } from '../../ui';
 import { usePermissions } from '../../auth/ProtectedFeature';
 import { toast } from '../../../lib/toast';
@@ -240,7 +237,7 @@ export default function TransferReconciliationPanel({
       <div className="space-y-2 max-h-[400px] overflow-y-auto">
         {loading && transfers.length === 0 ? (
           <div className="flex justify-center py-8">
-            <Loader2 className="w-6 h-6 animate-spin text-accent" />
+            <Spinner size="sm" tone="accent" />
           </div>
         ) : filteredTransfers.length === 0 ? (
           <div className="text-center py-8 text-content-muted">
@@ -336,7 +333,7 @@ export default function TransferReconciliationPanel({
                             className="text-xs"
                           >
                             {reconciling === transfer.id ? (
-                              <Loader2 size={12} className="animate-spin" />
+                              <Spinner size="xs" tone="current" />
                             ) : (
                               <>
                                 <CheckCircle size={12} className="mr-1" />
@@ -356,7 +353,7 @@ export default function TransferReconciliationPanel({
                             className="text-xs"
                           >
                             {reconciling === transfer.id ? (
-                              <Loader2 size={12} className="animate-spin" />
+                              <Spinner size="xs" tone="current" />
                             ) : (
                               <>
                                 <CheckSquare size={12} className="mr-1" />

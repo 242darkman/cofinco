@@ -45,90 +45,7 @@ const MenuItem = React.forwardRef<HTMLButtonElement, MenuItemProps>(
 );
 MenuItem.displayName = 'MenuItem';
 
-// Composant Avatar avec gestion d'erreur optimisée
-interface AvatarProps {
-  photoUrl?: string;
-  fullName: string;
-  initials: string;
-  size: 'sm' | 'lg';
-  className?: string;
-}
-
-const Avatar: React.FC<AvatarProps> = ({ photoUrl, fullName, initials, size, className = '' }) => {
-  const [imageState, setImageState] = useState<'loading' | 'loaded' | 'error'>('loading');
-  const imgRef = useRef<HTMLImageElement>(null);
-
-  const resolvedUrl = photoUrl ? resolveStorageUrl(photoUrl) : null;
-
-  // Vérifier immédiatement si l'image est en cache
-  useEffect(() => {
-    if (!resolvedUrl) {
-      setImageState('error');
-      return;
-    }
-
-    // Créer une image temporaire pour vérifier le cache
-    const img = new Image();
-    img.src = resolvedUrl;
-
-    // Si l'image est déjà complètement chargée (en cache)
-    if (img.complete && img.naturalHeight > 0) {
-      setImageState('loaded');
-      return;
-    }
-
-    // Sinon, afficher skeleton et attendre le chargement
-    setImageState('loading');
-
-    img.onload = () => setImageState('loaded');
-    img.onerror = () => setImageState('error');
-
-    return () => {
-      img.onload = null;
-      img.onerror = null;
-    };
-  }, [resolvedUrl]);
-
-  const sizeClasses = size === 'sm'
-    ? 'w-8 h-8 text-sm'
-    : 'w-12 h-12 text-lg';
-
-  const borderClasses = size === 'sm'
-    ? 'border-2 border-edge'
-    : 'border-2 border-edge-strong';
-
-  // Initiales (fallback seulement)
-  const initialsElement = (
-    <div className={`${sizeClasses} rounded-full bg-gradient-to-br from-accent to-status-info flex items-center justify-center text-white font-semibold ${borderClasses} ${className}`}>
-      {initials}
-    </div>
-  );
-
-  // Pas d'URL ou erreur de chargement - afficher les initiales (fallback)
-  if (!resolvedUrl || imageState === 'error') {
-    return initialsElement;
-  }
-
-  // Image chargée - afficher directement
-  if (imageState === 'loaded') {
-    return (
-      <img
-        ref={imgRef}
-        src={resolvedUrl}
-        alt={fullName}
-        className={`${sizeClasses} rounded-full object-cover ${borderClasses} ${className}`}
-        onError={() => setImageState('error')}
-        loading="eager"
-      />
-    );
-  }
-
-  // En chargement - afficher skeleton minimal
-  return (
-    <div className={`${sizeClasses} rounded-full bg-surface-elevated/50 ${borderClasses} ${className} animate-pulse`} />
-  );
-};
-
+import { Avatar } from '../ui';
 const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
   user,
   onProfileClick,
@@ -381,9 +298,9 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
             fullName={fullName}
             initials={getInitials()}
             size="sm"
+            showStatus={true}
+            status="online"
           />
-          {/* Indicateur de statut en ligne */}
-          <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-status-success border-2 border-edge rounded-full" />
         </div>
         <ChevronDown
           size={14}

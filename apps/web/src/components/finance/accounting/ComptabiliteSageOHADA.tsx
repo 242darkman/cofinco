@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Spinner, TabGroup, Card, Badge, Button } from '@/components/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   BookOpen, FileText, BarChart3, TrendingUp, Download, Building2,
@@ -16,12 +17,8 @@ import TAFIRE from './TAFIRE';
 import RapportsOHADA from './RapportsOHADA';
 import CoffreOperationsPanel from './CoffreOperationsPanel';
 import PayrollSummaryPanel from './PayrollSummaryPanel';
-import TabGroup from '../../ui/TabGroup';
 // jsPDF et ExcelJS sont lazy-loadés dans les composants enfants
 import { exportBilanExcel, exportBilanPDF } from './exports/bilanOHADAExports';
-import Card from '../../ui/Card';
-import Badge from '../../ui/Badge';
-import Button from '../../ui/Button';
 import { useDocumentBranding } from '@/hooks/useDocumentBranding';
 import {
   ResponsiveContainer,
@@ -38,51 +35,11 @@ import {
   useAccountingWebSocket,
 } from '../../../hooks/accounting/useAccounting';
 import { comptabiliteKeys } from '../../../lib/query-keys';
+import type { CompteOHADA, TabKey, JournalFromApi, JournalDisplay, JournalEntryFromApi } from './ComptabiliteSageOHADA.types';
 
 // ============================================
 // INTERFACES
 // ============================================
-interface CompteOHADA {
-  id: string;
-  numeroCompte: string;
-  intitule: string;
-  classe: number;
-  typeCompte: 'Actif' | 'Passif' | 'Charge' | 'Produit' | 'Capitaux';
-  sensNormal: 'Débit' | 'Crédit';
-  niveau: number;
-  actif: boolean;
-  description: string;
-  soldeActuel: number;
-}
-
-type TabKey = 'plan' | 'journaux' | 'ecritures' | 'balance' | 'grandlivre' | 'bilan' | 'resultat' | 'tva' | 'tresorerie' | 'tafire' | 'liasse' | 'rapports';
-
-interface JournalFromApi {
-  id: string;
-  code: string;
-  intitule: string;
-  typeJournal?: string;
-  actif?: boolean;
-}
-
-interface JournalDisplay {
-  id: string;
-  code: string;
-  label: string;
-  color: string;
-  count: number;
-}
-
-interface JournalEntryFromApi {
-  id: string;
-  date: string;
-  numeroPiece: string;
-  libelle: string;
-  journalId: string;
-  totalDebit: number;
-  totalCredit: number;
-}
-
 // ============================================
 // DONNÉES ET CONSTANTES
 // ============================================
@@ -100,36 +57,36 @@ const tabs = [
 ];
 
 const classesOHADA = [
-  { numero: 1, label: 'Comptes de ressources durables', color: 'from-status-info to-status-info' },
-  { numero: 2, label: 'Comptes d\'actif immobilisé', color: 'from-status-success to-status-success' },
-  { numero: 3, label: 'Comptes de stocks', color: 'from-status-warning to-status-warning' },
-  { numero: 4, label: 'Comptes de tiers', color: 'from-status-info to-status-info' },
-  { numero: 5, label: 'Comptes de trésorerie', color: 'from-accent to-accent' },
-  { numero: 6, label: 'Comptes de charges', color: 'from-status-danger to-status-danger' },
-  { numero: 7, label: 'Comptes de produits', color: 'from-status-success to-status-success' },
-  { numero: 8, label: 'Autres comptes', color: 'from-content-muted to-content-muted' },
+  { numero: 1, label: 'Comptes de ressources durables', color: 'text-status-info' },
+  { numero: 2, label: 'Comptes d\'actif immobilisé', color: 'text-status-success' },
+  { numero: 3, label: 'Comptes de stocks', color: 'text-status-warning' },
+  { numero: 4, label: 'Comptes de tiers', color: 'text-status-info' },
+  { numero: 5, label: 'Comptes de trésorerie', color: 'text-accent' },
+  { numero: 6, label: 'Comptes de charges', color: 'text-status-danger' },
+  { numero: 7, label: 'Comptes de produits', color: 'text-status-success' },
+  { numero: 8, label: 'Autres comptes', color: 'text-content-muted' },
 ];
 
 const JOURNAL_COLORS: Record<string, string> = {
-  CAISSE: 'from-status-info to-status-info',
-  BANK: 'from-status-info to-status-info',
-  ACHAT: 'from-status-warning to-status-warning',
-  VENTE: 'from-status-success to-status-success',
-  OD: 'from-content-muted to-content-muted',
-  MMTN: 'from-status-warning to-status-warning',
-  MAIR: 'from-status-danger to-status-danger',
-  CRED: 'from-accent to-accent',
-  EPGN: 'from-status-success to-status-success',
+  CAISSE: 'text-status-info bg-status-info/10',
+  BANK: 'text-status-info bg-status-info/10',
+  ACHAT: 'text-status-warning bg-status-warning/10',
+  VENTE: 'text-status-success bg-status-success/10',
+  OD: 'text-content-muted bg-surface-elevated',
+  MMTN: 'text-status-warning bg-status-warning/10',
+  MAIR: 'text-status-danger bg-status-danger/10',
+  CRED: 'text-accent bg-accent/10',
+  EPGN: 'text-status-success bg-status-success/10',
 };
-const DEFAULT_JOURNAL_COLOR = 'from-accent to-accent';
+const DEFAULT_JOURNAL_COLOR = 'text-accent bg-accent/10';
 
 const rapportsDisponibles = [
-  { id: 'balance', label: 'Balance générale', icon: BarChart3, color: 'from-status-info to-status-info' },
-  { id: 'grandlivre', label: 'Grand Livre', icon: BookOpen, color: 'from-status-success to-status-success' },
-  { id: 'bilan', label: 'Bilan OHADA', icon: PieChart, color: 'from-status-info to-status-info' },
-  { id: 'resultat', label: 'Compte de résultat', icon: TrendingUp, color: 'from-status-success to-status-success' },
-  { id: 'tresorerie', label: 'Tableau de trésorerie', icon: DollarSign, color: 'from-accent to-accent' },
-  { id: 'tafire', label: 'TAFIRE', icon: Activity, color: 'from-status-warning to-status-warning' },
+  { id: 'balance', label: 'Balance générale', icon: BarChart3, color: 'text-status-info' },
+  { id: 'grandlivre', label: 'Grand Livre', icon: BookOpen, color: 'text-status-success' },
+  { id: 'bilan', label: 'Bilan OHADA', icon: PieChart, color: 'text-status-info' },
+  { id: 'resultat', label: 'Compte de résultat', icon: TrendingUp, color: 'text-status-success' },
+  { id: 'tresorerie', label: 'Tableau de trésorerie', icon: DollarSign, color: 'text-accent' },
+  { id: 'tafire', label: 'TAFIRE', icon: Activity, color: 'text-status-warning' },
 ];
 
 // ============================================
@@ -281,41 +238,43 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
   const renderPlanOHADA = () => (
     <div className="space-y-3">
       {/* Header compact - UNE SEULE LIGNE avec overflow scroll si nécessaire */}
-      <div className="bg-gradient-to-r from-status-info to-status-success rounded-xl p-3">
-        <div className="flex items-center gap-3 overflow-x-auto">
+      <div className="bg-surface border border-edge rounded-xl p-4 flex items-center justify-between shadow-xs">
+        <div className="flex items-center gap-3 overflow-x-auto w-full">
           {/* Titre - ne shrink pas */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <Building2 className="w-5 h-5 text-white" />
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <div className="p-2.5 bg-accent/10 border border-accent/20 rounded-xl">
+              <Building2 className="w-5 h-5 text-accent" />
+            </div>
             <div>
-              <h2 className="text-sm font-bold text-white leading-tight whitespace-nowrap">Plan Comptable OHADA</h2>
-              <p className="text-[10px] text-white/80 whitespace-nowrap">SYSCOHADA révisé</p>
+              <h2 className="text-sm font-bold text-content-primary leading-tight whitespace-nowrap">Plan Comptable OHADA</h2>
+              <p className="text-[10px] text-content-muted whitespace-nowrap">SYSCOHADA révisé</p>
             </div>
           </div>
 
           {/* Séparateur */}
-          <div className="w-px h-10 bg-white/20 flex-shrink-0" />
+          <div className="w-px h-10 bg-edge flex-shrink-0 mx-2" />
 
           {/* Stats inline - compacts */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <div className="bg-white/15 rounded-lg px-3 py-1.5 flex items-center gap-2">
-              <BookOpen className="w-4 h-4 text-white/80" />
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <div className="bg-surface-elevated border border-edge rounded-lg px-3 py-1.5 flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-accent/80" />
               <div>
-                <div className="text-base font-bold text-white leading-none">{comptes.length}</div>
-                <div className="text-[9px] text-white/70">Comptes</div>
+                <div className="text-base font-bold text-content-primary leading-none">{comptes.length}</div>
+                <div className="text-[9px] text-content-muted uppercase font-medium">Comptes</div>
               </div>
             </div>
-            <div className="bg-white/15 rounded-lg px-3 py-1.5 flex items-center gap-2">
-              <Lock className="w-4 h-4 text-white/80" />
+            <div className="bg-surface-elevated border border-edge rounded-lg px-3 py-1.5 flex items-center gap-2">
+              <Lock className="w-4 h-4 text-accent/80" />
               <div>
-                <div className="text-base font-bold text-white leading-none">{classesUtilisees}</div>
-                <div className="text-[9px] text-white/70">Classes</div>
+                <div className="text-base font-bold text-content-primary leading-none">{classesUtilisees}</div>
+                <div className="text-[9px] text-content-muted uppercase font-medium">Classes</div>
               </div>
             </div>
-            <div className="bg-white/15 rounded-lg px-3 py-1.5 flex items-center gap-2">
-              <Activity className="w-4 h-4 text-white/80" />
+            <div className="bg-surface-elevated border border-edge rounded-lg px-3 py-1.5 flex items-center gap-2">
+              <Activity className="w-4 h-4 text-accent/80" />
               <div>
-                <div className="text-base font-bold text-white leading-none">{comptes.filter(c => c.actif !== false).length}</div>
-                <div className="text-[9px] text-white/70">Actifs</div>
+                <div className="text-base font-bold text-content-primary leading-none">{comptes.filter(c => c.actif !== false).length}</div>
+                <div className="text-[9px] text-content-muted uppercase font-medium">Actifs</div>
               </div>
             </div>
           </div>
@@ -325,8 +284,8 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
 
           {/* Actions - à droite */}
           <div className="flex gap-2 flex-shrink-0">
-            <button className="bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors">
-              <Download className="w-4 h-4" />
+            <button className="bg-surface-elevated border border-edge hover:bg-accent/10 hover:border-accent/20 hover:text-accent text-content-secondary px-4 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition-all shadow-xs">
+              <Download className="w-3.5 h-3.5" />
               Exporter
             </button>
           </div>
@@ -358,14 +317,15 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
             <div key={classe.numero} className="rounded-lg overflow-hidden">
               <button
                 onClick={() => toggleClasse(classe.numero)}
-                className={`w-full bg-gradient-to-r ${classe.color}
-                  px-3 py-2
-                  flex items-center gap-3 text-white
-                  hover:opacity-90 transition-all duration-200`}
+                className={`w-full bg-surface hover:bg-surface-elevated
+                  border border-edge rounded-t-lg
+                  px-4 py-3 mt-2
+                  flex items-center gap-3 text-content-primary
+                  transition-all duration-200`}
               >
-                <span className="font-bold text-sm w-5">{classe.numero}</span>
-                <span className="text-sm font-medium flex-1 text-left truncate">{classe.label}</span>
-                <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full flex-shrink-0">
+                <span className={`font-bold text-sm w-5 ${classe.color}`}>{classe.numero}</span>
+                <span className="text-sm font-semibold flex-1 text-left truncate">{classe.label}</span>
+                <span className="text-[10px] bg-edge text-content-secondary px-2 py-0.5 rounded-full flex-shrink-0 font-medium">
                   {comptesClasse.length}
                 </span>
                 {isExpanded 
@@ -436,31 +396,33 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
   const renderJournaux = () => (
     <div className="space-y-3">
       {/* Header compact */}
-      <div className="bg-gradient-to-r from-status-info to-pink-600 rounded-xl p-3">
-        <div className="flex items-center gap-3 overflow-x-auto">
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <FileText className="w-5 h-5 text-white" />
+      <div className="bg-surface border border-edge rounded-xl p-4 flex items-center justify-between shadow-xs">
+        <div className="flex items-center gap-3 overflow-x-auto w-full">
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <div className="p-2.5 bg-accent/10 border border-accent/20 rounded-xl">
+              <FileText className="w-5 h-5 text-accent" />
+            </div>
             <div>
-              <h2 className="text-sm font-bold text-white leading-tight whitespace-nowrap">Journaux Comptables</h2>
-              <p className="text-[10px] text-white/80 whitespace-nowrap">Gestion des écritures</p>
+              <h2 className="text-sm font-bold text-content-primary leading-tight whitespace-nowrap">Journaux Comptables</h2>
+              <p className="text-[10px] text-content-muted whitespace-nowrap">Gestion des écritures</p>
             </div>
           </div>
 
-          <div className="w-px h-10 bg-white/20 flex-shrink-0" />
+          <div className="w-px h-10 bg-edge flex-shrink-0 mx-2" />
 
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <div className="bg-white/15 rounded-lg px-3 py-1.5 flex items-center gap-2">
-              <FileText className="w-4 h-4 text-white/80" />
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <div className="bg-surface-elevated border border-edge rounded-lg px-3 py-1.5 flex items-center gap-2">
+              <FileText className="w-4 h-4 text-accent/80" />
               <div>
-                <div className="text-base font-bold text-white leading-none">{journauxDisplay.length}</div>
-                <div className="text-[9px] text-white/70">Journaux</div>
+                <div className="text-base font-bold text-content-primary leading-none">{journauxDisplay.length}</div>
+                <div className="text-[9px] text-content-muted uppercase font-medium">Journaux</div>
               </div>
             </div>
-            <div className="bg-white/15 rounded-lg px-3 py-1.5 flex items-center gap-2">
-              <Calculator className="w-4 h-4 text-white/80" />
+            <div className="bg-surface-elevated border border-edge rounded-lg px-3 py-1.5 flex items-center gap-2">
+              <Calculator className="w-4 h-4 text-accent/80" />
               <div>
-                <div className="text-base font-bold text-white leading-none">{totalEcrituresJournaux}</div>
-                <div className="text-[9px] text-white/70">Écritures</div>
+                <div className="text-base font-bold text-content-primary leading-none">{totalEcrituresJournaux}</div>
+                <div className="text-[9px] text-content-muted uppercase font-medium">Écritures</div>
               </div>
             </div>
           </div>
@@ -644,20 +606,20 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
                 key={journal.code}
                 onClick={() => handleSelectJournal(journal)}
                 className={`
-                  bg-gradient-to-br ${journal.color}
-                  rounded-lg p-3
-                  text-white text-left
-                  hover:scale-[1.02] hover:shadow-lg
+                  ${journal.color}
+                  rounded-xl p-4
+                  text-left border border-edge
+                  hover:scale-[1.02] hover:shadow-md
                   transition-all duration-200
                 `}
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-lg font-bold">{journal.code}</span>
-                  <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full">
+                  <span className="text-[10px] bg-current/10 px-2 py-0.5 rounded-full font-bold">
                     {journal.count}
                   </span>
                 </div>
-                <span className="text-xs font-medium line-clamp-2 opacity-90">
+                <span className="text-xs font-semibold line-clamp-2 opacity-90">
                   {journal.label}
                 </span>
               </button>
@@ -682,32 +644,37 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
   const renderBilan = () => (
     <div className="space-y-3">
       {/* Header compact */}
-      <div className="bg-gradient-to-r from-accent to-status-info rounded-xl p-3">
-        <div className="flex items-center justify-between gap-3 overflow-x-auto">
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <PieChart className="w-5 h-5 text-white" />
+      <div className="bg-surface border border-edge rounded-xl p-4 flex items-center justify-between shadow-xs">
+        <div className="flex items-center gap-3 overflow-x-auto w-full">
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <div className="p-2.5 bg-accent/10 border border-accent/20 rounded-xl">
+              <PieChart className="w-5 h-5 text-accent" />
+            </div>
             <div>
-              <h2 className="text-sm font-bold text-white leading-tight whitespace-nowrap">Bilan OHADA</h2>
-              <p className="text-[10px] text-white/80 whitespace-nowrap">Situation patrimoniale</p>
+              <h2 className="text-sm font-bold text-content-primary leading-tight whitespace-nowrap">Bilan OHADA</h2>
+              <p className="text-[10px] text-content-muted whitespace-nowrap">Situation patrimoniale</p>
             </div>
           </div>
+
+          <div className="flex-1 min-w-4" />
+
           <div className="flex gap-2 flex-shrink-0 items-center">
             <input
               type="date"
               value={bilanDateFin}
               onChange={(e) => setBilanDateFin(e.target.value)}
-              className="h-8 text-xs bg-white/15 border border-white/20 rounded-lg px-2 text-white"
+              className="h-8 text-xs bg-surface-elevated border border-edge rounded-lg px-3 text-content-primary focus:outline-none focus:ring-1 focus:ring-accent"
             />
             {bilanLoading && (
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <Spinner size="xs" tone="onAccent" />
             )}
-            <button onClick={handleExportBilanExcel} className="bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors">
-              <Download className="w-4 h-4" />
-              Excel
+            <button onClick={handleExportBilanExcel} className="bg-surface-elevated border border-edge hover:bg-accent/10 hover:border-accent/20 hover:text-accent text-content-secondary px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all shadow-xs">
+              <Download className="w-3.5 h-3.5" />
+              <span>Excel</span>
             </button>
-            <button onClick={handleExportBilanPDF} className="bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors">
-              <Printer className="w-4 h-4" />
-              PDF
+            <button onClick={handleExportBilanPDF} className="bg-surface-elevated border border-edge hover:bg-accent/10 hover:border-accent/20 hover:text-accent text-content-secondary px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all shadow-xs">
+              <Printer className="w-3.5 h-3.5" />
+              <span>PDF</span>
             </button>
           </div>
         </div>
@@ -848,13 +815,15 @@ const ComptabiliteSageOHADA: React.FC<ComptabiliteSageOHADAProps> = ({ activeVie
   const renderRapports = () => (
     <div className="space-y-3">
       {/* Header compact */}
-      <div className="bg-gradient-to-r from-accent to-accent rounded-xl p-3">
-        <div className="flex items-center gap-3 overflow-x-auto">
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <Download className="w-5 h-5 text-white" />
+      <div className="bg-surface border border-edge rounded-xl p-4 flex items-center justify-between shadow-xs">
+        <div className="flex items-center gap-3 overflow-x-auto w-full">
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <div className="p-2.5 bg-accent/10 border border-accent/20 rounded-xl">
+              <Download className="w-5 h-5 text-accent" />
+            </div>
             <div>
-              <h2 className="text-sm font-bold text-white leading-tight whitespace-nowrap">Rapports & Exports</h2>
-              <p className="text-[10px] text-white/80 whitespace-nowrap">Téléchargements</p>
+              <h2 className="text-sm font-bold text-content-primary leading-tight whitespace-nowrap">Rapports & Exports</h2>
+              <p className="text-[10px] text-content-muted whitespace-nowrap">Téléchargements</p>
             </div>
           </div>
         </div>

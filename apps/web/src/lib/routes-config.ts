@@ -5,12 +5,15 @@ import { authService } from './auth';
 import { Action, Subject, MODULE_TO_SUBJECT, Actions, Subjects } from './casl';
 import type { AppAbility } from './casl';
 import type { TenantFeatureKey, TenantFeatureFlags } from '@shared/tenant-config';
+// Sous-routes admin dérivées de la source unique des onglets (aucune liste dupliquée).
+import { ADMIN_SUBROUTES } from '@/components/admin/admin-tabs';
 
 // Lazy load components
 const Dashboard = lazy(() => import('@/components/dashboard/Dashboard'));
 const Credits = lazy(() => import('@/components/finance/credits/Credits'));
 const Comptes = lazy(() => import('@/components/finance/compte/Comptes'));
 const Tontines = lazy(() => import('@/components/finance/tontine/Tontines'));
+const CartesPointage = lazy(() => import('@/components/finance/carte-pointage/CartesPointage'));
 const Comptabilite = lazy(() => import('@/components/finance/accounting/ComptabiliteSageOHADA'));
 const RessourcesHumaines = lazy(() => import('@/components/hr/RessourcesHumaines'));
 const AgentTerrainPortail = lazy(() => import('@/components/agent/AgentTerrainPortail'));
@@ -157,6 +160,16 @@ export const ROUTES: RouteConfig[] = [
     labelKey: 'menuTontines',
     group: 'Services Clients',
     tenantFeature: 'enableTontine',
+  },
+  {
+    key: 'cartes-pointage',
+    path: '/cartes-pointage',
+    component: CartesPointage,
+    requiredModule: 'Cartes de Pointage',
+    label: 'Cartes de Pointage',
+    labelKey: 'menuCartesPointage',
+    group: 'Services Clients',
+    tenantFeature: 'enableCartesPointage',
   },
 
   // --- Opérations ---
@@ -359,31 +372,10 @@ export const ROUTES: RouteConfig[] = [
     labelKey: 'menuAdmin',
     group: 'Système',
     subRoutes: [
-      { path: '/administration/dashboard', subModule: 'dashboard', label: 'Dashboard' },
-      { path: '/administration/personnel', subModule: 'profils', label: 'Personnel' },
+      // Dérivées de la source unique ADMIN_TABS — aucune liste à maintenir ici.
+      ...ADMIN_SUBROUTES,
+      // Route héritée conservée pour la redirection legacy (activeView → 'users').
       { path: '/administration/utilisateurs', subModule: 'users', label: 'Utilisateurs' },
-      { path: '/administration/logs', subModule: 'logs', label: 'Logs' },
-      { path: '/administration/sessions', subModule: 'sessions', label: 'Sessions' },
-      { path: '/administration/acces', subModule: 'roles', label: 'Gestion des Accès' },
-      { path: '/administration/maintenance', subModule: 'maintenance', label: 'Maintenance' },
-      { path: '/administration/caisses', subModule: 'caisses', label: 'Caisses' },
-      { path: '/administration/credits', subModule: 'credits', label: 'Crédits' },
-      { path: '/administration/tontines', subModule: 'tontines', label: 'Tontines' },
-      { path: '/administration/agences', subModule: 'agences', label: 'Agences' },
-      { path: '/administration/zones', subModule: 'zones', label: 'Zones' },
-      { path: '/administration/notifications', subModule: 'notifications', label: 'Notifications' },
-      { path: '/administration/version', subModule: 'updates', label: 'Version' },
-      { path: '/administration/codes-caisse', subModule: 'codes', label: 'Codes Caisse' },
-      { path: '/administration/regularisation', subModule: 'regularisation', label: 'Régularisation' },
-      { path: '/administration/acces-clients', subModule: 'client-credentials', label: 'Accès Clients' },
-      { path: '/administration/taux-produits', subModule: 'product-rates', label: 'Taux Produits' },
-      { path: '/administration/zones-commerciales', subModule: 'zones-commerciales', label: 'Arrondissements & Marchés' },
-      { path: '/administration/paiements', subModule: 'payment-methods', label: 'Paiements' },
-      { path: '/administration/devise', subModule: 'currency', label: 'Devise' },
-      { path: '/administration/societe', subModule: 'company-info', label: 'Société' },
-      { path: '/administration/tenant', subModule: 'tenant', label: 'Tenant & Modules' },
-      { path: '/administration/reset-agence', subModule: 'reset-agence', label: 'Reset Agence' },
-      { path: '/administration/scoring', subModule: 'scoring', label: 'Scoring' },
     ],
   },
   {
@@ -577,7 +569,7 @@ export function getModuleFromPath(path: string): { moduleKey: string; subModule?
 
   // 3. Fallback: sous-route inconnue → résoudre vers le module parent
   // Ex: /clients/uuid/details (supprimé) → module "clients" avec params.id
-  const firstSegment = path.split('/').filter(Boolean)[0];
+  const firstSegment = path.split('/').find(Boolean);
   if (firstSegment) {
     const baseRoute = _urlMap.find(entry => !entry.subModule && entry.path === `/${firstSegment}`);
     if (baseRoute) {

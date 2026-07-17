@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Download, Printer, Loader2 } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Download, Printer } from 'lucide-react';
 import { Modal } from '@/components/ui';
 import Button from '@/components/ui/Button';
 import { PayslipTemplate, type PayslipData } from '@/components/ui/printable/PayslipTemplate';
@@ -113,9 +114,11 @@ export const PayslipViewer: React.FC<PayslipViewerProps> = ({
               onClick={handleDownload}
               disabled={isDownloading}
               className="flex-1 bg-status-success hover:bg-status-success text-white"
-              icon={isDownloading ? Loader2 : Download}
+              icon={Download}
+              isLoading={isDownloading}
+              loadingText="Génération..."
             >
-              {isDownloading ? 'Génération...' : 'Télécharger PDF'}
+              Télécharger PDF
             </Button>
           </div>
         ) : undefined
@@ -123,7 +126,7 @@ export const PayslipViewer: React.FC<PayslipViewerProps> = ({
     >
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="animate-spin text-status-success" size={32} />
+          <Spinner size="md" tone="accent" />
           <span className="ml-2 text-content-muted">Chargement du bulletin...</span>
         </div>
       ) : error ? (

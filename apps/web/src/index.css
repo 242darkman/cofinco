@@ -31,8 +31,10 @@
 
   /* Brand/Accent Colors - Vert émeraude professionnel */
   --accent-primary: #047857; /* Émeraude foncé - 5.1:1 contrast */
+  --accent-primary-rgb: 4, 120, 87; /* Repli RGB (surchargé par le thème tenant) */
   --accent-primary-hover: #065f46;
   --accent-secondary: #0e7490; /* Cyan foncé - 5.5:1 contrast */
+  --accent-secondary-rgb: 14, 116, 144;
   --accent-secondary-hover: #155e75;
 
   /* Semantic Colors - RGAA AA compliant */
@@ -99,6 +101,17 @@
   --brand-amber: #E8A33D;
   --brand-teal: #3AAA8C;
 
+  /* Tons du loader applicatif : dérivés de l'accent par défaut, surchargés par
+     tenant-theme.ts avec les teintes de la marque. Évite tout flash vert/jaune
+     avant l'application du thème tenant. */
+  --loader-ring-1: var(--accent-primary);
+  --loader-ring-2: var(--accent-secondary);
+  --loader-ring-3: var(--accent-primary-hover);
+
+  /* Skeleton shimmer — reflet argenté + cœur doré discret (thème clair). */
+  --skeleton-sheen: rgba(255, 255, 255, 0.65);
+  --skeleton-sheen-gold: rgba(232, 163, 61, 0.18);
+
   /* Login page - theme-aware */
   --login-bg-from: #f0f4f8;
   --login-bg-via: #e8eef5;
@@ -140,8 +153,10 @@
 
   /* Brand/Accent Colors - Cyan vif pour dark mode */
   --accent-primary: #22d3ee; /* Cyan brillant - 8.7:1 contrast */
+  --accent-primary-rgb: 34, 211, 238; /* Repli RGB (surchargé par le thème tenant) */
   --accent-primary-hover: #67e8f9;
   --accent-secondary: #60a5fa; /* Bleu brillant - 6.1:1 contrast */
+  --accent-secondary-rgb: 96, 165, 250;
   --accent-secondary-hover: #93c5fd;
 
   /* Semantic Colors - RGAA AA compliant on dark */
@@ -206,6 +221,15 @@
   --brand-green: #2D8B57;
   --brand-amber: #E8A33D;
   --brand-teal: #3AAA8C;
+
+  /* Tons du loader (thème sombre) : accent par défaut, surchargé par tenant. */
+  --loader-ring-1: var(--accent-primary);
+  --loader-ring-2: var(--accent-secondary);
+  --loader-ring-3: var(--accent-primary-hover);
+
+  /* Skeleton shimmer — reflet plus discret sur fond sombre. */
+  --skeleton-sheen: rgba(255, 255, 255, 0.10);
+  --skeleton-sheen-gold: rgba(232, 163, 61, 0.10);
 
   /* Login page - dark variant */
   --login-bg-from: #0a1628;
@@ -358,6 +382,19 @@ body {
     animation: shimmer 2s infinite;
   }
 
+  /* Skeleton shimmer premium : reflet qui balaie le bloc (transform-free,
+     background-position uniquement → 60 FPS, faible coût CPU/GPU). */
+  .animate-skeleton {
+    background-size: 200% 100%;
+    animation: skeletonShimmer 1.6s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-skeleton {
+      animation: none;
+    }
+  }
+
   .animate-suction {
     animation: glow-pulse 2s ease-in-out infinite;
     transition: all 0.3s ease;
@@ -492,6 +529,60 @@ body {
   }
   100% {
     background-position: 1000px 0;
+  }
+}
+
+/* Balayage du reflet skeleton (pair avec background-size: 200%). */
+@keyframes skeletonShimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Remplissage fluide d'une barre de progression via scaleX (composé GPU, 60 FPS).
+   Synchronisé sur la durée de l'étape pour une sensation d'accélération continue. */
+@keyframes loadingFillX {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Tracé de la coche de succès (SuccessCheckmark) — cercle puis coche.
+   pathLength normalise les longueurs : 132 (cercle) et 30 (coche). */
+@keyframes drawCircle {
+  from {
+    stroke-dashoffset: 132;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes drawCheck {
+  from {
+    stroke-dashoffset: 30;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Apparition ressort/amorti du conteneur de succès (overshoot porté par la
+   cubic-bezier côté composant). */
+@keyframes successPop {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
@@ -644,7 +735,7 @@ body {
 }
 
 .btn-danger {
-  @apply bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold px-6 py-2.5 rounded-lg transition-all duration-300 shadow-lg shadow-red-500/30 hover:shadow-xl hover:shadow-red-500/40 hover:scale-105 active:scale-95;
+  @apply bg-linear-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold px-6 py-2.5 rounded-lg transition-all duration-300 shadow-lg shadow-red-500/30 hover:shadow-xl hover:shadow-red-500/40 hover:scale-105 active:scale-95;
 }
 
 .card-gradient {

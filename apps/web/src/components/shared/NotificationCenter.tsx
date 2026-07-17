@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { Bell, X, CheckCircle, Calendar, CreditCard, Users, AlertTriangle, Settings, Info, Trash2, Check, Clock, ChevronRight, ClipboardCheck, Banknote } from 'lucide-react';
 import { Badge, Button } from '../ui';
 import clsx from 'clsx';
@@ -321,7 +322,7 @@ export default function NotificationCenter({ onClose, fullHeight }: Notification
       >
         {loading && notifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 gap-3">
-             <div className="w-8 h-8 border-2 border-status-info/30 border-t-blue-500 rounded-full animate-spin" />
+             <Spinner size="md" />
              <p className="text-xs text-content-muted">Chargement...</p>
           </div>
         ) : filteredNotifications.length === 0 ? (

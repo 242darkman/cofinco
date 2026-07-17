@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, ArrowRight, Loader2, Users, Briefcase, X, AlertTriangle } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Building2, ArrowRight, Users, Briefcase, X, AlertTriangle } from 'lucide-react';
 import { toast } from '@/lib/toast';
 import { Employe } from '../../hooks/hr/useEmployes';
 import { useCurrency } from '@/contexts/CurrencyContext';
@@ -190,7 +191,7 @@ export default function TransferAgenceModal({ employee, onClose, onSuccess }: Tr
               </label>
               {loadingAgences ? (
                 <div className="flex items-center gap-2 px-3 py-2.5 bg-surface/50 rounded-lg border border-edge">
-                  <Loader2 size={14} className="animate-spin text-content-muted" />
+                  <Spinner size="xs" tone="current" className="text-content-muted" />
                   <span className="text-xs text-content-muted">Chargement...</span>
                 </div>
               ) : agences.length === 0 ? (
@@ -266,7 +267,7 @@ export default function TransferAgenceModal({ employee, onClose, onSuccess }: Tr
                   </label>
                   {loadingManagers ? (
                     <div className="flex items-center gap-2 h-10 px-3 bg-surface/50 rounded-lg border border-edge">
-                      <Loader2 size={12} className="animate-spin text-content-muted" />
+                      <Spinner size="xs" tone="current" className="text-content-muted" />
                       <span className="text-[10px] text-content-muted">Chargement...</span>
                     </div>
                   ) : (
@@ -344,7 +345,7 @@ export default function TransferAgenceModal({ employee, onClose, onSuccess }: Tr
             >
               {submitting ? (
                 <>
-                  <Loader2 size={14} className="animate-spin" />
+                  <Spinner size="xs" tone="current" />
                   Transfert en cours...
                 </>
               ) : (

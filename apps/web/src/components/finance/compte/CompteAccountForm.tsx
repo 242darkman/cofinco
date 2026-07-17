@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  X, User, AlertCircle, CheckCircle, Banknote, Phone, Wallet,
-  ShieldCheck, Lock, Building2, ChevronRight, ChevronLeft, Loader2, XCircle
-} from 'lucide-react';
+import { X, User, AlertCircle, CheckCircle, Banknote, Phone, Wallet, ShieldCheck, Lock, Building2, ChevronRight, ChevronLeft, XCircle } from 'lucide-react';
 import { clientApi, compteEpargneApi, paymentsApi } from '../../../lib/api-client';
 import mtnLogo from '@/assets/logos/mtn-logo.png';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
@@ -926,7 +924,7 @@ export default function CompteAccountForm({ onClose, onSuccess, clientId }: Comp
                        </div>
                        {mmFeeLoading ? (
                          <div className="flex items-center gap-2 text-xs text-content-muted">
-                           <Loader2 size={12} className="animate-spin" />
+                           <Spinner size="xs" tone="current" />
                            <span>Calcul des frais...</span>
                          </div>
                        ) : mmFeeEstimate ? (
@@ -1155,7 +1153,7 @@ export default function CompteAccountForm({ onClose, onSuccess, clientId }: Comp
                        />
                      </div>
                      <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-surface-base border-2 border-status-info flex items-center justify-center">
-                       <Loader2 size={14} className="animate-spin text-status-info" />
+                       <Spinner size="xs" tone="accent" />
                      </div>
                    </div>
                    <div>
@@ -1168,7 +1166,7 @@ export default function CompteAccountForm({ onClose, onSuccess, clientId }: Comp
                      </p>
                    </div>
                    <div className="flex items-center gap-2 text-xs text-content-muted animate-pulse">
-                     <Loader2 size={12} className="animate-spin" />
+                     <Spinner size="xs" tone="current" />
                      En attente de confirmation...
                    </div>
                  </div>
@@ -1211,7 +1209,7 @@ export default function CompteAccountForm({ onClose, onSuccess, clientId }: Comp
                       </div>
                       {mmFeeLoading ? (
                         <div className="flex items-center gap-2 text-xs text-content-muted">
-                          <Loader2 size={12} className="animate-spin" />
+                          <Spinner size="xs" tone="current" />
                           Calcul des frais...
                         </div>
                       ) : mmFeeEstimate ? (

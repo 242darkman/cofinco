@@ -1,9 +1,10 @@
 
 import React, { useState, useCallback } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../../ui/sheet';
 import { Input, Button, Badge } from '../../ui';
-import { Search, UserCheck, Clock, CheckCircle2, CheckSquare, Square, Loader2 } from 'lucide-react';
+import { Search, UserCheck, Clock, CheckCircle2, CheckSquare, Square } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { api, compteEpargneApi } from '../../../lib/api-client';
@@ -182,7 +183,7 @@ export function PendingActivationDrawer({ open, onClose, sessionId, onActivate }
                   className="bg-status-success hover:bg-status-success text-xs"
                 >
                   {batchActivating ? (
-                    <Loader2 size={14} className="animate-spin mr-1" />
+                    <Spinner size="xs" tone="current" className="mr-1" />
                   ) : (
                     <CheckCircle2 size={14} className="mr-1" />
                   )}

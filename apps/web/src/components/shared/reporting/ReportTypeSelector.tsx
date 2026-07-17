@@ -29,7 +29,7 @@ export default function ReportTypeSelector({ selectedType, onSelect, filter }: R
           >
             {/* Active Indicator Line */}
             {isSelected && (
-              <div className="absolute inset-x-4 -bottom-px h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent shadow-[0_-2px_8px_rgba(99,102,241,0.5)]" />
+              <div className="absolute inset-x-4 -bottom-px h-0.5 bg-linear-to-r from-transparent via-indigo-500 to-transparent shadow-[0_-2px_8px_rgba(99,102,241,0.5)]" />
             )}
 
             <div className={`mb-2 p-2 rounded-lg transition-colors ${

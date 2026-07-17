@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { X, Percent, Calendar, DollarSign, TrendingUp, AlertCircle, Loader2 } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { X, Percent, Calendar, DollarSign, TrendingUp, AlertCircle } from 'lucide-react';
 import { compteEpargneApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
@@ -110,7 +111,7 @@ export default function CompteInterestCalculator({ compte, onClose, onSuccess }:
     >
       <div className="bg-surface rounded-xl border border-edge w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="bg-gradient-to-r from-status-success/20 to-accent/20 border-b border-edge p-6 flex justify-between items-center sticky top-0 z-10">
+        <div className="bg-linear-to-r from-status-success/20 to-accent/20 border-b border-edge p-6 flex justify-between items-center sticky top-0 z-10">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-status-success-bg rounded-lg" aria-hidden="true">
               <Percent className="text-status-success" size={24} />
@@ -266,7 +267,7 @@ export default function CompteInterestCalculator({ compte, onClose, onSuccess }:
             >
               {loading ? (
                 <>
-                  <Loader2 size={18} className="animate-spin" aria-hidden="true" />
+                  <Spinner size="sm" tone="current" />
                   Traitement...
                 </>
               ) : (

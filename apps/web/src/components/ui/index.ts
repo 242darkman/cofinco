@@ -67,7 +67,10 @@ export type { ProgressBarProps, ProgressBarColor, ProgressBarSize } from './Prog
 // Loading Components
 export { default as LoadingScreen } from './LoadingScreen';
 export { default as LoadingSpinner } from './LoadingSpinner';
-export { Skeleton } from './Skeleton';
+export { Skeleton, SkeletonTransactionList, SkeletonBankCard, SkeletonStatsGrid, SkeletonCard } from './Skeleton';
+export { Spinner } from './Spinner';
+export { ClearingRing } from './ClearingRing';
+export { TopProgressBar } from './TopProgressBar';
 
 // Layout Components
 export { default as PageHeader } from './PageHeader';
@@ -89,3 +92,5 @@ export { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from './
 // Feature Header (with descriptions)
 export { FeatureHeader, FEATURE_DESCRIPTIONS, getFeatureDescription } from './FeatureHeader';
 export type { FeatureKey } from './FeatureHeader';
+export { default as Avatar } from './Avatar';
+export type { AvatarProps } from './Avatar';

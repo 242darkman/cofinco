@@ -1,5 +1,6 @@
 import React from 'react';
-import { Shield, Users, CheckCircle, Ban, Loader2, AlertTriangle } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Shield, Users, CheckCircle, Ban, AlertTriangle } from 'lucide-react';
 import { StatutReevaluation } from '@shared/enum/status-constants';
 import type { Reevaluation, ActionContext } from '../types';
 
@@ -56,7 +57,7 @@ export function FinalDecisionCard({
             disabled={actionLoading !== null || !canValidateEligibility}
             className="w-full px-3 py-2.5 bg-accent hover:bg-accent/90 text-content-inverted rounded-lg text-sm font-medium transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {actionLoading === 'eligibility' ? <Loader2 size={16} className="animate-spin" /> : <Shield size={16} />}
+            {actionLoading === 'eligibility' ? <Spinner size="xs" tone="current" /> : <Shield size={16} />}
             Vérifier l'éligibilité
           </button>
         )}
@@ -67,7 +68,7 @@ export function FinalDecisionCard({
             disabled={actionLoading !== null || !canSubmitToCommittee}
             className="w-full px-3 py-2.5 bg-status-warning hover:bg-status-warning/90 text-content-inverted rounded-lg text-sm font-medium transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {actionLoading === 'committee' ? <Loader2 size={16} className="animate-spin" /> : <Users size={16} />}
+            {actionLoading === 'committee' ? <Spinner size="xs" tone="current" /> : <Users size={16} />}
             Soumettre au comité
           </button>
         )}
@@ -89,7 +90,7 @@ export function FinalDecisionCard({
           disabled={actionLoading !== null || !canCancel}
           className="w-full px-3 py-2.5 bg-surface-elevated hover:bg-surface-subtle text-content-secondary rounded-lg text-sm font-medium transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed border border-edge"
         >
-          {actionLoading === 'cancel' ? <Loader2 size={16} className="animate-spin" /> : <Ban size={16} />}
+          {actionLoading === 'cancel' ? <Spinner size="xs" tone="current" /> : <Ban size={16} />}
           Rejeter le dossier
         </button>
 

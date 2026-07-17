@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { DollarSign, Search, Calendar, User, CreditCard, Check, X, Smartphone, Banknote, FileCheck, Building, ReceiptText, AlertTriangle, Loader2, Printer, WifiOff } from 'lucide-react';
+import { DollarSign, Search, Calendar, User, CreditCard, Check, X, Smartphone, Banknote, FileCheck, Building, ReceiptText, AlertTriangle, Printer, WifiOff } from 'lucide-react';
 import PaymentValidationModal from '../operations/PaymentValidationModal';
 import { useFeatureFlags, useEnabledPaymentMethods } from '../../../contexts/FeatureFlagsContext';
 import { usePermissions } from '../../auth/ProtectedFeature';
@@ -10,7 +10,7 @@ import { validateAmount, VALIDATION_LIMITS } from '../../../lib/validation';
 import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import ConfirmDialog from '../../ui/ConfirmDialog';
 import { SkeletonCard } from '../../ui/Skeleton';
-import { Button } from '../../ui';
+import { Button, Spinner } from '../../ui';
 import { ReceiptTemplate } from '../../ui/printable/ReceiptTemplate';
 import { InvoiceTemplate } from '../../ui/printable/InvoiceTemplate';
 import { usePrinter } from '../../../hooks/useReceiptPrinter';
@@ -596,7 +596,7 @@ export default function CreditRemboursement() {
           <div className="mt-4 max-h-60 overflow-y-auto space-y-2" role="listbox" aria-label="Résultats de recherche">
             {loadingCredits ? (
               <div className="flex items-center justify-center py-4">
-                <Loader2 className="animate-spin text-accent" size={24} />
+                <Spinner size="sm" tone="accent" />
                 <span className="ml-2 text-content-muted">Chargement...</span>
               </div>
             ) : filteredCredits.length > 0 ? (
@@ -849,7 +849,7 @@ export default function CreditRemboursement() {
               >
                 {loading ? (
                   <>
-                    <Loader2 size={20} className="animate-spin" aria-hidden="true" />
+                    <Spinner size="sm" tone="current" />
                     Enregistrement...
                   </>
                 ) : (

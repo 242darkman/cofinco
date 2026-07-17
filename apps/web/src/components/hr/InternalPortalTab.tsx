@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { Briefcase, MapPin, Calendar, Users, Send, CheckCircle, Clock, Loader2 } from 'lucide-react';
+import { SkeletonList } from '@/components/ui/Skeleton';
+import { Spinner } from '@/components/ui/Spinner';
+import { Briefcase, MapPin, Calendar, Users, Send, CheckCircle, Clock } from 'lucide-react';
 import { Card, Button, Modal, Badge, TextareaField } from '../ui';
 import { useInternalOffers } from '../../hooks/hr/useJobOffers';
 
@@ -29,9 +31,7 @@ export default function InternalPortalTab() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
-      </div>
+      <SkeletonList items={4} />
     );
   }
 
@@ -145,7 +145,7 @@ export default function InternalPortalTab() {
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => { setApplyingOffer(null); setMotivation(''); }}>Annuler</Button>
             <Button onClick={handleApply} disabled={isApplying}>
-              {isApplying ? <Loader2 size={14} className="animate-spin mr-1" /> : <Send size={14} className="mr-1" />}
+              {isApplying ? <Spinner size="xs" tone="current" className="mr-1" /> : <Send size={14} className="mr-1" />}
               Envoyer ma candidature
             </Button>
           </div>

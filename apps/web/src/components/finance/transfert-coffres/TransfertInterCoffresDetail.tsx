@@ -386,7 +386,7 @@ export default function TransfertInterCoffresDetail({
                     {transfert.typeTransfert.replace(/_/g, ' → ')}
                   </div>
                   <div className="relative">
-                    <div className="w-10 sm:w-16 h-0.5 bg-gradient-to-r from-accent/50 via-accent to-accent/50 rounded-full" />
+                    <div className="w-10 sm:w-16 h-0.5 bg-linear-to-r from-accent/50 via-accent to-accent/50 rounded-full" />
                     <div className="absolute inset-0 flex items-center justify-center">
                       <div className="p-1 rounded-full bg-accent/10 border border-accent/40">
                         <ArrowRightLeft size={12} className="text-accent" />
@@ -767,11 +767,11 @@ export default function TransfertInterCoffresDetail({
                     variant={action.variant}
                     className={`sm:min-w-[140px] ${
                       action.variant === 'primary'
-                        ? 'bg-gradient-to-r from-accent to-accent-secondary hover:from-accent/90 hover:to-accent-secondary/90 shadow-lg shadow-accent/20'
+                        ? 'bg-linear-to-r from-accent to-accent-secondary hover:from-accent/90 hover:to-accent-secondary/90 shadow-lg shadow-accent/20'
                         : action.variant === 'success'
-                        ? 'bg-gradient-to-r from-status-success to-accent hover:from-status-success/90 hover:to-accent/90 shadow-lg shadow-status-success/20'
+                        ? 'bg-linear-to-r from-status-success to-accent hover:from-status-success/90 hover:to-accent/90 shadow-lg shadow-status-success/20'
                         : action.variant === 'warning'
-                        ? 'bg-gradient-to-r from-status-warning to-status-warning/80 hover:from-status-warning/90 hover:to-status-warning/70 shadow-lg shadow-status-warning/20'
+                        ? 'bg-linear-to-r from-status-warning to-status-warning/80 hover:from-status-warning/90 hover:to-status-warning/70 shadow-lg shadow-status-warning/20'
                         : 'bg-status-danger hover:bg-status-danger'
                     }`}
                   >

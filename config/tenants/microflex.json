@@ -9,6 +9,18 @@
     "enableSms": true,
     "enableTontine": true,
     "enableMobileMoney": true,
-    "enableFieldAgents": true
+    "enableFieldAgents": true,
+    "enableCredits": true,
+    "enableComptes": true,
+    "enableCaisse": true,
+    "enableCoffreFort": true,
+    "enableTresorerie": true,
+    "enableTransfert": true,
+    "enableVirementsProgrammes": true,
+    "enableComptabilite": true,
+    "enableRapports": true,
+    "enableKpi": true,
+    "enableRH": true,
+    "enableCartesPointage": true
   }
 }

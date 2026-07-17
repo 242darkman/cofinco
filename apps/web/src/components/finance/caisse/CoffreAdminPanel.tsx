@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { Button, Switch } from "@/components/ui";
-import {
-  Loader2, Save, ShieldAlert, AlertTriangle, Clock,
-  Coins, FileCheck, Bell
-} from 'lucide-react';
+import { Save, ShieldAlert, AlertTriangle, Clock, Coins, FileCheck, Bell } from 'lucide-react';
 import { toast } from 'sonner';
 import { coffreApi } from '@/lib/api-client';
 import { cn } from "../../../lib/utils";
@@ -159,7 +157,7 @@ export function CoffreAdminPanel({ agenceId }: CoffreAdminPanelProps) {
     }));
   };
 
-  if (loading) return <div className="flex justify-center p-6"><Loader2 className="h-5 w-5 animate-spin text-accent" /></div>;
+  if (loading) return <div className="flex justify-center p-6"><Spinner size="sm" tone="accent" /></div>;
 
   return (
     <div className="flex flex-col h-full p-2 space-y-2">

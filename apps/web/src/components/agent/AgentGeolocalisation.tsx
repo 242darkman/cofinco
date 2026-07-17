@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { MapPin, Navigation, Clock, ChevronLeft, ChevronRight, Eye, Gauge } from 'lucide-react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -8,6 +9,7 @@ import { agentTerrainApi } from '../../lib/api-client';
 import { StatutUser } from '@shared/enum/status-constants';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import type { GeoLocation, Agent } from './AgentGeolocalisation.types';
 
 // Fix Leaflet/Vite default icon
 delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl;
@@ -30,26 +32,6 @@ const endIcon = new L.DivIcon({
   iconSize: [28, 28],
   iconAnchor: [14, 14],
 });
-
-interface GeoLocation {
-  id: string;
-  agent_id: string;
-  latitude: number;
-  longitude: number;
-  accuracy: number;
-  speed?: number | null;
-  heading?: number | null;
-  timestamp: string;
-  activity_type: string;
-}
-
-interface Agent {
-  id: string;
-  nom: string;
-  prenom: string;
-  zone_affectation: string;
-  statut: string;
-}
 
 export default function AgentGeolocalisation({ agentId, embedded }: { agentId?: string; embedded?: boolean }) {
   const [locations, setLocations] = useState<GeoLocation[]>([]);
@@ -227,7 +209,7 @@ export default function AgentGeolocalisation({ agentId, embedded }: { agentId?: 
         <div className="w-full lg:flex-1 rounded-xl overflow-hidden border border-edge bg-surface" style={{ minHeight: 280 }}>
           {loading ? (
             <div className="h-full flex items-center justify-center">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent" />
+              <Spinner size="sm" />
             </div>
           ) : routePositions.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center opacity-50 p-6">
@@ -284,7 +266,7 @@ export default function AgentGeolocalisation({ agentId, embedded }: { agentId?: 
           <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-edge/50">
             {loading ? (
               <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-accent" />
+                <Spinner size="sm" />
               </div>
             ) : locations.length === 0 ? (
               <div className="text-center py-8 opacity-50">

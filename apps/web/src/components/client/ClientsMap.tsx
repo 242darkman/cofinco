@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
@@ -152,7 +153,7 @@ export default function ClientsMap({ clients: propClients, height = '500px', sho
     return (
       <div className="bg-surface rounded-xl p-8 flex items-center justify-center" style={{ height }}>
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-accent border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <Spinner size="xl" className="mx-auto mb-4" />
           <p className="text-content-muted">Chargement de la carte...</p>
         </div>
       </div>

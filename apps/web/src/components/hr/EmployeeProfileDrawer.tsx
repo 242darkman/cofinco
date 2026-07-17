@@ -1,11 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  X, User, MapPin, Briefcase, Mail, Phone, CreditCard,
-  MoreVertical, CheckCircle, Ban, Calendar, MessageCircle,
-  Loader2, FileText, KeyRound, LogOut, Archive, History, Shield,
-  ChevronLeft, Upload, Download, Trash2, Clock, AlertTriangle,
-  Eye, File, Building2, Wallet, Users
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { X, User, MapPin, Briefcase, Mail, Phone, CreditCard, MoreVertical, CheckCircle, Ban, Calendar, MessageCircle, FileText, KeyRound, LogOut, Archive, History, Shield, ChevronLeft, Upload, Download, Trash2, Clock, AlertTriangle, Eye, File, Building2, Wallet, Users } from 'lucide-react';
 import { Employe } from '../../hooks/hr/useEmployes';
 import TransferAgenceModal from './TransferAgenceModal';
 import CreateClientModal from '../client/CreateClientModal';
@@ -547,7 +542,7 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
                       : 'bg-accent hover:bg-accent-primary-hover text-white'
                   }`}
                 >
-                  {actionLoading && <Loader2 size={16} className="animate-spin" />}
+                  {actionLoading && <Spinner size="xs" tone="current" />}
                   {confirmAction.confirmLabel}
                 </button>
               </div>
@@ -587,7 +582,7 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
                   className="px-4 py-2.5 bg-surface hover:bg-surface-elevated text-content-primary rounded-xl font-bold text-sm border border-edge flex items-center gap-2 transition-colors disabled:opacity-70 disabled:cursor-wait"
                 >
                   {isLoadingChat ? (
-                    <Loader2 size={18} className="animate-spin text-accent" />
+                    <Spinner size="sm" tone="accent" />
                   ) : (
                     <MessageCircle size={18} />
                   )}
@@ -852,7 +847,7 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
                   disabled={uploading}
                   className="flex items-center gap-2 px-3 py-2 bg-accent hover:bg-accent-primary-hover text-white text-xs font-bold rounded-lg transition-colors"
                 >
-                  {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                  {uploading ? <Spinner size="xs" tone="current" /> : <Upload size={14} />}
                   Ajouter
                 </button>
               </div>
@@ -899,7 +894,7 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
                       disabled={uploading || !uploadMeta.nom}
                       className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-accent hover:bg-accent-primary-hover disabled:bg-surface disabled:text-content-muted text-white text-xs font-bold rounded-lg transition-colors"
                     >
-                      {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                      {uploading ? <Spinner size="xs" tone="current" /> : <Upload size={14} />}
                       Choisir le fichier
                     </button>
                     <button
@@ -921,7 +916,7 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
 
               {docsLoading ? (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 size={24} className="animate-spin text-accent" />
+                  <Spinner size="sm" tone="accent" />
                 </div>
               ) : documents.length === 0 ? (
                 <div className="text-center py-12 text-content-muted">
@@ -1016,7 +1011,7 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
 
               {logsLoading ? (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 size={24} className="animate-spin text-accent" />
+                  <Spinner size="sm" tone="accent" />
                 </div>
               ) : auditLogs.length === 0 ? (
                 <div className="text-center py-12 text-content-muted">

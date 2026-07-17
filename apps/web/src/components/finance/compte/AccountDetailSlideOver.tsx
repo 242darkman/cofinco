@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetClose } from '../../ui/sheet';
 import TabGroup from '../../ui/TabGroup';
 import Badge from '../../ui/Badge';
-import { Button, IconButton } from '../../ui';
+import { Button, IconButton, Spinner } from '../../ui';
 import { compteEpargneApi, transactionEpargneApi, sessionCaisseApi } from '../../../lib/api-client';
 import { TransactionRowActions } from '../shared/TransactionRowActions';
 import { ReceiptViewer } from '../shared/ReceiptViewer';
@@ -246,7 +246,7 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
           <div className="flex-1 overflow-y-auto pro-scrollbar">
              {loading ? (
                 <div className="p-6 flex justify-center">
-                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                   <Spinner size="md" tone="onAccent" />
                 </div>
              ) : (
                 <div className="p-3 sm:p-4 space-y-3 sm:space-y-4">

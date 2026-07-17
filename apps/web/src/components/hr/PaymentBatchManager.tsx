@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { Building2, Send, CheckCircle, XCircle, Clock, Loader2, ChevronDown, ChevronUp, FileSpreadsheet, AlertTriangle } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { SkeletonList } from '@/components/ui/Skeleton';
+import { Building2, Send, CheckCircle, XCircle, Clock, ChevronDown, ChevronUp, FileSpreadsheet, AlertTriangle } from 'lucide-react';
 import { Card, Button, Modal, Badge, FormField } from '../ui';
 import { usePaymentBatches, usePaymentBatchDetail, type PaymentBatch } from '../../hooks/hr/usePaymentBatches';
 import { usePermissions } from '../auth/ProtectedFeature';
@@ -47,9 +49,7 @@ export default function PaymentBatchManager({ runId, onGenerateXlsx }: PaymentBa
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent" />
-      </div>
+      <SkeletonList items={5} />
     );
   }
 
@@ -102,7 +102,7 @@ export default function PaymentBatchManager({ runId, onGenerateXlsx }: PaymentBa
         <div className="flex items-center gap-2">
           {batches.length === 0 && (
             <Button size="sm" onClick={handleCreateBatches} disabled={isCreatingBatches}>
-              {isCreatingBatches ? <Loader2 size={14} className="animate-spin mr-1" /> : <Building2 size={14} className="mr-1" />}
+              {isCreatingBatches ? <Spinner size="xs" tone="current" className="mr-1" /> : <Building2 size={14} className="mr-1" />}
               Créer les batches
             </Button>
           )}

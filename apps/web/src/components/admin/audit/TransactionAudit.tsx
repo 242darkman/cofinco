@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { DollarSign, TrendingUp, TrendingDown, Filter, Download, Search, FileSpreadsheet, FileText, Shield } from 'lucide-react';
 import { addPdfLogoHeader } from '@/lib/pdf-logo';
 import { useDocumentBranding } from '@/hooks/useDocumentBranding';
@@ -6,22 +7,7 @@ import { auditApi } from '../../../lib/api-client';
 // P4.1: Lazy-load heavy export libraries
 import { loadPDFLibraries } from '@/lib/lazy-export';
 import { toast, handleApiError } from '../../../lib/toast';
-
-interface TransactionLog {
-  id: string;
-  timestamp: string;
-  transaction_type: string;
-  user_id: string;
-  client_id: string;
-  montant: number;
-  devise: string;
-  compte_source: string;
-  compte_destination: string;
-  statut_avant: string;
-  statut_apres: string;
-  reference: string;
-  description: string;
-}
+import type { TransactionLog } from './TransactionAudit.types';
 
 export default function TransactionAudit() {
   const branding = useDocumentBranding();
@@ -314,7 +300,7 @@ export default function TransactionAudit() {
 
         {loading ? (
           <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-status-success mx-auto"></div>
+            <Spinner size="xl" className="mx-auto" />
             <p className="text-content-muted mt-4">Chargement des transactions...</p>
           </div>
         ) : (

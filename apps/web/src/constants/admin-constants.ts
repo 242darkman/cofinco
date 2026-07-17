@@ -2,7 +2,6 @@
  * Constantes pour le module Admin
  */
 import { SystemRole } from '@shared/types/roles';
-import type { TenantFeatureKey } from '@shared/tenant-config';
 
 export const ADMIN_ROLES = [
   SystemRole.ADMIN,
@@ -36,47 +35,18 @@ export const CATEGORY_LABELS: Record<string, string> = {
   'Administrateur': 'Administration'
 };
 
-export const ADMIN_TABS = [
-  { id: 'dashboard', label: 'Dashboard', icon: 'BarChart3', permission: 'dashboard.view' },
-  { id: 'profils', label: 'Personnel', icon: 'Award', permission: 'rh.view' },
-  { id: 'logs', label: 'Logs', icon: 'Activity', permission: 'admin.logs' },
-  { id: 'sessions', label: 'Sessions', icon: 'Monitor', permission: 'admin.settings' },
-  { id: 'roles', label: 'Gestion des Accès', icon: 'Shield', permission: 'admin.roles' },
-  { id: 'maintenance', label: 'Maintenance', icon: 'Power', permission: 'admin.settings' },
-  { id: 'caisses', label: 'Caisses', icon: 'Wallet', permission: 'caisse.manage' },
-  { id: 'credits', label: 'Crédits', icon: 'CreditCard', permission: 'credits.view' },
-  { id: 'tontines', label: 'Tontines', icon: 'Users', permission: 'tontines.manage' },
-  { id: 'agences', label: 'Agences', icon: 'Building2', permission: 'admin.settings' },
-  { id: 'zones', label: 'Zones', icon: 'MapPin', permission: 'admin.settings' },
-  { id: 'notifications', label: 'Notifications', icon: 'MessageSquare', permission: 'admin.settings' },
-  { id: 'updates', label: 'Version', icon: 'Package', permission: 'admin.settings' },
-  { id: 'codes', label: 'Codes Caisse', icon: 'KeyRound', permission: 'caisse.manage' },
-  { id: 'regularisation', label: 'Régularisation', icon: 'AlertTriangle', permission: 'admin.manage' },
-  { id: 'client-credentials', label: 'Accès Clients', icon: 'Key', permission: 'admin.manage' },
-  { id: 'product-rates', label: 'Taux Produits', icon: 'Percent', permission: 'admin.manage' },
-  { id: 'zones-commerciales', label: 'Arrondissements & Marchés', icon: 'MapPin', permission: 'zones.view' },
-  { id: 'payment-methods', label: 'Paiements', icon: 'CreditCard', permission: 'admin.settings' },
-  { id: 'currency', label: 'Devise', icon: 'Coins', permission: 'admin.settings' },
-  { id: 'company-info', label: 'Société', icon: 'Building2', permission: 'admin.settings' },
-  { id: 'tenant', label: 'Tenant & Modules', icon: 'Settings', permission: 'admin.settings' },
-  { id: 'reset-agence', label: 'Reset Agence', icon: 'RotateCcw', permission: 'admin.manage' },
-  { id: 'scoring', label: 'Scoring', icon: 'BarChart3', permission: 'loyalty.view' },
-  { id: 'sync', label: 'Synchronisation', icon: 'CloudUpload', permission: 'admin.settings' },
-] as const;
-
-export type AdminTabId = typeof ADMIN_TABS[number]['id'];
-
 /**
- * Onglets d'administration liés à un flag tenant : masqués (et inaccessibles)
- * quand la feature est désactivée pour le déploiement, en parité avec la
- * navigation. Ajouter une entrée ici suffit à couvrir l'écran admin.
+ * Onglets d'administration : la SOURCE UNIQUE de vérité vit désormais dans
+ * `components/admin/admin-tabs.tsx` (métadonnées + URL + rendu). On re-exporte
+ * ici pour ne pas casser les imports existants (vues/hook de permissions).
  */
-export const ADMIN_TAB_TENANT_FEATURE: Partial<Record<AdminTabId, TenantFeatureKey>> = {
-  credits: 'enableCredits',
-  scoring: 'enableCredits',
-  'product-rates': 'enableCredits',
-  caisses: 'enableCaisse',
-  codes: 'enableCaisse',
-  tontines: 'enableTontine',
-  profils: 'enableRH',
-};
+export {
+  ADMIN_TABS,
+  ADMIN_TAB_TENANT_FEATURE,
+  ADMIN_SUBROUTES,
+  getAdminTab,
+  isAdminTabInScope,
+  isPlatformOperator,
+  PLATFORM_OPERATOR_ROLES,
+  type AdminTab,
+} from '@/components/admin/admin-tabs';

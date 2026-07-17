@@ -1,14 +1,12 @@
 import React, { useState, useCallback, useEffect } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { useMyPresence, MyPresence } from '../../hooks/hr/useMonEspace';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { useGeolocation } from '../../hooks/useGeolocation';
 import { hrPresenceApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
 import { Card, Badge, Button, StatCard, ResponsiveTable } from '../ui';
-import {
-  Clock, AlertTriangle, XCircle, ChevronLeft, ChevronRight, CalendarDays,
-  UserCheck, Coffee, LogOut, Play, Loader2, CheckCircle,
-} from 'lucide-react';
+import { Clock, AlertTriangle, XCircle, ChevronLeft, ChevronRight, CalendarDays, UserCheck, Coffee, LogOut, Play, CheckCircle } from 'lucide-react';
 
 const JOUR_NOMS = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
 
@@ -219,7 +217,7 @@ export default function MaPresenceTab() {
             )}
 
             {loadingToday ? (
-              <Loader2 className="h-4 w-4 animate-spin text-content-muted" />
+              <Spinner size="xs" tone="current" className="text-content-muted" />
             ) : isCheckedOut ? (
               <span className="flex items-center gap-1.5 text-xs font-bold text-status-success bg-status-success-bg px-2.5 py-1 rounded-md">
                 <CheckCircle className="h-3.5 w-3.5" />
@@ -229,12 +227,13 @@ export default function MaPresenceTab() {
               <Button
                 variant="primary"
                 size="sm"
-                icon={isCapturingGps ? Loader2 : UserCheck}
+                icon={UserCheck}
+                isLoading={isCapturingGps}
+                loadingText="Localisation..."
                 onClick={handleCheckIn}
                 disabled={isCapturingGps}
-                className={isCapturingGps ? '[&_svg]:animate-spin' : ''}
               >
-                {isCapturingGps ? 'Localisation...' : 'Pointer Arrivée'}
+                Pointer Arrivée
               </Button>
             ) : isWorking ? (
               <>

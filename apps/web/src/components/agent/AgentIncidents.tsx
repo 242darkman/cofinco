@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { AlertTriangle, Plus, CheckCircle, Clock, X, Upload, ArrowUpCircle, FileText, Image as ImageIcon, ChevronLeft, ChevronRight, Eye, Shield, AlertCircle } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usePermissions } from '../auth/ProtectedFeature';
@@ -7,6 +8,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '
 import { toast } from '@/lib/toast';
 import { agentKeys } from '@/lib/query-keys';
 import { authService } from '@/lib/auth';
+import type { Incident } from './AgentIncidents.types';
 
 // SLA thresholds in hours by severity
 const SLA_HOURS: Record<string, number> = {
@@ -40,23 +42,6 @@ function getSlaStatus(incident: Incident): { overdue: boolean; remaining: string
     remaining: remaining >= 24 ? `${Math.floor(remaining / 24)}j restants` : `${Math.floor(remaining)}h restants`,
     pct,
   };
-}
-
-interface Incident {
-  id: string;
-  agent_id: string;
-  type_incident: string;
-  gravite: string;
-  description: string;
-  date_incident: string;
-  localisation: string;
-  statut: string;
-  resolution: string;
-  date_resolution?: string;
-  pieces_jointes?: string[];
-  escalade_par?: string;
-  date_escalade?: string;
-  agent?: { nom: string; prenom: string };
 }
 
 export default function AgentIncidents({ agentId }: { agentId?: string }) {
@@ -362,7 +347,7 @@ export default function AgentIncidents({ agentId }: { agentId?: string }) {
         </div>
 
         {loading ? (
-          <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent" /></div>
+          <div className="flex justify-center py-12"><Spinner size="sm" /></div>
         ) : incidents.length === 0 ? (
           <div className="text-center py-12 opacity-50">
             <CheckCircle size={32} className="mx-auto mb-2 text-content-muted" />

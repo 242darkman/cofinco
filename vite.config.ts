@@ -29,6 +29,14 @@ export default defineConfig({
         globIgnores: ['**/node_modules/**/*', 'sw.js', 'workbox-*.js'],
         // Runtime caching strategies
         runtimeCaching: [
+          // Identité du tenant (branding + feature flags) : JAMAIS servie depuis
+          // le cache. Une config périmée changerait la marque et les modules
+          // visibles à l'écran. NetworkOnly, placée en tête pour être prioritaire
+          // sur le catch-all NetworkFirst plus bas.
+          {
+            urlPattern: /^\/api\/tenant\/config/i,
+            handler: 'NetworkOnly',
+          },
           // P2.5: Lightweight stats - StaleWhileRevalidate for instant display on 3G
           {
             urlPattern: /^\/api\/dashboard\/stats-light/i,
@@ -192,7 +200,9 @@ export default defineConfig({
       },
       // Development options
       devOptions: {
-        enabled: process.env.NODE_ENV === 'development',
+        // Avoid stale Workbox registrations in local dev: Vite serves source files
+        // directly, while the generated SW expects a production precache.
+        enabled: false,
         type: 'module'
       }
     }),
@@ -220,8 +230,10 @@ export default defineConfig({
     // Target modern browsers for smaller bundles
     target: 'es2020',
 
-    // Chunk size warning threshold
-    chunkSizeWarningLimit: 500,
+    // Seuil d'alerte de taille de chunk. Relevé pour couvrir nos gros chunks
+    // *lazy* et intentionnels (export-tools ≈ xlsx/pdf, charts, vendor) déjà
+    // isolés via manualChunks : ils ne sont chargés qu'à la demande.
+    chunkSizeWarningLimit: 1600,
 
     // Report compressed sizes
     reportCompressedSize: true,

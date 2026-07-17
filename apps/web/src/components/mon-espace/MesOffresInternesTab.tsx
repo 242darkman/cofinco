@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { Briefcase, MapPin, Clock, Send, Loader2 } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { SkeletonList } from '@/components/ui/Skeleton';
+import { Briefcase, MapPin, Clock, Send } from 'lucide-react';
 import { Card, Modal, TextareaField } from '../ui';
 import { useInternalOffers } from '../../hooks/hr/useJobOffers';
 
@@ -39,9 +41,7 @@ export default function MesOffresInternesTab() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
-      </div>
+      <SkeletonList items={5} />
     );
   }
 
@@ -190,7 +190,7 @@ export default function MesOffresInternesTab() {
               disabled={isApplying}
               className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold bg-accent text-white hover:bg-accent/90 disabled:opacity-50 transition-colors"
             >
-              {isApplying ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+              {isApplying ? <Spinner size="xs" tone="current" /> : <Send size={12} />}
               Envoyer ma candidature
             </button>
           </div>

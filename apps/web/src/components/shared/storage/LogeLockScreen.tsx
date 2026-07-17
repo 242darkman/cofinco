@@ -66,7 +66,7 @@ export default function LogeLockScreen({
                 disabled={isAuthenticating}
                 fullWidth
                 size="lg"
-                className="bg-gradient-to-r from-status-info to-accent hover:opacity-90 border-none"
+                className="bg-linear-to-r from-status-info to-accent hover:opacity-90 border-none"
                 isLoading={isAuthenticating}
                 icon={!isAuthenticating ? Lock : undefined}
               >

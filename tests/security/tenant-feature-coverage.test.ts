@@ -33,6 +33,7 @@ const EXEMPTED_PATHS: Array<{ pattern: RegExp; justification: string }> = [
 /** Associe un chemin à la feature attendue selon le vocabulaire du domaine. */
 function expectedFeature(path: string): TenantFeatureKey | undefined {
   if (/tontine/.test(path)) return "enableTontine";
+  if (/^\/api\/cartes-pointage(?:\/|$)/.test(path)) return "enableCartesPointage";
   if (/sms/.test(path)) return "enableSms";
   if (/mobile-money|pawapay|\/payments(?:-test)?(?:\/|$)/.test(path)) return "enableMobileMoney";
   if (
@@ -42,6 +43,20 @@ function expectedFeature(path: string): TenantFeatureKey | undefined {
   ) {
     return "enableFieldAgents";
   }
+  if (/^\/api\/credits(?:\/|$)|^\/api\/remboursements(?:\/|$)/.test(path)) return "enableCredits";
+  if (/^\/api\/comptes(?:\/|$)/.test(path)) return "enableComptes";
+  if (/^\/api\/(?:caisse|caisses|caisse-transferts|sessions-caisse|operations-caisse)(?:\/|$)/.test(path)) {
+    return "enableCaisse";
+  }
+  // Coffre AVANT transfert : /api/transferts-inter-coffres relève du coffre
+  // (le middleware le résout ainsi via l'ordre des règles).
+  if (/^\/api\/(?:coffre|transferts-inter-coffres|evacuations-coffre)(?:\/|$)/.test(path)) {
+    return "enableCoffreFort";
+  }
+  if (/^\/api\/transferts(?:\/|$)/.test(path)) return "enableTransfert";
+  if (/^\/api\/comptabilite(?:\/|$)/.test(path)) return "enableComptabilite";
+  if (/^\/api\/kpi(?:\/|$)/.test(path)) return "enableKpi";
+  if (/^\/api\/(?:hr|departments)(?:\/|$)/.test(path)) return "enableRH";
   return undefined;
 }
 

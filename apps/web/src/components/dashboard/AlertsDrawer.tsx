@@ -1,8 +1,9 @@
 import { useState, useCallback, useEffect } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
 import { Input, Button, Badge } from '../ui';
-import { Search, ShieldAlert, ChevronRight, Loader2 } from 'lucide-react';
+import { Search, ShieldAlert, ChevronRight } from 'lucide-react';
 import { resolveClientPhotoUrl } from '@/lib/format';
 import { useLanguage } from '../../contexts/LanguageContext';
 
@@ -171,7 +172,7 @@ export function AlertsDrawer({ open, onClose }: AlertsDrawerProps) {
         <div className="flex-1 overflow-y-auto p-3 space-y-2">
           {isLoading ? (
             <div className="flex justify-center py-12">
-              <Loader2 size={20} className="animate-spin text-content-muted" />
+              <Spinner size="sm" tone="current" className="text-content-muted" />
             </div>
           ) : clients.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-content-muted gap-3">

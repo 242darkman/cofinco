@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Loader2, RotateCcw, Paintbrush, AlertTriangle } from 'lucide-react';
+import { RotateCcw, Paintbrush, AlertTriangle } from 'lucide-react';
 import type { TenantBrandingKey, TenantFeatureKey } from '@shared/tenant-config';
 import { FEATURE_LABELS, BRANDING_LABELS } from './tenantSettingsLabels';
 import { TenantModulesPanel, type FeatureState } from './TenantModulesPanel';
@@ -141,7 +142,7 @@ export default function AdminTenantSettings() {
   if (featuresQuery.isLoading || brandingQuery.isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <Loader2 className="animate-spin text-accent" size={28} />
+        <Spinner size="md" tone="accent" />
       </div>
     );
   }
@@ -171,7 +172,7 @@ export default function AdminTenantSettings() {
       : null;
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6">
       {/* Modules provisionnés & intégrations (feature flags) */}
       <TenantModulesPanel
         features={features}

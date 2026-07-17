@@ -135,8 +135,7 @@ describe("cohérence RBAC : seeds ↔ mappings ↔ usages", () => {
 
   it("chaque code de permission utilisé par l'app est seedé (ou exempté avec justification)", () => {
     const sources = [
-      read("apps/web/src/constants/admin-constants.ts"),
-      read("apps/web/src/lib/routes-config.ts"),
+      read("apps/web/src/components/admin/admin-tabs.tsx"),
     ].join("\n");
     const used = [
       ...sources.matchAll(/permission: '([a-z-]+\.[a-z_.-]+)'/g),

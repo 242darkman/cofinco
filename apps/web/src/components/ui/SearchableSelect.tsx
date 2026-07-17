@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { ChevronDown, Search, X, Check, AlertCircle } from 'lucide-react';
 import { resolveStorageUrl } from '../../lib/format';
+import { Avatar } from '@/components/ui/Avatar';
 import * as Popover from '@radix-ui/react-popover';
 
 const PAGE_SIZE = 20;
@@ -13,34 +15,23 @@ function getInitials(label: string): string {
   return (words[0].charAt(0) + words[words.length - 1].charAt(0)).toUpperCase();
 }
 
-/** Composant Avatar avec fallback initiales */
 function OptionAvatar({ image, label, disabled, emoji }: { image?: string; label: string; disabled?: boolean; emoji?: string }) {
-  const [hasError, setHasError] = useState(false);
-  const resolvedUrl = image ? resolveStorageUrl(image) : null;
-
-  // Reset error state when image changes
-  useEffect(() => {
-    setHasError(false);
-  }, [image]);
-
-  const showImage = resolvedUrl && !hasError;
+  if (emoji && !image) {
+    return (
+      <div className={`relative ${disabled ? 'grayscale opacity-70' : ''}`}>
+        <span className="w-8 h-8 flex items-center justify-center text-xl leading-none flex-shrink-0">{emoji}</span>
+      </div>
+    );
+  }
 
   return (
-    <div className={`relative ${disabled ? 'grayscale opacity-70' : ''}`}>
-      {showImage ? (
-        <img
-          src={resolvedUrl}
-          alt=""
-          className="w-8 h-8 rounded-full object-cover border border-edge-strong"
-          onError={() => setHasError(true)}
-        />
-      ) : emoji ? (
-        <span className="w-8 h-8 flex items-center justify-center text-xl leading-none flex-shrink-0">{emoji}</span>
-      ) : (
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-surface-subtle to-surface-elevated flex items-center justify-center text-xs font-bold text-content-primary border border-edge-strong flex-shrink-0">
-          {getInitials(label)}
-        </div>
-      )}
+    <div className={`shrink-0 ${disabled ? 'grayscale opacity-70' : ''}`}>
+      <Avatar
+        photoUrl={image}
+        fullName={label}
+        initials={getInitials(label)}
+        size="sm"
+      />
     </div>
   );
 }
@@ -276,9 +267,9 @@ export default function SearchableSelect({
   return (
     <div className={`relative ${className} ${label ? 'mb-4' : ''}`} ref={containerRef}>
       {label && (
-        <label htmlFor={name} className="block font-inter font-medium text-[13px] text-[#374151] mb-[6px]">
+        <label htmlFor={name} className="block font-inter font-medium text-[13px] text-content-secondary mb-[6px]">
           {label}
-          {required && <span className="text-[#EF4444] ml-1">*</span>}
+          {required && <span className="text-status-danger ml-1">*</span>}
         </label>
       )}
 
@@ -299,24 +290,25 @@ export default function SearchableSelect({
               transition-all duration-200
               ${variant === 'dark'
                 ? 'bg-surface-base border-edge text-content-primary'
-                : 'bg-white text-[#111827]'
+                : 'bg-input-bg text-input-text'
               }
-              ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-gray-400'}
-              ${isOpen ? 'border-[#059669] ring-[3px] ring-[#059669]/30' : (variant === 'dark' ? '' : 'border-[#E5E7EB]')}
-              ${error ? '!border-[#EF4444] !ring-[3px] !ring-[#EF4444]/30' : ''}
+              ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-content-muted'}
+              ${isOpen ? 'border-accent ring-[3px] ring-accent/30' : (variant === 'dark' ? '' : 'border-input-border')}
+              ${error ? '!border-status-danger !ring-[3px] !ring-status-danger/30' : ''}
             `}
           >
               {/* Left Icon / Avatar — small (20px) to match SelectField height */}
                {showAvatarInTrigger && selectedOption && !selectedOption.hideAvatar ? (
                  <div className="shrink-0 mr-2 flex items-center">
-                   {selectedOption.image && !selectedOption.emoji ? (
-                     <img src={resolveStorageUrl(selectedOption.image)} alt="" className="w-5 h-5 rounded-full object-cover border border-edge-strong" />
-                   ) : selectedOption.emoji ? (
+                   {selectedOption.emoji && !selectedOption.image ? (
                      <span className="w-5 h-5 flex items-center justify-center text-sm leading-none">{selectedOption.emoji}</span>
                    ) : (
-                     <div className="w-5 h-5 rounded-full bg-gradient-to-br from-surface-subtle to-surface-elevated flex items-center justify-center text-[9px] font-bold text-content-primary border border-edge-strong">
-                       {getInitials(selectedOption.label)}
-                     </div>
+                     <Avatar
+                       photoUrl={selectedOption.image}
+                       fullName={selectedOption.label}
+                       initials={getInitials(selectedOption.label)}
+                       className="w-5 h-5 text-[9px]"
+                     />
                    )}
                  </div>
                ) : (
@@ -337,7 +329,7 @@ export default function SearchableSelect({
                            if (onSearchChange) onSearchChange(e.target.value);
                         }}
                         placeholder="Tapez pour rechercher..."
-                        className="w-full bg-transparent border-none p-0 text-[#111827] placeholder:text-[#9CA3AF] placeholder:font-normal focus:ring-0 focus:outline-none text-[13px]"
+                        className="w-full bg-transparent border-none p-0 text-input-text placeholder:text-input-placeholder placeholder:font-normal focus:ring-0 focus:outline-none text-[13px]"
                         onClick={(e) => e.stopPropagation()}
                         onKeyDown={(e) => {
                            e.stopPropagation();
@@ -345,7 +337,7 @@ export default function SearchableSelect({
                         }}
                      />
                   ) : selectedOption ? (
-                    <span className="text-[13px] text-[#111827] truncate leading-tight block">{selectedOption.label}</span>
+                    <span className="text-[13px] text-input-text truncate leading-tight block">{selectedOption.label}</span>
                   ) : (
                      <span className="text-[#9CA3AF] text-[13px] block">{placeholder}</span>
                   )}
@@ -379,7 +371,7 @@ export default function SearchableSelect({
                     }}
                     className="cursor-pointer transition-colors"
                   >
-                    <ChevronDown size={16} strokeWidth={1.5} className={`text-gray-500 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+                    <ChevronDown size={16} strokeWidth={1.5} className={`text-content-muted transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
                   </div>
                </div>
           </div>
@@ -397,7 +389,7 @@ export default function SearchableSelect({
                  {/* Initial full loading state */}
                  {isLoading && visibleOptions.length === 0 ? (
                    <div className="p-8 flex flex-col items-center justify-center gap-3 text-content-muted">
-                     <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin"></div>
+                     <Spinner size="sm" />
                      <span className="text-xs font-medium uppercase tracking-wider">Chargement...</span>
                    </div>
                  ) : visibleOptions.length > 0 ? (
@@ -447,7 +439,7 @@ export default function SearchableSelect({
                       {hasMore && (
                         isLoadingMore ? (
                           <div className="py-3 flex justify-center">
-                            <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+                            <Spinner size="sm" />
                           </div>
                         ) : (
                           <>
@@ -488,7 +480,7 @@ export default function SearchableSelect({
 
       {/* Errors */}
       {error && (
-        <p className="absolute -bottom-5 left-0 text-[11px] text-[#EF4444] flex items-center gap-1 mt-1">
+        <p className="absolute -bottom-5 left-0 text-[11px] text-status-danger flex items-center gap-1 mt-1">
           <AlertCircle size={12} strokeWidth={2} className="shrink-0" />
           {error}
         </p>

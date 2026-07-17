@@ -13,30 +13,7 @@ import React, { useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import {
-  CheckCircle2,
-  XCircle,
-  Loader2,
-  ArrowRightLeft,
-  Wallet,
-  Clock,
-  ArrowUpRight,
-  ArrowDownRight,
-  Shield,
-  AlertTriangle,
-  AlertCircle,
-  Settings,
-  Download,
-  MoreHorizontal,
-  Play,
-  Ban,
-  Eye,
-  Vault,
-  User,
-  KeyRound,
-  Info,
-  X
-} from "lucide-react";
+import { CheckCircle2, XCircle, ArrowRightLeft, Wallet, Clock, ArrowUpRight, ArrowDownRight, Shield, AlertTriangle, AlertCircle, Settings, Download, MoreHorizontal, Play, Ban, Eye, Vault, User, KeyRound, Info, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Card, Button, Badge, StatCard, ResponsiveTable, TabGroup, ConfirmDialog, IconButton } from "@/components/ui";
@@ -125,9 +102,9 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
           <span className="text-[9px] text-content-muted">{currency.symbol}</span>
         </div>
 
-        {/* Tabs — underline style, scrollable */}
-        <nav className="flex-1 min-w-0 overflow-x-auto scrollbar-hide" role="tablist">
-          <div className="flex items-center">
+        {/* Premium Compact Navigation */}
+        <nav className="flex-1 min-w-0 overflow-x-auto scrollbar-hide py-1" role="tablist">
+          <div className="flex items-center gap-1.5 p-1 bg-surface-muted/20 border border-edge rounded-2xl w-fit">
             {[
               { id: 'operations', label: 'Transferts', icon: ArrowRightLeft },
               { id: 'intercoffres', label: 'Inter-Coffres', icon: Vault },
@@ -137,6 +114,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
               ...(canConfigure ? [{ id: 'admin', label: 'Admin', icon: Settings }] : [])
             ].map(tab => {
               const isActive = activeTab === tab.id;
+              const Icon = tab.icon;
               return (
                 <button
                   key={tab.id}
@@ -144,19 +122,22 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
                   aria-selected={isActive}
                   onClick={() => setActiveTab(tab.id)}
                   className={`
-                    relative flex items-center gap-1.5 px-2.5 py-2.5 text-[11px] font-medium whitespace-nowrap transition-colors
-                    ${isActive ? 'text-status-info' : 'text-content-muted hover:text-content-secondary'}
+                    relative px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all flex items-center gap-2 outline-none group
+                    ${isActive ? 'text-accent' : 'text-content-muted hover:text-content-primary hover:bg-surface-subtle'}
                   `}
                 >
-                  <tab.icon size={13} />
-                  {tab.label}
+                  {isActive && (
+                    <div className="absolute inset-0 bg-accent/10 border border-accent/20 shadow-sm rounded-xl" />
+                  )}
+                  <Icon size={14} className={`relative z-10 transition-colors ${isActive ? 'text-accent' : 'opacity-60'}`} />
+                  <span className="relative z-10 whitespace-nowrap uppercase tracking-wider">{tab.label}</span>
                   {tab.id === 'operations' && pendingCount > 0 && (
-                    <span className="px-1 min-w-[16px] text-center rounded-full bg-status-warning text-white text-[9px] font-bold leading-[16px]">
+                    <span className={`
+                      relative z-10 text-[9px] px-1.5 py-0.5 rounded-full font-black min-w-[16px] text-center
+                      ${isActive ? 'bg-accent text-white shadow-sm' : 'bg-surface-elevated border border-edge text-content-muted'}
+                    `}>
                       {pendingCount}
                     </span>
-                  )}
-                  {isActive && (
-                    <span className="absolute bottom-0 inset-x-1.5 h-[2px] bg-accent rounded-full" />
                   )}
                 </button>
               );
@@ -169,10 +150,15 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
           <div className="relative shrink-0">
             <button
               onClick={() => setShowHelp(v => !v)}
-              className={`p-1.5 rounded-md transition ${showHelp ? 'text-status-info bg-status-info-bg' : 'text-content-muted hover:text-content-muted'}`}
+              className={`px-2.5 py-1.5 flex items-center gap-1.5 rounded-lg text-xs font-medium transition-colors border shadow-sm ${
+                showHelp 
+                  ? 'text-status-info bg-status-info-bg border-status-info/30' 
+                  : 'text-content-secondary bg-surface-elevated hover:bg-surface-hover hover:text-content-primary border-edge'
+              }`}
               aria-label="Aide"
             >
               <Info size={14} />
+              <span>Aide</span>
             </button>
             {showHelp && (
               <>
@@ -192,7 +178,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
             className="shrink-0 flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 text-[11px] font-semibold text-status-success border border-status-success/30 rounded-lg hover:bg-status-success-bg transition whitespace-nowrap"
           >
             <ArrowDownRight size={13} />
-            <span className="hidden sm:inline">Approvisionner</span>
+            <span>Approvisionner</span>
           </button>
         )}
       </div>

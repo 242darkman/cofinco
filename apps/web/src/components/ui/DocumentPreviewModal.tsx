@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Download, ExternalLink, FileText, Loader } from 'lucide-react';
+import { X, Download, ExternalLink, FileText } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
 
 interface DocumentPreviewModalProps {
   isOpen: boolean;
@@ -99,7 +100,7 @@ export default function DocumentPreviewModal({
         <div className="flex-1 overflow-hidden p-2 min-h-0">
           {loading ? (
             <div className="flex items-center justify-center h-64">
-              <Loader size={24} className="animate-spin text-accent" />
+              <Spinner size="sm" tone="accent" />
             </div>
           ) : error ? (
             <div className="flex flex-col items-center justify-center h-64 text-content-muted">

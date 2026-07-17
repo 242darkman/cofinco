@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Settings, Save, Loader2, Plus, ToggleLeft, ToggleRight, ChevronLeft, ChevronRight, Award } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Settings, Save, Plus, ToggleLeft, ToggleRight, ChevronLeft, ChevronRight, Award } from 'lucide-react';
 import { prospectionPrimeApi } from '../../lib/api-client';
 import { toast } from 'sonner';
 import { FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui';
@@ -88,7 +89,7 @@ export default function ProspectionPrimeConfig() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <Loader2 size={20} className="animate-spin text-accent" />
+        <Spinner size="sm" tone="accent" />
       </div>
     );
   }
@@ -230,7 +231,7 @@ export default function ProspectionPrimeConfig() {
               disabled={saving}
               className="flex-1 py-1.5 bg-accent-secondary hover:bg-accent-secondary-hover text-white rounded text-xs font-medium flex items-center justify-center gap-1 transition disabled:opacity-50"
             >
-              {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+              {saving ? <Spinner size="xs" tone="current" /> : <Save size={12} />}
               Créer
             </button>
           </div>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { Shield, Filter, Download, Search, AlertTriangle, CheckCircle, XCircle, Clock, FileSpreadsheet, FileText } from 'lucide-react';
 import { addPdfLogoHeader } from '@/lib/pdf-logo';
 import { useDocumentBranding } from '@/hooks/useDocumentBranding';
@@ -7,20 +8,7 @@ import { toast, handleApiError } from '../../../lib/toast';
 import { ALL_STATUS_LABELS } from '../../../lib/status-labels';
 // P4.1: Lazy-load heavy export libraries
 import { loadPDFLibraries } from '@/lib/lazy-export';
-
-interface AuditLog {
-  id: string;
-  timestamp?: string;
-  createdAt?: string;
-  userEmail?: string;
-  action?: string;
-  entityType?: string;
-  entityId?: string;
-  resource?: string;
-  status?: string;
-  ipAddress?: string;
-  errorMessage?: string;
-}
+import type { AuditLog } from './AuditLogs.types';
 
 const formatLogDate = (log: any) => {
   const value = log?.timestamp ?? log?.createdAt;
@@ -361,7 +349,7 @@ export default function AuditLogs() {
 
         {loading ? (
           <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-status-success mx-auto"></div>
+            <Spinner size="xl" className="mx-auto" />
             <p className="text-content-muted mt-4">Chargement des logs...</p>
           </div>
         ) : (

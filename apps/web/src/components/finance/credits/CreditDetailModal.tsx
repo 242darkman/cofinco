@@ -435,7 +435,7 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
                 {/* Progress Bar - Compact */}
                 <div className="relative h-1.5 bg-surface-elevated/50 rounded-full overflow-hidden mb-3">
                   <div
-                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-status-success to-status-success rounded-full transition-all duration-700 ease-out"
+                    className="absolute inset-y-0 left-0 bg-linear-to-r from-status-success to-status-success rounded-full transition-all duration-700 ease-out"
                     style={{ width: `${progression}%` }}
                   />
                 </div>

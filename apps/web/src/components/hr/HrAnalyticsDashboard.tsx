@@ -1,4 +1,5 @@
 import React from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Users, TrendingDown, Briefcase } from 'lucide-react';
 import { useHrAnalytics } from '../../hooks/hr/useHrAnalytics';
@@ -26,7 +27,7 @@ export default function HrAnalyticsDashboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+        <Spinner size="md" />
       </div>
     );
   }

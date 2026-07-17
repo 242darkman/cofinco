@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Loader2, Landmark } from 'lucide-react';
+import { Landmark } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Modal, Button, FormField, TextareaField } from '../../ui';

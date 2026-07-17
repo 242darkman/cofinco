@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { CheckCircle, XCircle, Search, Clock, DollarSign, User, AlertCircle, RefreshCw, MapPin, Smartphone, CreditCard, Hash, Calendar, Building2, CheckSquare, Square, MinusSquare, Loader2, FileImage, Eye } from 'lucide-react';
-import { Button, Modal, FormField, ResponsiveTable, Badge, Card, FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui';
+import { CheckCircle, XCircle, Search, Clock, DollarSign, User, AlertCircle, RefreshCw, MapPin, Smartphone, CreditCard, Hash, Calendar, Building2, CheckSquare, Square, MinusSquare, FileImage, Eye } from 'lucide-react';
+import { Button, Modal, FormField, ResponsiveTable, Badge, Card, FeatureHeader, FEATURE_DESCRIPTIONS, Avatar, Spinner } from '../ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -361,24 +361,22 @@ export default function AdminValidationTerrain() {
       label: 'Client',
       format: (_: any, item: PaiementTerrain) => (
         <div className="flex items-center gap-2">
-          {item.clients?.photoProfile && (
+          {item.clients?.photoProfile ? (
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 handlePreviewDocument(item);
               }}
-              className="relative group"
+              className="relative group shrink-0"
               title="Voir la photo"
             >
-              <img
-                src={item.clients.photoProfile}
-                alt=""
-                className="w-8 h-8 rounded-full object-cover border border-edge-strong"
-              />
+              <Avatar photoUrl={item.clients.photoProfile} fullName={`${item.clients.nom} ${item.clients.prenom}`} size="sm" />
               <div className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
-                <Eye size={12} className="text-content-primary" />
+                <Eye size={12} className="text-white" />
               </div>
             </button>
+          ) : (
+            <Avatar fullName={item.clients ? `${item.clients.nom} ${item.clients.prenom}` : 'Inconnu'} size="sm" />
           )}
           <div className="flex flex-col">
             <span className="font-medium">{item.clients ? `${item.clients.nom} ${item.clients.prenom}` : 'Inconnu'}</span>
@@ -505,7 +503,7 @@ export default function AdminValidationTerrain() {
 
            {bulkProcessing && bulkProgress && (
              <div className="flex items-center gap-3 px-4 py-2 bg-accent/10 rounded-lg border border-accent/30">
-               <Loader2 className="animate-spin text-accent" size={16} />
+               <Spinner size="xs" tone="accent" />
                <div className="text-sm">
                  <span className="text-content-primary font-medium">{bulkProgress.current}</span>
                  <span className="text-content-muted"> / {bulkProgress.total}</span>

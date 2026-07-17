@@ -202,7 +202,7 @@ export default function CompteBloqueForm({ onClose, onSuccess, clientId }: Compt
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
       <div className="bg-surface rounded-xl border border-edge w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="bg-gradient-to-r from-status-success/20 to-status-info/20 border-b border-edge p-6 flex justify-between items-center">
+        <div className="bg-linear-to-r from-status-success/20 to-status-info/20 border-b border-edge p-6 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <Lock className="text-status-success" size={24} />
             <div>

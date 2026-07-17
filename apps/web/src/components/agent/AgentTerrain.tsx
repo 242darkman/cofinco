@@ -1,11 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import {
-  Users, Wallet, ArrowRightLeft, UserPlus, RefreshCw,
-  Wifi, Search, MapPin, ChevronDown, Clock, CheckCircle,
-  Target, Banknote, Calendar, AlertTriangle,
-  ClipboardCheck, ChevronLeft, ChevronRight, Loader2,
-  ShieldCheck, Printer, ArrowDownLeft, ArrowUpRight, Filter, X
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Users, Wallet, ArrowRightLeft, UserPlus, RefreshCw, Wifi, Search, MapPin, ChevronDown, Clock, CheckCircle, Target, Banknote, Calendar, AlertTriangle, ClipboardCheck, ChevronLeft, ChevronRight, ShieldCheck, Printer, ArrowDownLeft, ArrowUpRight, Filter, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { agentTerrainApi, caisseAgentApi } from '../../lib/api-client';
 import { authService } from '../../lib/auth';
@@ -23,6 +18,7 @@ import { ReceiptData } from '../ui/printable/ReceiptTemplate';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../ui/sheet';
 import { useIsOnline } from '@/contexts/NetworkContext';
 import { getOperationStats } from '@/lib/offline-db';
+import { Avatar } from '@/components/ui/Avatar';
 import { StatutUser, StatutOperationTerrain, TYPE_OPERATION_TERRAIN_LABELS, TypeOperationTerrainType } from '@shared/enum/status-constants';
 import { Actions, Subjects } from '@/lib/casl';
 import { currencySymbol } from '@shared/config/currency';
@@ -576,13 +572,15 @@ export default function AgentTerrain({ activeView, agentId: propAgentId, embedde
             ) : (
               <div className="flex items-center justify-between gap-3 relative">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  {currentAgent?.photoProfile ? (
-                    <img src={resolveStorageUrl(currentAgent.photoProfile)} alt="" className="w-8 h-8 rounded-full object-cover shrink-0 border-2 border-accent/30" />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center font-bold text-xs text-white shrink-0">
-                      {currentAgent ? `${currentAgent.nom.charAt(0)}${currentAgent.prenom.charAt(0)}` : <Users size={14} />}
-                    </div>
-                  )}
+                  <div className="shrink-0">
+                    <Avatar
+                      photoUrl={currentAgent?.photoProfile}
+                      fullName={currentAgent ? `${currentAgent.nom} ${currentAgent.prenom}` : '...'}
+                      initials={currentAgent ? `${currentAgent.nom.charAt(0)}${currentAgent.prenom.charAt(0)}` : '?'}
+                      size="sm"
+                      className="border-2 border-accent/30"
+                    />
+                  </div>
                   <div className="min-w-0">
                     <div className="text-[9px] text-content-muted uppercase font-bold tracking-wider">
                       {canSupervise ? 'Supervision' : 'Agent Actif'}
@@ -748,7 +746,7 @@ export default function AgentTerrain({ activeView, agentId: propAgentId, embedde
                     disabled={txLoading}
                     className="px-4 py-2 rounded-lg bg-surface border border-edge text-xs font-bold text-content-secondary hover:bg-surface-elevated transition-colors disabled:opacity-50 flex items-center gap-2"
                   >
-                    {txLoading ? <Loader2 size={12} className="animate-spin" /> : null}
+                    {txLoading ? <Spinner size="xs" tone="current" /> : null}
                     Charger plus
                   </button>
                 </div>
@@ -756,7 +754,7 @@ export default function AgentTerrain({ activeView, agentId: propAgentId, embedde
 
               {txLoading && transactions.length === 0 && (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 size={20} className="animate-spin text-accent" />
+                  <Spinner size="sm" tone="accent" />
                 </div>
               )}
             </>
@@ -1092,13 +1090,14 @@ function AgentSelector({ agents, open, searchQuery, onToggle, onSelect, onSearch
                 onClick={() => onSelect(agent.id)}
                 className="w-full px-4 py-3 flex items-center gap-3 hover:bg-surface transition-colors text-left border-b border-edge last:border-b-0"
               >
-                {agent.photoProfile ? (
-                  <img src={resolveStorageUrl(agent.photoProfile)} alt="" className="w-9 h-9 rounded-full object-cover border border-edge-strong" />
-                ) : (
-                  <div className="w-9 h-9 rounded-full bg-accent/10 flex items-center justify-center text-accent font-bold text-xs">
-                    {agent.nom.charAt(0)}{agent.prenom.charAt(0)}
-                  </div>
-                )}
+                <div className="shrink-0">
+                  <Avatar
+                    photoUrl={agent.photoProfile}
+                    fullName={`${agent.nom} ${agent.prenom}`}
+                    initials={`${agent.nom.charAt(0)}${agent.prenom.charAt(0)}`}
+                    size="sm"
+                  />
+                </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-content-primary truncate">
                     {agent.nom} {agent.prenom}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Trash2, AlertCircle, AlertTriangle, Info, Edit2, Save, X, MessageSquare, ChevronLeft, ChevronRight, CheckSquare, Square, ListTodo } from 'lucide-react';
-import { Card, Badge } from '../ui';
+import { Card, Badge, Spinner } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
 
 const NOTES_PER_PAGE = 10;
@@ -286,7 +286,7 @@ export default function ClientNotes({ clientId }: ClientNotesProps) {
       {/* Notes List */}
         {loading ? (
            <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
+            <Spinner size="md" />
           </div>
         ) : notes.length === 0 ? (
           <Card variant="default" padding="lg" className="border-dashed border-edge bg-transparent text-center">

@@ -6,6 +6,9 @@ dist
 !.env.production.example
 !.env.vps.example
 .DS_Store
+
+# Réglages locaux d'outillage (permissions par machine, non versionnés)
+.claude/settings.local.json
 server/public
 vite.config.ts.*
 *.tar.gz

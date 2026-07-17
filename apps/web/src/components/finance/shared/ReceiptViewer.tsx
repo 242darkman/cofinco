@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
-import { Download, Share2, Loader2 } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Download, Share2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { Button, Modal } from '@/components/ui';
 import { factureApi } from '@/lib/api/factureApi';
@@ -119,7 +120,7 @@ export const ReceiptViewer: React.FC<ReceiptViewerProps> = ({
       {/* Content */}
       {isLoading && (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="animate-spin text-status-success" size={32} />
+          <Spinner size="md" tone="accent" />
         </div>
       )}
 

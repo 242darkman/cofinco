@@ -12,6 +12,8 @@
 
 import { offlineBus } from './offline-bus';
 import type { JournalEntry, JournalEventType } from './offline-db';
+import { db, setMetadata, getMetadata } from './offline-db';
+import { isNetworkUsable } from './networkManager';
 import { currencySymbol } from '@shared/config/currency';
 
 // ========== TYPES ==========
@@ -192,8 +194,6 @@ function registerSyncReactor(): UnsubscribeFn {
     syncTimeout = setTimeout(async () => {
       syncTimeout = null;
       try {
-        // Import dynamically to avoid circular dependency
-        const { isNetworkUsable } = await import('./networkManager');
         if (isNetworkUsable()) {
           await context.syncService!.syncJournal();
         } else {
@@ -221,8 +221,6 @@ function registerLimitsReactor(): UnsubscribeFn {
     if (!isFinancialEvent(entry.type)) return;
 
     try {
-      const { db } = await import('./offline-db');
-
       // Get current session
       const today = new Date().toISOString().slice(0, 10);
       const session = await db.agentDaySessions
@@ -293,8 +291,6 @@ function registerLimitsReactor(): UnsubscribeFn {
 function registerAuditReactor(): UnsubscribeFn {
   return offlineBus.on('*', async (entry) => {
     try {
-      const { setMetadata, getMetadata } = await import('./offline-db');
-
       const auditLog = (await getMetadata<Array<{
         timestamp: number;
         action: string;

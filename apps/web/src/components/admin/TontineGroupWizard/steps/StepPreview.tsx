@@ -1,4 +1,5 @@
-import { Loader2, CalendarDays } from "lucide-react";
+import { CalendarDays } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
 import type { StepComponentProps } from "../types";
 import type { SchedulePreview } from "../../TontinePlanWizard/hooks/useSchedulePreview";
 
@@ -29,7 +30,7 @@ export default function StepPreview({
           className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg bg-accent text-white hover:bg-accent/90 disabled:opacity-50 transition-colors"
         >
           {previewLoading ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            <Spinner size="xs" tone="current" />
           ) : (
             <CalendarDays className="w-3.5 h-3.5" />
           )}

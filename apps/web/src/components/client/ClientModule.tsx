@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useClientAlerts } from '../../hooks/useClientAlerts';
-import { Plus, Search, Filter, Download, Upload, Users, MapPin, RefreshCw, List, Eye, Edit2, Trash2, ChevronRight, FileText, CreditCard, Shield, BarChart3, AlertCircle, Building2, Send, DollarSign, UserPlus, LayoutDashboard, User, Phone, Scale, Network, TrendingUp, FileSearch } from 'lucide-react';
-import { Button, IconButton, Card, ResponsiveTable, Badge, ConfirmDialog, FeatureHeader, FEATURE_DESCRIPTIONS, TabGroup } from '../ui';
+import { Plus, Search, Download, Upload, Users, MapPin, RefreshCw, List, Eye, Edit2, ChevronRight, BarChart3, Send, UserPlus, ChevronDown } from 'lucide-react';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import { Button, IconButton, Card, ResponsiveTable, ConfirmDialog, FeatureHeader, FEATURE_DESCRIPTIONS, LoadingSpinner, EmptyState, Pagination } from '../ui';
 import { usePermissions, ProtectedFeature } from '../auth/ProtectedFeature';
 import ClientForm from './ClientForm';
 import CreateClientModal from './CreateClientModal';
@@ -12,44 +13,22 @@ import ClientImport from './ClientImport';
 import ClientsMap from './ClientsMap';
 import ClientProfileLayout from './ClientProfileLayout';
 import ClientEditDrawer from './ClientEditDrawer';
-import ClientOverviewTab from './tabs/ClientOverviewTab';
-import ClientProfileTab from './tabs/ClientProfileTab';
-import ClientContactTab from './tabs/ClientContactTab';
-import ClientKycLegalTab from './tabs/ClientKycLegalTab';
-import ClientReferencesTab from './tabs/ClientReferencesTab';
-import ClientAccounts from './ClientAccounts';
-import ClientKYC from './ClientKYC';
-import ClientNotes from './ClientNotes';
-import ClientGlobalHistory from './ClientGlobalHistory';
-import ClientAlerts from './ClientAlerts';
-import ClientScoreTab from './tabs/ClientScoreTab';
-import ClientEnquetesTab from './tabs/ClientEnquetesTab';
+import ClientProfileTabsPanel, { CLIENT_TAB_IDS } from './tabs/ClientProfileTabsPanel';
 import ClientBulkCommunication from './ClientBulkCommunication';
 import ClientSearch from './ClientSearch';
 import SelectEmployeeForConversionModal from './SelectEmployeeForConversionModal';
+import { CLIENT_LIST_COLUMNS } from './client-list-columns';
 import type { EmployeeConversionData } from './CreateClientModal';
 import { clientService } from '../../services/clientService';
-import LoadingSpinner from '../ui/LoadingSpinner';
-import EmptyState from '../ui/EmptyState';
 import { toast, handleApiError } from '../../lib/toast';
-import { Pagination } from '../ui/Pagination';
-import { formatClientName, resolveStorageUrl, formatPhoneNumber } from '../../lib/format';
-import { StatutClient, STATUT_CLIENT_LABELS } from '@shared/enum/status-constants';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
-import {
-  getStatusLabel,
-  getStatusColor,
-  CLIENT_STATUS_COLORS,
-  CLIENT_SEGMENT_LABELS,
-  CLIENT_SEGMENT_COLORS
-} from '../../lib/status-labels';
 
 interface ClientModuleProps {
   onModuleChange?: (module: string, subModule?: string, data?: any) => void;
   activeSubModule?: string;
 }
 
-const CLIENT_TAB_IDS = ['overview', 'profil', 'coordonnees', 'kyc-legal', 'references', 'comptes', 'kyc', 'notes', 'transactions', 'enquetes', 'alertes', 'score'] as const;
+// CLIENT_TAB_IDS vit désormais dans ./tabs/ClientProfileTabsPanel (source de vérité).
 
 export default function ClientModule({ onModuleChange, activeSubModule }: ClientModuleProps) {
   // RBAC permissions
@@ -148,11 +127,6 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
     }
   };
 
-  const getPhotoUrl = (client: any) => {
-    const raw = client.photoProfile || '';
-    return resolveStorageUrl(raw);
-  };
-
   const handleSaveClient = async (clientData: any) => {
     try {
       if (selectedClient) {
@@ -243,43 +217,14 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
           onEdit={() => setShowEditDrawer(true)}
           onDelete={() => handleDeleteClick(viewingClient.id)}
         >
-          {/* Tabs */}
-          <TabGroup
+          {/* Onglets + contenu (extraits — voir ClientProfileTabsPanel) */}
+          <ClientProfileTabsPanel
+            client={viewingClient}
             activeTab={activeTab}
-            onTabChange={(key) => navigateToPath(`/clients/${viewingClient.id}/${key}`)}
-            variant="underline"
-            size="sm"
-            tabs={[
-              { key: 'overview', label: 'Vue d\'ensemble', icon: LayoutDashboard },
-              { key: 'profil', label: 'Profil', icon: User },
-              { key: 'coordonnees', label: 'Coordonnées', icon: Phone },
-              { key: 'kyc-legal', label: 'Dossier KYC', icon: Scale },
-              { key: 'references', label: 'Références', icon: Network },
-              { key: 'comptes', label: 'Comptes', icon: CreditCard },
-              { key: 'kyc', label: 'Documents KYC', icon: Shield },
-              { key: 'notes', label: 'Notes', icon: Edit2 },
-              { key: 'transactions', label: 'Transactions', icon: DollarSign },
-              { key: 'enquetes', label: 'Enquêtes', icon: FileSearch },
-              { key: 'alertes', label: 'Alertes', icon: AlertCircle, badge: alertCount > 0 ? alertCount : undefined, badgeClassName: alertCount > 0 ? 'bg-status-danger text-white' : undefined },
-              { key: 'score', label: 'Score', icon: TrendingUp },
-            ]}
+            alertCount={alertCount}
+            onNavigateToTab={(tab) => navigateToPath(`/clients/${viewingClient.id}/${tab}`)}
+            onClientsReload={loadClients}
           />
-
-          {/* Tab Content */}
-          <div className="min-h-[400px] mt-4">
-            {activeTab === 'overview' && <ClientOverviewTab client={viewingClient} onNavigateToTab={(tab) => navigateToPath(`/clients/${viewingClient.id}/${tab}`)} />}
-            {activeTab === 'profil' && <ClientProfileTab client={viewingClient} />}
-            {activeTab === 'coordonnees' && <ClientContactTab client={viewingClient} />}
-            {activeTab === 'kyc-legal' && <ClientKycLegalTab client={viewingClient} />}
-            {activeTab === 'references' && <ClientReferencesTab client={viewingClient} />}
-            {activeTab === 'comptes' && <ClientAccounts clientId={viewingClient.id} />}
-            {activeTab === 'kyc' && <ClientKYC clientId={viewingClient.id} onUpdate={loadClients} />}
-            {activeTab === 'notes' && <ClientNotes clientId={viewingClient.id} />}
-            {activeTab === 'transactions' && <ClientGlobalHistory clientId={viewingClient.id} />}
-            {activeTab === 'enquetes' && <ClientEnquetesTab client={viewingClient} />}
-            {activeTab === 'alertes' && <ClientAlerts client={viewingClient} onUpdate={loadClients} onNavigateToTab={(tab) => navigateToPath(`/clients/${viewingClient.id}/${tab}`)} />}
-            {activeTab === 'score' && <ClientScoreTab client={viewingClient} />}
-          </div>
         </ClientProfileLayout>
 
         {/* Delete Confirmation */}
@@ -347,67 +292,159 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
 
             <div className="w-px h-5 bg-surface-subtle-elevated mx-0.5" />
 
-            <div className="flex items-center gap-0.5">
-              <IconButton
-                icon={activeView === 'list' ? MapPin : activeView === 'map' ? BarChart3 : List}
-                variant="secondary"
-                size="sm"
-                onClick={() => setActiveView(activeView === 'list' ? 'map' : activeView === 'map' ? 'stats' : 'list')}
-                title={activeView === 'list' ? 'Carte' : activeView === 'map' ? 'Stats' : 'Liste'}
-                aria-label={activeView === 'list' ? 'Carte' : activeView === 'map' ? 'Stats' : 'Liste'}
-                className="h-7 w-7"
-              />
-              <div className="hidden sm:flex items-center gap-0.5">
-                <IconButton
+            <div className="flex items-center gap-2">
+              <div className="flex items-center bg-surface-muted/40 p-0.5 rounded-lg border border-edge shadow-sm">
+                <Button
+                  icon={activeView === 'list' ? MapPin : activeView === 'map' ? BarChart3 : List}
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setActiveView(activeView === 'list' ? 'map' : activeView === 'map' ? 'stats' : 'list')}
+                  className="h-7 text-xs px-2.5 bg-surface shadow-sm text-content-primary border border-edge/50"
+                >
+                  <span className="hidden sm:inline">{activeView === 'list' ? 'Voir sur la carte' : activeView === 'map' ? 'Statistiques' : 'Vue Liste'}</span>
+                </Button>
+              </div>
+
+              <div className="hidden md:flex items-center bg-surface-muted/40 p-0.5 rounded-lg border border-edge shadow-sm">
+                <Button
                   icon={Search}
-                  variant="secondary"
+                  variant="ghost"
                   size="sm"
                   onClick={() => setShowAdvancedSearch(true)}
-                  title="Recherche avancée"
-                  aria-label="Recherche avancée"
-                  className="h-7 w-7"
-                />
-                <IconButton
+                  className="h-7 text-xs px-3 text-content-secondary hover:text-content-primary hover:bg-surface"
+                >
+                  Rechercher
+                </Button>
+                <div className="w-px h-4 bg-edge mx-1" />
+                <Button
                   icon={RefreshCw}
-                  variant="secondary"
+                  variant="ghost"
                   size="sm"
                   onClick={loadClients}
-                  title="Actualiser"
-                  aria-label="Actualiser"
-                  className="h-7 w-7"
-                />
+                  className="h-7 text-xs px-3 text-content-secondary hover:text-content-primary hover:bg-surface"
+                >
+                  Actualiser
+                </Button>
+                
                 {canImportClients && (
-                  <IconButton
-                    icon={Upload}
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setShowImport(true)}
-                    title="Imp."
-                    aria-label="Importer"
-                    className="h-7 w-7"
-                  />
+                  <>
+                    <div className="w-px h-4 bg-edge mx-1" />
+                    <DropdownMenu.Root>
+                      <DropdownMenu.Trigger asChild>
+                        <Button
+                          icon={ChevronDown}
+                          iconPosition="right"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs px-3 text-content-secondary hover:text-content-primary hover:bg-surface"
+                        >
+                          Actions
+                        </Button>
+                      </DropdownMenu.Trigger>
+                      <DropdownMenu.Portal>
+                        <DropdownMenu.Content 
+                          className="min-w-[180px] bg-surface-base border border-edge rounded-xl shadow-2xl p-1 z-50 animate-in fade-in zoom-in-95 duration-100"
+                          sideOffset={5}
+                          align="end"
+                        >
+                          <DropdownMenu.Item
+                            onSelect={() => setShowImport(true)}
+                            className="group flex items-center px-2 py-2 text-sm text-content-secondary hover:text-content-primary hover:bg-surface rounded-lg outline-none cursor-pointer"
+                          >
+                            <Upload className="mr-2 h-4 w-4 text-content-muted group-hover:text-content-primary" />
+                            Importer
+                          </DropdownMenu.Item>
+                          
+                          {canExportClients && (
+                            <DropdownMenu.Item
+                              onSelect={() => setShowExport(true)}
+                              className="group flex items-center px-2 py-2 text-sm text-content-secondary hover:text-content-primary hover:bg-surface rounded-lg outline-none cursor-pointer"
+                            >
+                              <Download className="mr-2 h-4 w-4 text-content-muted group-hover:text-content-primary" />
+                              Exporter
+                            </DropdownMenu.Item>
+                          )}
+                          
+                          {clients.length > 0 && (
+                            <>
+                              <DropdownMenu.Separator className="h-px bg-surface my-1" />
+                              <DropdownMenu.Item
+                                onSelect={() => setShowBulkCommunication(true)}
+                                className="group flex items-center px-2 py-2 text-sm text-content-secondary hover:text-content-primary hover:bg-surface rounded-lg outline-none cursor-pointer"
+                              >
+                                <Send className="mr-2 h-4 w-4 text-content-muted group-hover:text-content-primary" />
+                                Communication
+                              </DropdownMenu.Item>
+                            </>
+                          )}
+                        </DropdownMenu.Content>
+                      </DropdownMenu.Portal>
+                    </DropdownMenu.Root>
+                  </>
                 )}
-                {canExportClients && (
-                  <IconButton
-                    icon={Download}
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setShowExport(true)}
-                    title="Exp."
-                    aria-label="Exporter"
-                    className="h-7 w-7"
-                  />
+                
+                {/* Fallback if no import permission but export/comm exists */}
+                {!canImportClients && canExportClients && (
+                  <>
+                    <div className="w-px h-4 bg-edge mx-1" />
+                    <DropdownMenu.Root>
+                      <DropdownMenu.Trigger asChild>
+                        <Button
+                          icon={ChevronDown}
+                          iconPosition="right"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs px-3 text-content-secondary hover:text-content-primary hover:bg-surface"
+                        >
+                          Actions
+                        </Button>
+                      </DropdownMenu.Trigger>
+                      <DropdownMenu.Portal>
+                        <DropdownMenu.Content 
+                          className="min-w-[180px] bg-surface-base border border-edge rounded-xl shadow-2xl p-1 z-50 animate-in fade-in zoom-in-95 duration-100"
+                          sideOffset={5}
+                          align="end"
+                        >
+                          <DropdownMenu.Item
+                            onSelect={() => setShowExport(true)}
+                            className="group flex items-center px-2 py-2 text-sm text-content-secondary hover:text-content-primary hover:bg-surface rounded-lg outline-none cursor-pointer"
+                          >
+                            <Download className="mr-2 h-4 w-4 text-content-muted group-hover:text-content-primary" />
+                            Exporter
+                          </DropdownMenu.Item>
+                          
+                          {clients.length > 0 && (
+                            <>
+                              <DropdownMenu.Separator className="h-px bg-surface my-1" />
+                              <DropdownMenu.Item
+                                onSelect={() => setShowBulkCommunication(true)}
+                                className="group flex items-center px-2 py-2 text-sm text-content-secondary hover:text-content-primary hover:bg-surface rounded-lg outline-none cursor-pointer"
+                              >
+                                <Send className="mr-2 h-4 w-4 text-content-muted group-hover:text-content-primary" />
+                                Communication
+                              </DropdownMenu.Item>
+                            </>
+                          )}
+                        </DropdownMenu.Content>
+                      </DropdownMenu.Portal>
+                    </DropdownMenu.Root>
+                  </>
                 )}
-                {clients.length > 0 && (
-                  <IconButton
-                    icon={Send}
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setShowBulkCommunication(true)}
-                    title="Com."
-                    aria-label="Communication en masse"
-                    className="h-7 w-7"
-                  />
+
+                {/* Fallback if no import/export but comm exists */}
+                {!canImportClients && !canExportClients && clients.length > 0 && (
+                  <>
+                    <div className="w-px h-4 bg-edge mx-1" />
+                    <Button
+                      icon={Send}
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowBulkCommunication(true)}
+                      className="h-7 text-xs px-3 text-content-secondary hover:text-content-primary hover:bg-surface"
+                    >
+                      Communication
+                    </Button>
+                  </>
                 )}
               </div>
             </div>
@@ -457,120 +494,7 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
                 <ResponsiveTable
                   data={paginatedClients}
                   density="compact"
-                  columns={[
-                    {
-                      key: 'nom',
-                      label: 'Nom',
-                      primary: true,
-                      format: (_, item) => (
-                        <div className="flex items-center gap-2">
-                          {getPhotoUrl(item) ? (
-                            <img 
-                              src={getPhotoUrl(item)} 
-                              alt="" 
-                              className="w-6 h-6 rounded-full object-cover border border-edge bg-surface-muted"
-                            />
-                          ) : (
-                            <div className="w-6 h-6 rounded-full bg-surface-muted-elevated flex items-center justify-center border border-edge-strong text-[10px] font-bold text-content-muted">
-                              {`${item.prenom?.[0] || ''}${item.nom?.[0] || ''}`.toUpperCase() || '?'}
-                            </div>
-                          )}
-                          <span className="font-medium text-content-primary text-xs">
-                            {formatClientName(item.nom, item.prenom) || 'Sans nom'}
-                          </span>
-                        </div>
-                      )
-                    },
-                    {
-                      key: 'agence',
-                      label: 'Agence',
-                      hideOnMobile: true,
-                      headerAlign: 'center',
-                      align: 'center',
-                      format: (_, item) => (
-                        <div className="w-24 mx-auto">
-                          <Badge 
-                            value={item.agenceNom || item.agence_nom || 'N/A'}
-                            variant="neutral"
-                            size="sm"
-                            className="w-full justify-center text-[10px] font-medium py-0 h-5"
-                          />
-                        </div>
-                      )
-                    },
-                    {
-                      key: 'telephone',
-                      label: 'Téléphone',
-                      hideOnMobile: true,
-                      headerAlign: 'center',
-                      align: 'center',
-                      format: (val) => <span className="text-xs font-mono text-content-muted">{formatPhoneNumber(val)}</span>
-                    },
-                    {
-                      key: 'segment',
-                      label: 'Segment',
-                      hideOnMobile: true,
-                      headerAlign: 'center',
-                      align: 'center',
-                      format: (_, item) => (
-                        <div className="flex flex-col items-center gap-0.5">
-                          <Badge
-                            value={getStatusLabel(item.segment, CLIENT_SEGMENT_LABELS)}
-                            className={getStatusColor(item.segment, CLIENT_SEGMENT_COLORS)}
-                            size="sm"
-                          />
-                          {item.tags && item.tags.length > 0 && (
-                            <div className="flex items-center gap-0.5 flex-wrap justify-center">
-                              {item.tags.slice(0, 2).map((tag: any) => (
-                                <span
-                                  key={tag.id}
-                                  className="px-1.5 py-0 rounded text-[9px] font-medium leading-relaxed"
-                                  style={{ backgroundColor: `${tag.color}15`, color: tag.color }}
-                                >
-                                  {tag.name}
-                                </span>
-                              ))}
-                              {item.tags.length > 2 && (
-                                <span className="text-[9px] text-content-muted font-medium">+{item.tags.length - 2}</span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    },
-                    {
-                      key: 'score',
-                      label: 'Score',
-                      hideOnMobile: true,
-                      headerAlign: 'center',
-                      align: 'center',
-                      format: (_, item) => {
-                        const score = item.score ?? 0;
-                        const color = score >= 80 ? 'text-status-success' : score >= 65 ? 'text-status-info' : score >= 40 ? 'text-status-warning' : 'text-status-danger';
-                        return (
-                          <div className="flex items-center justify-center gap-1">
-                            <BarChart3 size={12} className={color} />
-                            <span className={`text-xs font-bold ${color}`}>{score}</span>
-                          </div>
-                        );
-                      }
-                    },
-                    {
-                      key: 'statut',
-                      label: 'Statut',
-                      headerAlign: 'center',
-                      align: 'center',
-                      format: (_, item) => (
-                        <div className="flex justify-center">
-                          <Badge
-                            value={getStatusLabel(item.statut, STATUT_CLIENT_LABELS)}
-                            className={getStatusColor(item.statut, CLIENT_STATUS_COLORS)}
-                            size="sm"
-                          />
-                        </div>
-                      )
-                    }
-                  ]}
+                  columns={CLIENT_LIST_COLUMNS}
                   actions={(client) => (
                     <div className="flex items-center gap-1">
                       <IconButton

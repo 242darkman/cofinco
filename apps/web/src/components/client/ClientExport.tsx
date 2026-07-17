@@ -193,7 +193,7 @@ export default function ClientExport({ clients, onClose }: ClientExportProps) {
           <button
             onClick={handleExport}
             disabled={selectedFields.length === 0 || exporting}
-            className="w-full px-6 py-3 bg-gradient-to-r from-accent to-status-info hover:from-accent hover:to-status-info disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition flex items-center justify-center gap-2"
+            className="w-full px-6 py-3 bg-linear-to-r from-accent to-status-info hover:from-accent hover:to-status-info disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition flex items-center justify-center gap-2"
           >
             <Download size={20} />
             {exporting ? 'Export en cours...' : `Exporter en ${format.toUpperCase()}`}

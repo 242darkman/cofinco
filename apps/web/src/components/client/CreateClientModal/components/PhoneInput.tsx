@@ -34,7 +34,7 @@ export default function PhoneInput({ value, onChange, error, onBlur, disabled }:
           phone-input-group flex items-center
           bg-white border rounded-lg
           transition-all duration-200 overflow-hidden
-          focus-within:border-[#059669] focus-within:ring-[3px] focus-within:ring-[#059669]/30
+          focus-within:border-accent focus-within:ring-[3px] focus-within:ring-accent/30
           ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-gray-400'}
           ${error
             ? 'border-[#EF4444] focus-within:border-[#EF4444] focus-within:ring-[#EF4444]/30'

@@ -1,21 +1,6 @@
 import React, { useEffect, useMemo } from 'react';
-import {
-  MapPin,
-  Loader2,
-  CheckCircle,
-  AlertCircle,
-  Signal,
-  SignalLow,
-  SignalMedium,
-  SignalHigh,
-  RefreshCw,
-  X,
-  Navigation,
-  Clock,
-  Target,
-  Zap,
-  TrendingUp,
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { MapPin, CheckCircle, AlertCircle, Signal, SignalLow, SignalMedium, SignalHigh, RefreshCw, X, Navigation, Clock, Target, Zap, TrendingUp } from 'lucide-react';
 import { useGeolocation, GpsSignalQuality, getSignalQualityInfo } from '../../hooks/useGeolocation';
 
 interface GpsCaptureProps {
@@ -134,14 +119,14 @@ function CaptureProgress({
         <div
           className={`absolute inset-y-0 left-0 rounded-full transition-all duration-300 ${
             isRefining
-              ? 'bg-gradient-to-r from-accent to-status-success'
-              : 'bg-gradient-to-r from-status-success to-status-success'
+              ? 'bg-linear-to-r from-accent to-status-success'
+              : 'bg-linear-to-r from-status-success to-status-success'
           }`}
           style={{ width: `${progress}%` }}
         />
         {/* Effet de brillance animé */}
         <div
-          className="absolute inset-y-0 w-20 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+          className="absolute inset-y-0 w-20 bg-linear-to-r from-transparent via-white/30 to-transparent"
           style={{
             animation: 'shimmer 1.5s infinite',
             left: `${progress - 10}%`,
@@ -461,7 +446,7 @@ export default function GpsCapture({
           <button
             type="button"
             onClick={getCurrentPosition}
-            className="w-full px-4 py-4 bg-gradient-to-r from-status-success/20 to-status-success/20 hover:from-status-success/30 hover:to-status-success/30 text-status-success rounded-lg transition-all flex items-center justify-center gap-3 border border-status-success/30 hover:border-status-success/50 active:scale-[0.98] min-h-[56px]"
+            className="w-full px-4 py-4 bg-linear-to-r from-status-success/20 to-status-success/20 hover:from-status-success/30 hover:to-status-success/30 text-status-success rounded-lg transition-all flex items-center justify-center gap-3 border border-status-success/30 hover:border-status-success/50 active:scale-[0.98] min-h-[56px]"
           >
             <Zap size={22} />
             <div className="text-left">
@@ -478,7 +463,7 @@ export default function GpsCapture({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="relative">
-                  <Loader2 size={20} className="text-status-success animate-spin" />
+                  <Spinner size="sm" tone="accent" />
                 </div>
                 <span className="text-sm font-medium text-status-success">
                   {accuracy !== null ? 'Raffinement en cours...' : 'Acquisition GPS...'}

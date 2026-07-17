@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { Eye, ChevronDown, ChevronRight, Shield, Clock, UserCog, ShieldOff, Loader2, Search, Users } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Eye, ChevronDown, ChevronRight, Shield, Clock, UserCog, ShieldOff, Search, Users } from 'lucide-react';
 import { Button, Badge, SearchableSelect } from '@/components/ui';
 import { usePermissionSimulator, type SimulatedModule } from '@/hooks/admin/usePermissionSimulator';
 
@@ -151,7 +152,7 @@ export default function PermissionSimulator({ users: usersList }: PermissionSimu
             disabled={!targetUserId || loading}
             size="sm"
           >
-            {loading ? <Loader2 size={14} className="animate-spin mr-1" /> : <Eye size={14} className="mr-1" />}
+            {loading ? <Spinner size="xs" tone="current" className="mr-1" /> : <Eye size={14} className="mr-1" />}
             Simuler
           </Button>
         </div>
@@ -176,7 +177,7 @@ export default function PermissionSimulator({ users: usersList }: PermissionSimu
 
         {loading && (
           <div className="flex items-center justify-center py-16">
-            <Loader2 size={24} className="animate-spin text-accent" />
+            <Spinner size="sm" tone="accent" />
           </div>
         )}
 

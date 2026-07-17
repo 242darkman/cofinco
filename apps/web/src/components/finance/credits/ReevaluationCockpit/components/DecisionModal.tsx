@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Users, Loader2, CheckCircle } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Users, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { DecisionComite, DecisionComiteType } from '@shared/enum/status-constants';
 import { formatMoney } from '@/lib/format';
@@ -169,7 +170,7 @@ export function DecisionModal({ reevaluationId, onClose, onSuccess }: DecisionMo
                 : 'bg-status-success hover:bg-status-success text-white'
             }`}
           >
-            {submitting ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle size={18} />}
+            {submitting ? <Spinner size="sm" tone="current" /> : <CheckCircle size={18} />}
             Confirmer
           </button>
         </div>

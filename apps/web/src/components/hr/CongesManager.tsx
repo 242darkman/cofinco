@@ -354,7 +354,7 @@ export default function CongesManager({
 
       {/* Leave Balance Card (if available) */}
       {leaveBalance?.data && (
-        <div className="shrink-0 bg-gradient-to-r from-accent/10 to-status-info/10 border border-accent/30 rounded-lg p-3">
+        <div className="shrink-0 bg-linear-to-r from-accent/10 to-status-info/10 border border-accent/30 rounded-lg p-3">
           <div className="flex items-center justify-between">
             <div>
               <h4 className="text-xs font-medium text-content-muted">Votre solde congés {new Date().getFullYear()}</h4>

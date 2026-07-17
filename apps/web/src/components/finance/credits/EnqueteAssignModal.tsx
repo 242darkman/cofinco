@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { X, UserCheck, Calendar, AlertTriangle, Loader2, Search, MapPin, FileText, Shield, Info } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { X, UserCheck, Calendar, AlertTriangle, Search, MapPin, FileText, Shield, Info } from 'lucide-react';
 import { api } from '../../../lib/api';
 import { creditPlanApi } from '../../../lib/api-client';
 import { resolveStorageUrl } from '../../../lib/format';
+import { Avatar } from '@/components/ui/Avatar';
 
 interface Agent {
   id: string;
@@ -186,7 +188,7 @@ export default function EnqueteAssignModal({ isOpen, onClose, demande, onAssign 
           <div className="max-h-48 overflow-y-auto rounded-lg border border-edge divide-y divide-edge">
             {loading ? (
               <div className="flex items-center justify-center py-6">
-                <Loader2 size={16} className="animate-spin text-content-muted" />
+                <Spinner size="xs" tone="current" className="text-content-muted" />
               </div>
             ) : filteredAgents.length === 0 ? (
               <div className="text-center py-4 text-xs text-content-muted">
@@ -211,13 +213,14 @@ export default function EnqueteAssignModal({ isOpen, onClose, demande, onAssign 
                     }`}
                   >
                     {/* Avatar */}
-                    {photoUrl ? (
-                      <img src={photoUrl} alt="" className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
-                    ) : (
-                      <div className="w-7 h-7 rounded-full bg-surface-elevated flex items-center justify-center text-[10px] font-bold text-content-muted flex-shrink-0">
-                        {initials}
-                      </div>
-                    )}
+                    <div className="shrink-0">
+                      <Avatar
+                        photoUrl={photoUrl}
+                        fullName={`${agent.prenom} ${agent.nom}`}
+                        initials={initials}
+                        className="w-7 h-7 text-[10px]"
+                      />
+                    </div>
                     <div className="min-w-0 flex-1">
                       <p className={`text-xs font-medium truncate ${isSelected ? 'text-accent' : 'text-content-primary'}`}>
                         {agent.prenom} {agent.nom}
@@ -284,7 +287,7 @@ export default function EnqueteAssignModal({ isOpen, onClose, demande, onAssign 
             disabled={!selectedAgentId || submitting}
             className="flex-1 py-2 bg-accent-secondary hover:bg-accent-secondary disabled:bg-surface disabled:text-content-muted text-content-primary text-xs font-bold rounded-lg transition flex items-center justify-center gap-1.5"
           >
-            {submitting ? <Loader2 size={14} className="animate-spin" /> : <UserCheck size={14} />}
+            {submitting ? <Spinner size="xs" tone="current" /> : <UserCheck size={14} />}
             Assigner
           </button>
         </div>

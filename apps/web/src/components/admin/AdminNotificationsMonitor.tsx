@@ -1,9 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import {
-  Mail, MessageSquare, AlertTriangle, CheckCircle, Clock, XCircle,
-  RefreshCw, BarChart3, Send, Inbox, Loader2, ChevronDown, ChevronUp,
-  ChevronLeft, ChevronRight,
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Mail, MessageSquare, AlertTriangle, CheckCircle, Clock, XCircle, RefreshCw, BarChart3, Send, Inbox, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
 
 // ============================================================================
 // TYPES
@@ -161,7 +158,7 @@ export default function AdminNotificationsMonitor() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-6 h-6 animate-spin text-status-info" />
+        <Spinner size="sm" tone="accent" />
         <span className="ml-2 text-sm text-content-muted">Chargement...</span>
       </div>
     );
@@ -187,7 +184,7 @@ export default function AdminNotificationsMonitor() {
           <MetricCard
             label="En cours"
             value={metrics.processing}
-            icon={<Loader2 className="w-4 h-4 animate-spin" />}
+            icon={<Spinner size="xs" tone="current" />}
             color="blue"
           />
           <MetricCard

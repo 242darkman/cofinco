@@ -4,22 +4,8 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  AlertTriangle,
-  RefreshCcw,
-  Trash2,
-  Eye,
-  Download,
-  Loader2,
-  Clock,
-  User,
-  MessageSquare,
-  Mail,
-  Bell,
-  Filter,
-  CheckSquare,
-  Square,
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { AlertTriangle, RefreshCcw, Trash2, Eye, Download, Clock, User, MessageSquare, Mail, Bell, Filter, CheckSquare, Square } from 'lucide-react';
 import { toast, handleApiError } from '../../../lib/toast';
 import DateRangeFilter from '../shared/DateRangeFilter';
 
@@ -244,7 +230,7 @@ export default function DeadLetterQueue({
             disabled={retrying}
             className="flex items-center gap-2 px-3 py-1.5 bg-status-success hover:bg-status-success text-white rounded-lg text-sm transition disabled:opacity-50"
           >
-            {retrying ? <Loader2 className="animate-spin" size={14} /> : <RefreshCcw size={14} />}
+            {retrying ? <Spinner size="xs" tone="current" /> : <RefreshCcw size={14} />}
             Réessayer
           </button>
 
@@ -253,7 +239,7 @@ export default function DeadLetterQueue({
             disabled={deleting}
             className="flex items-center gap-2 px-3 py-1.5 bg-status-danger hover:bg-status-danger text-white rounded-lg text-sm transition disabled:opacity-50"
           >
-            {deleting ? <Loader2 className="animate-spin" size={14} /> : <Trash2 size={14} />}
+            {deleting ? <Spinner size="xs" tone="current" /> : <Trash2 size={14} />}
             Supprimer
           </button>
 
@@ -271,7 +257,7 @@ export default function DeadLetterQueue({
       <div className="max-h-[500px] overflow-auto">
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="animate-spin text-accent" size={32} />
+            <Spinner size="md" tone="accent" />
           </div>
         ) : notifications.length === 0 ? (
           <div className="text-center py-12">

@@ -1,21 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { formatPhoneNumber } from '../../lib/format';
-import {
-  Users,
-  Key,
-  RefreshCw,
-  Download,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-  Copy,
-  Eye,
-  EyeOff,
-  Loader2,
-  Search,
-  Mail,
-  Send
-} from 'lucide-react';
+import { Users, Key, RefreshCw, Download, CheckCircle, XCircle, AlertTriangle, Copy, Eye, EyeOff, Search, Mail, Send } from 'lucide-react';
 import { Card, Button, IconButton, FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { toast, handleApiError } from '../../lib/toast';
@@ -227,12 +213,13 @@ export default function AdminClientCredentials() {
               <Button
                 variant="primary"
                 size="sm"
-                icon={generating ? Loader2 : sendEmail ? Send : Key}
+                icon={sendEmail ? Send : Key}
+                isLoading={generating}
+                loadingText="Génération..."
                 onClick={handleGenerateCredentials}
                 disabled={loading || generating || clients.length === 0}
-                className={generating ? 'animate-pulse' : ''}
               >
-                {generating ? 'Génération...' : `Générer ${selectedClients.size > 0 ? `(${selectedClients.size})` : 'Tous'}`}
+                {`Générer ${selectedClients.size > 0 ? `(${selectedClients.size})` : 'Tous'}`}
               </Button>
               )}
               </div>
@@ -266,7 +253,7 @@ export default function AdminClientCredentials() {
         {/* Content */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <Spinner size="md" />
             <p className="text-content-muted text-sm mt-3">Chargement des clients...</p>
           </div>
         ) : clients.length === 0 ? (

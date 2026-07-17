@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { X, DollarSign, FileText, AlertCircle, TrendingUp, TrendingDown, Smartphone, Banknote, FileCheck, Building, Loader2, AlertTriangle, CheckCircle, WifiOff } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { X, DollarSign, FileText, AlertCircle, TrendingUp, TrendingDown, Smartphone, Banknote, FileCheck, Building, AlertTriangle, CheckCircle, WifiOff } from 'lucide-react';
 import { compteEpargneApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
@@ -11,6 +12,7 @@ import { useNetworkStatus } from '../../../contexts/NetworkContext';
 import { useEnabledPaymentMethods } from '../../../contexts/FeatureFlagsContext';
 import { executeOfflineOperation } from '../../../lib/offline-treasury';
 import { useUserProfile } from '../../../hooks/useUserProfile';
+import type { Compte, ModePaiement } from './CompteTransactionForm.types';
 
 // Mapping EN -> FR pour les types de compte
 const TYPE_COMPTE_LABELS: Record<string, string> = {
@@ -23,28 +25,12 @@ const getTypeCompteLabel = (type: string): string => {
   return TYPE_COMPTE_LABELS[type] || type;
 };
 
-interface Compte {
-  id: string;
-  numeroCompte?: string;
-  numero_compte?: string;
-  typeCompte?: string;
-  type_compte?: string;
-  solde: number;
-  statut?: string;
-  clients: {
-    nom: string;
-    id: string;
-  };
-}
-
 interface CompteTransactionFormProps {
   compte: Compte;
   type: 'Dépôt' | 'Retrait';
   onClose: () => void;
   onSuccess: () => void;
 }
-
-type ModePaiement = 'CASH' | 'MOBILE_MONEY' | 'CHECK' | 'TRANSFER';
 
 const MOBILE_OPERATORS = [
   { id: 'mtn', name: 'MTN Mobile Money', color: 'bg-status-warning-bg0', prefix: '+242 05/06' },
@@ -525,7 +511,7 @@ export default function CompteTransactionForm({ compte, type, onClose, onSuccess
               >
                 {loading ? (
                   <>
-                    <Loader2 size={18} className="animate-spin" aria-hidden="true" />
+                    <Spinner size="sm" tone="current" />
                     Traitement...
                   </>
                 ) : isPendingActivation && type === 'Dépôt' ? (

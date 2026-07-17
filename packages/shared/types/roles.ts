@@ -17,6 +17,18 @@ export enum SystemRole {
 
 const SYSTEM_ROLE_VALUES = Object.values(SystemRole);
 
+/**
+ * Rôles « opérateur plateforme » (éditeur) : seuls autorisés aux écrans et
+ * endpoints d'exploitation (maintenance, version, provisioning tenant, reset
+ * agence, synchronisation). L'admin tenant, même avec « manage all », en est
+ * exclu. SOURCE UNIQUE partagée front + back — un seul point à modifier.
+ */
+export const PLATFORM_OPERATOR_ROLES: readonly SystemRole[] = [SystemRole.SUPPORT_IT];
+
+/** Vrai si le rôle est un opérateur plateforme. */
+export const isPlatformOperator = (role?: SystemRole | string | null): boolean =>
+  !!role && (PLATFORM_OPERATOR_ROLES as readonly string[]).includes(role);
+
 export const isSystemRole = (role?: string | null): role is SystemRole => {
   if (!role) return false;
   return SYSTEM_ROLE_VALUES.includes(role as SystemRole);

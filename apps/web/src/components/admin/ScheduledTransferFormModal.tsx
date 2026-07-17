@@ -1,18 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import {
-  X,
-  Search,
-  ArrowRight,
-  Clock,
-  Banknote,
-  Loader2,
-  CheckCircle,
-  AlertCircle,
-  User,
-  Building2,
-  Repeat,
-  Wallet,
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { X, Search, ArrowRight, Clock, Banknote, CheckCircle, AlertCircle, User, Building2, Repeat, Wallet } from 'lucide-react';
 import { compteEpargneApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
 import { formatMoney } from '../../lib/format';
@@ -428,7 +416,7 @@ export default function ScheduledTransferFormModal({ isOpen, onClose, onSuccess,
                       className="w-full h-12 bg-surface-base border border-edge rounded-xl pl-10 pr-4 text-content-primary text-sm placeholder:text-content-muted focus:border-accent outline-none"
                     />
                     {searchingSource && (
-                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-accent animate-spin" />
+                      <Spinner size="xs" tone="accent" className="absolute right-3 top-1/2 -translate-y-1/2" />
                     )}
                     {showSourceDropdown && sourceComptes.length > 0 && (
                       <div className="absolute z-20 w-full mt-1 bg-surface border border-edge rounded-xl shadow-xl max-h-48 overflow-y-auto">
@@ -516,7 +504,7 @@ export default function ScheduledTransferFormModal({ isOpen, onClose, onSuccess,
                       className="w-full h-12 bg-surface-base border border-edge rounded-xl pl-10 pr-10 text-content-primary text-sm placeholder:text-content-muted focus:border-accent outline-none"
                     />
                     {(searchingDest || verifyingDest) && (
-                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-accent animate-spin" />
+                      <Spinner size="xs" tone="accent" className="absolute right-3 top-1/2 -translate-y-1/2" />
                     )}
                     {destVerified && !verifyingDest && destAccountNumber && (
                       destVerified.found ? (
@@ -641,7 +629,7 @@ export default function ScheduledTransferFormModal({ isOpen, onClose, onSuccess,
             >
               {loading ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Spinner size="xs" tone="current" />
                   {isEditing ? 'Mise à jour...' : 'Planification...'}
                 </>
               ) : (

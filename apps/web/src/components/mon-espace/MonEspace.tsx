@@ -104,8 +104,6 @@ export default function MonEspace() {
           }))}
           activeTab={activeTab}
           onTabChange={(key) => setActiveTab(key)}
-          variant="underline"
-          size="sm"
           className="mt-2"
           scrollable
         />

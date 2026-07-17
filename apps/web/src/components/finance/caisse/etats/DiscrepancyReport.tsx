@@ -11,7 +11,7 @@ import {
   Target,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { Card, Pagination } from '@/components/ui';
+import { Card, Pagination, Spinner } from '@/components/ui';
 import { SessionCaisse } from '@/types/finance';
 import { computeSessionStatus, getSessionStatusLabel } from '@/lib/format';
 
@@ -131,7 +131,7 @@ export function DiscrepancyReport({
     return (
       <Card className="bg-surface-base/80 border-edge p-8">
         <div className="flex items-center justify-center gap-3">
-          <div className="animate-spin w-5 h-5 border-2 border-accent border-t-transparent rounded-full" />
+          <Spinner size="sm" />
           <span className="text-content-muted">Analyse des écarts en cours...</span>
         </div>
       </Card>

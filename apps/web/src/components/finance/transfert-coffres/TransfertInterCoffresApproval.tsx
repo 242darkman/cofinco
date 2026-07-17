@@ -1,22 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import {
-  X,
-  Shield,
-  ShieldCheck,
-  ShieldX,
-  ArrowRightLeft,
-  AlertTriangle,
-  CheckCircle,
-  Loader2,
-  Building2,
-  Vault,
-  User,
-  MessageSquare,
-  Calendar,
-  Tag,
-  Package,
-  Lock,
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { X, Shield, ShieldCheck, ShieldX, ArrowRightLeft, AlertTriangle, CheckCircle, Building2, Vault, User, MessageSquare, Calendar, Tag, Package, Lock } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { toast } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
@@ -200,9 +184,9 @@ export default function TransfertInterCoffresApproval({
                 <div
                   className={`h-2.5 rounded-full transition-all duration-300 ${
                     getStepStatus(1) === 'completed'
-                      ? 'bg-gradient-to-r from-status-success to-status-success'
+                      ? 'bg-linear-to-r from-status-success to-status-success'
                       : getStepStatus(1) === 'active'
-                      ? 'bg-gradient-to-r from-accent to-accent animate-pulse'
+                      ? 'bg-linear-to-r from-accent to-accent animate-pulse'
                       : 'bg-surface-elevated'
                   }`}
                 />
@@ -228,9 +212,9 @@ export default function TransfertInterCoffresApproval({
                 <div
                   className={`h-2.5 rounded-full transition-all duration-300 ${
                     getStepStatus(2) === 'completed'
-                      ? 'bg-gradient-to-r from-status-success to-status-success'
+                      ? 'bg-linear-to-r from-status-success to-status-success'
                       : getStepStatus(2) === 'active'
-                      ? 'bg-gradient-to-r from-accent to-accent animate-pulse'
+                      ? 'bg-linear-to-r from-accent to-accent animate-pulse'
                       : 'bg-surface-elevated'
                   }`}
                 />
@@ -275,7 +259,7 @@ export default function TransfertInterCoffresApproval({
 
                 {/* Animated Arrow */}
                 <div className="flex-shrink-0 relative">
-                  <div className="w-16 sm:w-24 h-1 bg-gradient-to-r from-accent/50 via-cyan-400 to-accent/50 rounded-full" />
+                  <div className="w-16 sm:w-24 h-1 bg-linear-to-r from-accent/50 via-cyan-400 to-accent/50 rounded-full" />
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="p-2 rounded-full bg-accent/10 border border-accent/40 animate-pulse">
                       <ArrowRightLeft size={20} className="text-accent" />
@@ -522,7 +506,7 @@ export default function TransfertInterCoffresApproval({
                 disabled={!action || loading || (action === 'reject' && commentaire.length < 10)}
                 className={`sm:min-w-[180px] ${
                   action === 'approve'
-                    ? 'bg-gradient-to-r from-status-success to-accent hover:from-status-success hover:to-accent shadow-lg shadow-status-success/20'
+                    ? 'bg-linear-to-r from-status-success to-accent hover:from-status-success hover:to-accent shadow-lg shadow-status-success/20'
                     : action === 'reject'
                     ? 'bg-status-danger hover:bg-status-danger shadow-lg shadow-status-danger/20'
                     : 'bg-surface-elevated'
@@ -530,7 +514,7 @@ export default function TransfertInterCoffresApproval({
               >
                 {loading ? (
                   <>
-                    <Loader2 size={18} className="mr-2 animate-spin" />
+                    <Spinner size="sm" tone="current" className="mr-2" />
                     Traitement...
                   </>
                 ) : action === 'approve' ? (

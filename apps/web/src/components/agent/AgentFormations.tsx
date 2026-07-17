@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import {
   GraduationCap, Award, TrendingUp, CheckCircle, Clock,
   ExternalLink, Download, Star, ChevronLeft, ChevronRight,
@@ -6,71 +7,11 @@ import {
 } from 'lucide-react';
 import { StatutSuiviFormation, STATUT_SUIVI_FORMATION_LABELS } from '@shared/enum/status-constants';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
+import type { Formation, FormationSuivi, ComplianceData } from './AgentFormations.types';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
 // ═══════════════════════════════════════════════════════════════════════════
-
-interface Formation {
-  id: number;
-  titre: string;
-  description: string | null;
-  typeFormation: string | null;
-  dureeHeures: number | null;
-  contenuUrl: string | null;
-  obligatoire: boolean | null;
-  statut: string | null;
-  formateur: string | null;
-  dateDebut: string | null;
-  dateFin: string | null;
-  lieu: string | null;
-  programme: string | null;
-  capaciteMax: number | null;
-  participants: number;
-  createdAt: string;
-}
-
-interface FormationSuivi {
-  id: string;
-  agentId: string | null;
-  formationId: number;
-  dateDebut: string | null;
-  dateFin: string | null;
-  progression: number | null;
-  statut: string | null;
-  presence: string | null;
-  createdAt: string | null;
-  scoreEvaluation: number | null;
-  evaluation: string | null;
-  competencesAcquises: string | null;
-  recommandation: string | null;
-  evaluatedAt: string | null;
-  formation?: {
-    id: number;
-    titre: string;
-    description: string | null;
-    typeFormation: string | null;
-    dureeHeures: number | null;
-    contenuUrl: string | null;
-    obligatoire: boolean | null;
-    statut: string | null;
-    dateFin: string | null;
-  };
-  certificate: {
-    id: string;
-    numero: string;
-    statut: string;
-    fichierUrl: string | null;
-    dateExpiration: string | null;
-  } | null;
-}
-
-interface ComplianceData {
-  mandatoryNotEnrolled: Array<{ id: number; titre: string; dateDebut: string | null; dateFin: string | null }>;
-  overdue: Array<{ id: number; titre: string; dateFin: string | null; progression: number }>;
-  expiringCertificates: Array<{ id: string; titre: string; numero: string; dateExpiration: string | null }>;
-  complianceScore: number;
-}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // COMPONENT
@@ -193,7 +134,7 @@ export default function AgentFormations({ agentId }: { agentId?: string }) {
   if (loading) {
     return (
       <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent" />
+        <Spinner size="sm" />
       </div>
     );
   }

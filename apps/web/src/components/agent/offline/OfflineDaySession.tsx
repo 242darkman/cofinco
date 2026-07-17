@@ -9,20 +9,8 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import {
-  Play,
-  StopCircle,
-  RefreshCw,
-  AlertTriangle,
-  CheckCircle,
-  Clock,
-  Banknote,
-  TrendingUp,
-  TrendingDown,
-  WifiOff,
-  Loader2,
-  ArrowUpDown,
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Play, StopCircle, RefreshCw, AlertTriangle, CheckCircle, Clock, Banknote, TrendingUp, TrendingDown, WifiOff, ArrowUpDown } from 'lucide-react';
 import { toast } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
 import {
@@ -182,7 +170,7 @@ export default function OfflineDaySession({ agentId, agenceId }: OfflineDaySessi
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <Loader2 className="animate-spin text-status-info" size={24} />
+        <Spinner size="sm" tone="accent" />
       </div>
     );
   }
@@ -223,7 +211,7 @@ export default function OfflineDaySession({ agentId, agenceId }: OfflineDaySessi
                 disabled={actionLoading || billetageTotal <= 0}
                 className="flex-1 py-3 bg-status-success hover:bg-status-success text-white rounded-lg font-semibold transition disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {actionLoading && <Loader2 size={16} className="animate-spin" />}
+                {actionLoading && <Spinner size="xs" tone="current" />}
                 Ouvrir ({formatMoney(billetageTotal)})
               </button>
             </div>
@@ -260,7 +248,7 @@ export default function OfflineDaySession({ agentId, agenceId }: OfflineDaySessi
       </div>
 
       {/* Cash Balance */}
-      <div className="p-4 bg-gradient-to-r from-surface to-surface-elevated">
+      <div className="p-4 bg-linear-to-r from-surface to-surface-elevated">
         <div className="text-center">
           <p className="text-content-muted text-sm">Solde caisse actuel</p>
           <p className="text-3xl font-bold text-content-primary mt-1">
@@ -394,7 +382,7 @@ export default function OfflineDaySession({ agentId, agenceId }: OfflineDaySessi
                 disabled={actionLoading || billetageTotal <= 0}
                 className="flex-1 py-2 bg-status-danger hover:bg-status-danger text-white rounded-lg text-sm font-semibold transition disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {actionLoading && <Loader2 size={14} className="animate-spin" />}
+                {actionLoading && <Spinner size="xs" tone="current" />}
                 Fermer la session
               </button>
             </div>

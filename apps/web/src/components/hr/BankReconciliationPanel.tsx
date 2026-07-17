@@ -1,5 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { Plus, Upload, Zap, CheckCircle, AlertTriangle, Eye, ArrowLeft, Lock, FileText, Loader2 } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { SkeletonList } from '@/components/ui/Skeleton';
+import { Plus, Upload, Zap, CheckCircle, AlertTriangle, Eye, ArrowLeft, Lock, FileText } from 'lucide-react';
 import { Card, Button, Modal, Badge, FormField, SelectField } from '../ui';
 import { useBankReconciliation, useReconciliationDetail, type ReconciliationSession } from '../../hooks/hr/useBankReconciliation';
 import { usePermissions } from '../auth/ProtectedFeature';
@@ -66,9 +68,7 @@ export default function BankReconciliationPanel() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent" />
-      </div>
+      <SkeletonList items={5} />
     );
   }
 
@@ -117,14 +117,14 @@ export default function BankReconciliationPanel() {
         {canManage && sessionDetail.statut !== 'COMPLETED' && (
           <div className="flex items-center gap-2 flex-wrap">
             <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>
-              {isImporting ? <Loader2 size={14} className="animate-spin mr-1" /> : <Upload size={14} className="mr-1" />}
+              {isImporting ? <Spinner size="xs" tone="current" className="mr-1" /> : <Upload size={14} className="mr-1" />}
               Importer relevé
             </Button>
             <input ref={fileInputRef} type="file" accept=".csv,.txt" className="hidden" onChange={handleImport} />
 
             {bankLines.length > 0 && (
               <Button size="sm" variant="outline" onClick={() => autoMatch()} disabled={isAutoMatching}>
-                {isAutoMatching ? <Loader2 size={14} className="animate-spin mr-1" /> : <Zap size={14} className="mr-1" />}
+                {isAutoMatching ? <Spinner size="xs" tone="current" className="mr-1" /> : <Zap size={14} className="mr-1" />}
                 Rapprochement auto
               </Button>
             )}
@@ -257,7 +257,7 @@ export default function BankReconciliationPanel() {
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setShowCreateModal(false)}>Annuler</Button>
             <Button onClick={handleCreate} disabled={isCreating || !newPeriod || !newBankName}>
-              {isCreating ? <Loader2 size={14} className="animate-spin mr-1" /> : null}
+              {isCreating ? <Spinner size="xs" tone="current" className="mr-1" /> : null}
               Créer
             </Button>
           </div>

@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { SkeletonList } from '@/components/ui/Skeleton';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, Button, Badge, Modal } from '../ui';
 import { Calendar, Check, X, Users, Clock } from 'lucide-react';
@@ -121,9 +122,7 @@ export default function MonEquipeCongesTab() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
-      </div>
+      <SkeletonList items={5} />
     );
   }
 

@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { MapPin, Plus, Edit2, Trash2, ChevronDown, ChevronRight, Loader2, X, Save, Building2 } from 'lucide-react';
+import { MapPin, Plus, Edit2, Trash2, ChevronDown, ChevronRight, X, Save, Building2 } from 'lucide-react';
 import { arrondissementApi, marcheApi, villeApi } from '../../lib/api-client';
 import { toast } from 'sonner';
 import { usePermissions } from '../auth/ProtectedFeature';
-import { Button, Input, Modal, SearchInput, Pagination, EmptyState } from '../ui';
-
+import { Button, Input, Modal, SearchInput, Pagination, EmptyState, Spinner } from '../ui';
 interface Arrondissement {
   id: string;
   nom: string;
@@ -245,7 +244,7 @@ export default function ZoneManagement() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12 h-64">
-        <Loader2 size={24} className="animate-spin text-accent" />
+        <Spinner size="sm" tone="accent" />
       </div>
     );
   }
@@ -361,7 +360,7 @@ export default function ZoneManagement() {
                              {expandedArr === arr.id && (
                                 <div className="p-2 bg-surface-base/20 flex-1 border-t border-edge animate-in slide-in-from-top-2 duration-200">
                                    {loadingMarches === arr.id ? (
-                                      <div className="flex justify-center p-2"><Loader2 size={14} className="animate-spin text-content-muted" /></div>
+                                      <div className="flex justify-center p-2"><Spinner size="xs" tone="current" className="text-content-muted" /></div>
                                    ) : (
                                       <div className="space-y-1">
                                          {(marchesMap[arr.id] || []).map(m => (
@@ -479,7 +478,7 @@ export default function ZoneManagement() {
             <div className="flex justify-end gap-2 pt-4">
                <Button variant="ghost" onClick={() => setIsCreateModalOpen(false)}>Annuler</Button>
                <Button variant="primary" onClick={handleCreateArr} disabled={saving || !newArrName || !newArrVilleId}>
-                  {saving ? <Loader2 size={16} className="animate-spin" /> : 'Créer'}
+                  {saving ? <Spinner size="xs" tone="current" /> : 'Créer'}
                </Button>
             </div>
          </div>

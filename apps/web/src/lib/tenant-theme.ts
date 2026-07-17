@@ -60,6 +60,40 @@ function rgbToHsl(r: number, g: number, b: number): Hsl {
 
 const clamp = (v: number, min = 0, max = 100) => Math.max(min, Math.min(max, v));
 
+/** Convertit un HSL vers son triplet RGB (0-255). */
+function hslToRgb({ h, s, l }: Hsl): { r: number; g: number; b: number } {
+  const sat = s / 100;
+  const lig = l / 100;
+  const c = (1 - Math.abs(2 * lig - 1)) * sat;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = lig - c / 2;
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  if (h < 60) [r, g, b] = [c, x, 0];
+  else if (h < 120) [r, g, b] = [x, c, 0];
+  else if (h < 180) [r, g, b] = [0, c, x];
+  else if (h < 240) [r, g, b] = [0, x, c];
+  else if (h < 300) [r, g, b] = [x, 0, c];
+  else [r, g, b] = [c, 0, x];
+  return {
+    r: Math.round((r + m) * 255),
+    g: Math.round((g + m) * 255),
+    b: Math.round((b + m) * 255),
+  };
+}
+
+/**
+ * Triplet « r, g, b » (sans fonction rgb) prêt à composer des couleurs
+ * translucides dérivées de la marque : `rgba(var(--accent-primary-rgb), 0.1)`.
+ * Sert aux structures de fond (anneaux fixes, rails de barres) qui doivent
+ * s'auto-adapter à l'accent du tenant tout en gardant une opacité maîtrisée.
+ */
+export const rgbTriplet = (c: Hsl): string => {
+  const { r, g, b } = hslToRgb(c);
+  return `${r}, ${g}, ${b}`;
+};
+
 export const hsl = (c: Hsl): string => `hsl(${c.h}, ${c.s}%, ${c.l}%)`;
 export const hsla = (c: Hsl, a: number): string => `hsla(${c.h}, ${c.s}%, ${c.l}%, ${a})`;
 export const withLightness = (c: Hsl, l: number): Hsl => ({ ...c, l: clamp(l) });
@@ -82,6 +116,7 @@ export function computeTenantThemeVariables(config: TenantConfig): ThemeVariable
   // teintes très claires pour les fonds actifs.
   const root: Record<string, string> = {
     '--accent-primary': hsl(primary),
+    '--accent-primary-rgb': rgbTriplet(primary),
     '--accent-primary-hover': hsl(shiftLightness(primary, -8)),
     '--input-focus': hsl(primary),
     '--sidebar-text-active': hsl(primary),
@@ -94,6 +129,7 @@ export function computeTenantThemeVariables(config: TenantConfig): ThemeVariable
   const darkPrimary = withLightness(primary, Math.max(primary.l, 60));
   const dark: Record<string, string> = {
     '--accent-primary': hsl(darkPrimary),
+    '--accent-primary-rgb': rgbTriplet(darkPrimary),
     '--accent-primary-hover': hsl(shiftLightness(darkPrimary, 8)),
     '--input-focus': hsl(darkPrimary),
     '--sidebar-text-active': hsl(shiftLightness(darkPrimary, 8)),
@@ -101,14 +137,32 @@ export function computeTenantThemeVariables(config: TenantConfig): ThemeVariable
     '--login-accent-glow': hsla(darkPrimary, 0.2),
   };
 
-  const secondary = config.theme.secondaryColor ? parseColor(config.theme.secondaryColor) : undefined;
-  if (secondary) {
-    root['--accent-secondary'] = hsl(secondary);
-    root['--accent-secondary-hover'] = hsl(shiftLightness(secondary, -8));
-    const darkSecondary = withLightness(secondary, Math.max(secondary.l, 60));
-    dark['--accent-secondary'] = hsl(darkSecondary);
-    dark['--accent-secondary-hover'] = hsl(shiftLightness(darkSecondary, 8));
-  }
+  // Secondaire : explicite si fourni, sinon dérivé de la primaire (ton plus
+  // clair du même hue) afin que les dégradés de marque (avatar, onglets)
+  // restent cohérents sur tous les tenants.
+  const explicitSecondary = config.theme.secondaryColor ? parseColor(config.theme.secondaryColor) : undefined;
+  const secondary = explicitSecondary ?? withLightness(primary, clamp(primary.l + 14));
+  root['--accent-secondary'] = hsl(secondary);
+  root['--accent-secondary-rgb'] = rgbTriplet(secondary);
+  root['--accent-secondary-hover'] = hsl(shiftLightness(secondary, -8));
+  const darkSecondary = withLightness(secondary, Math.max(secondary.l, 60));
+  dark['--accent-secondary'] = hsl(darkSecondary);
+  dark['--accent-secondary-rgb'] = rgbTriplet(darkSecondary);
+  dark['--accent-secondary-hover'] = hsl(shiftLightness(darkSecondary, 8));
+
+  // Tons du loader applicatif : trois teintes harmonieuses dérivées de la
+  // marque (base, secondaire, contre-ton). Le contre-ton s'éclaircit ou
+  // s'assombrit à l'opposé de la primaire pour rester distinct quel que soit
+  // le branding, tout en conservant un rendu premium.
+  // Base claire → contre-ton plus sombre ; base sombre → contre-ton plus clair.
+  const counterTone = shiftLightness(primary, primary.l >= 50 ? -22 : 22);
+  root['--loader-ring-1'] = hsl(primary);
+  root['--loader-ring-2'] = hsl(secondary);
+  root['--loader-ring-3'] = hsl(counterTone);
+  const darkCounter = withLightness(darkPrimary, clamp(darkPrimary.l - 18));
+  dark['--loader-ring-1'] = hsl(darkPrimary);
+  dark['--loader-ring-2'] = hsl(darkSecondary);
+  dark['--loader-ring-3'] = hsl(darkCounter);
 
   return { root, dark };
 }

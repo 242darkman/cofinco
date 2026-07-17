@@ -1,4 +1,5 @@
-import { MapPin, Loader2, AlertCircle } from "lucide-react";
+import { MapPin, AlertCircle } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
 import { useReverseGeocode } from "../../hooks/useReverseGeocode";
 import Button from "../ui/Button";
 
@@ -26,7 +27,7 @@ export function LocationDisplay({
   if (loading) {
     return (
       <div className={`flex items-center gap-2 text-muted-foreground ${className}`}>
-        <Loader2 className="w-3 h-3 animate-spin" />
+        <Spinner size="xs" tone="current" />
         <span className="text-xs">Recherche de l'adresse...</span>
       </div>
     );

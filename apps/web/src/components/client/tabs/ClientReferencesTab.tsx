@@ -1,7 +1,7 @@
 import React from 'react';
 import type { ClientWithIdentity } from '@shared/schema';
 import { Users, Phone, MapPin, Briefcase } from 'lucide-react';
-import { Card, EmptyState } from '../../ui';
+import { Card, EmptyState, Avatar } from '../../ui';
 import { RELATION_REFERENCE_LABELS } from '@shared/enum/status-constants';
 
 interface ClientReferencesTabProps {
@@ -39,10 +39,12 @@ export default function ClientReferencesTab({ client }: ClientReferencesTabProps
           <div className="p-4 sm:p-5">
             {/* Header with name and relation */}
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-accent/20 to-status-info/20 flex items-center justify-center shrink-0">
-                <span className="text-sm font-bold text-accent">
-                  {ref.prenom?.charAt(0) || ''}{ref.nom?.charAt(0) || ''}
-                </span>
+              <div className="shrink-0">
+                <Avatar
+                  fullName={`${ref.prenom || ''} ${ref.nom || ''}`}
+                  initials={`${ref.prenom?.charAt(0) || ''}${ref.nom?.charAt(0) || ''}`}
+                  size="sm"
+                />
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-bold text-content-primary truncate">

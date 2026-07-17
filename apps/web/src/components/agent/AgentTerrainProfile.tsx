@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, User, Phone, Mail, MapPin, Calendar, Target, TrendingUp, Users, DollarSign, CheckCircle, Clock, Camera, Loader2 } from 'lucide-react';
-import { Button, Card, Badge, TabGroup } from '../ui';
+import { Spinner } from '@/components/ui/Spinner';
+import { X, User, Phone, Mail, MapPin, Calendar, Target, TrendingUp, Users, DollarSign, CheckCircle, Clock, Camera } from 'lucide-react';
+import { Button, Card, Badge, TabGroup, Avatar } from '../ui';
 import { resolveStorageUrl } from '../../lib/format';
 
 interface AgentTerrainProfileProps {
@@ -170,17 +171,13 @@ export default function AgentTerrainProfile({ agentId, onClose, onEdit }: AgentT
         <div className="p-4 border-b border-edge flex items-center justify-between gap-3 bg-surface-base shrink-0 sm:rounded-t-2xl">
           <div className="flex items-center gap-3 overflow-hidden">
             <div className="relative group">
-              {photoUrl ? (
-                <img
-                  src={resolveStorageUrl(photoUrl)}
-                  alt={`${agent.nom} ${agent.prenom}`}
-                  className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-status-info/30 shadow-lg shadow-status-info/20"
-                />
-              ) : (
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-status-info to-accent flex items-center justify-center text-white font-bold text-sm sm:text-base shrink-0 shadow-lg shadow-status-info/20">
-                  {agent.nom?.charAt(0)}{agent.prenom?.charAt(0)}
-                </div>
-              )}
+              <Avatar
+                photoUrl={photoUrl}
+                fullName={`${agent.nom || ''} ${agent.prenom || ''}`}
+                initials={`${agent.nom?.charAt(0) || ''}${agent.prenom?.charAt(0) || ''}`}
+                size="lg"
+                className="w-10 h-10 sm:w-12 sm:h-12 border-2 border-status-info/30 shadow-lg shadow-status-info/20"
+              />
               <input
                 ref={photoInputRef}
                 type="file"
@@ -195,7 +192,7 @@ export default function AgentTerrainProfile({ agentId, onClose, onEdit }: AgentT
                 className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer"
               >
                 {uploadingPhoto ? (
-                  <Loader2 size={16} className="text-content-primary animate-spin" />
+                  <Spinner size="xs" tone="current" className="text-content-primary" />
                 ) : (
                   <Camera size={16} className="text-content-primary" />
                 )}
@@ -391,7 +388,7 @@ export default function AgentTerrainProfile({ agentId, onClose, onEdit }: AgentT
                    </div>
                    <div className="w-full bg-surface-elevated rounded-full h-2 overflow-hidden mb-1">
                       <div
-                         className="h-full rounded-full bg-gradient-to-r from-accent to-status-success transition-all duration-500 ease-out"
+                         className="h-full rounded-full bg-linear-to-r from-accent to-status-success transition-all duration-500 ease-out"
                          style={{ width: `${tauxReussite}%` }}
                       />
                    </div>

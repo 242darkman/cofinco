@@ -7,7 +7,7 @@ import {
   ExternalLink, CheckCheck, Filter, TrendingDown,
   Ban, Landmark, AlertOctagon, CircleSlash
 } from 'lucide-react';
-import { Card, Badge, Button, Skeleton } from '../ui';
+import { Card, Badge, Button, Skeleton, Spinner } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { toast } from '../../lib/toast';
 import { useClientAlerts, type ClientAlert } from '../../hooks/useClientAlerts';
@@ -361,7 +361,7 @@ export default function ClientAlerts({ client, onUpdate, onNavigateToTab }: Clie
 
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
+            <Spinner size="md" />
           </div>
         ) : fetchError ? (
           <div className="text-center py-12 border border-dashed border-status-danger/30 rounded-lg bg-status-danger-bg/30">

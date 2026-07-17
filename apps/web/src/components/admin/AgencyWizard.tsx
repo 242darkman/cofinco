@@ -1,8 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { Building2, MapPin, Users, ChevronLeft, ChevronRight, Loader2, Check, Eye } from 'lucide-react';
-import Modal from '../ui/Modal';
-import FormField from '../ui/FormField';
-import SelectField from '../ui/SelectField';
+import { Spinner, Modal, FormField, SelectField } from '@/components/ui';
+import { Building2, MapPin, Users, ChevronLeft, ChevronRight, Check, Eye } from 'lucide-react';
 import { CascadingGeoSelect, type GeoSelection } from '../shared/CascadingGeoSelect';
 import { agenceApi } from '../../lib/api-client';
 import { toast } from '../../lib/toast';
@@ -393,7 +391,7 @@ export function AgencyWizard({ open, onClose, onCreated }: AgencyWizardProps) {
                 bg-btn-success text-white hover:bg-btn-success/90
                 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+              {isSubmitting && <Spinner size="xs" tone="current" />}
               Créer l'agence
             </button>
           ) : (

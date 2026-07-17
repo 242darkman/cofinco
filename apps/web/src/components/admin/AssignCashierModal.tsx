@@ -1,5 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Search, User, CheckCircle, X, Loader2, Users } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Search, User, CheckCircle, X, Users } from 'lucide-react';
+import { Avatar } from '@/components/ui/Avatar';
 import { resolveStorageUrl } from '../../lib/format';
 import { getRoleLabel } from '@shared/types/roles';
 
@@ -119,7 +121,7 @@ export default function AssignCashierModal({
         <div className="flex-1 overflow-y-auto p-4 space-y-2 max-h-[60vh]">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-12 text-content-muted">
-              <Loader2 className="w-8 h-8 animate-spin mb-3 opacity-50" />
+              <Spinner size="md" tone="current" className="mb-3 opacity-50" />
               <p className="text-sm">Chargement des agents...</p>
             </div>
           ) : filteredUsers.length > 0 ? (
@@ -157,12 +159,13 @@ export default function AssignCashierModal({
                   </div>
 
                   {/* Avatar */}
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs relative overflow-hidden flex-shrink-0 ${isSelected ? 'bg-accent/30 text-accent' : 'bg-surface text-content-muted'}`}>
-                    {user.photoProfile ? (
-                      <img src={resolveStorageUrl(user.photoProfile)} alt={fullName} className="w-full h-full object-cover" />
-                    ) : (
-                      initials
-                    )}
+                  <div className="relative flex-shrink-0">
+                    <Avatar
+                      photoUrl={user.photoProfile}
+                      fullName={fullName}
+                      initials={initials}
+                      size="sm"
+                    />
                     {isCurrent && (
                       <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-status-success opacity-75"></span>
@@ -245,7 +248,7 @@ export default function AssignCashierModal({
             >
               {isSaving ? (
                 <>
-                  <Loader2 size={16} className="animate-spin" /> Sauvegarde...
+                  <Spinner size="xs" tone="current" /> Sauvegarde...
                 </>
               ) : (
                 <>

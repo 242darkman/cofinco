@@ -35,7 +35,9 @@ const readDirConcat = (relDir: string): string => {
 const migrationService = readDirConcat("apps/api/services/agency-migration");
 const settingsRoute = read("apps/api/routes/settings.ts");
 const agencesRoute = read("apps/api/routes/agences/agences-migrations.ts");
-const wsServer = read("apps/api/ws-server.ts");
+// Le catalogue des messages WebSocket (`GlobalMessage`) est modularisé dans
+// ws/message-types.ts (source unique de vérité des types de messages).
+const wsMessageTypes = read("apps/api/ws/message-types.ts");
 const migrationSchema = read("packages/shared/schema/agency_migration.ts");
 
 // ============================================================================
@@ -360,8 +362,8 @@ describe("Rollback Route", () => {
 describe("WebSocket Migration Events", () => {
 
   it("should define MIGRATION_PROGRESS and MIGRATION_STATUS message types", () => {
-    expect(wsServer).toContain('"MIGRATION_PROGRESS"');
-    expect(wsServer).toContain('"MIGRATION_STATUS"');
+    expect(wsMessageTypes).toContain('"MIGRATION_PROGRESS"');
+    expect(wsMessageTypes).toContain('"MIGRATION_STATUS"');
   });
 
   it("migration service should import getWsInstance", () => {

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Spinner } from '@/components/ui/Spinner';
 import { Plus, AlertCircle } from 'lucide-react';
 import { Card, ConfirmDialog } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
@@ -250,7 +251,7 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
+            <Spinner size="md" />
         </div>
       ) : comptes.length === 0 ? (
         <Card variant="default" padding="lg" className="border-dashed border-edge bg-transparent">

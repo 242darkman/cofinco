@@ -6,7 +6,7 @@ import {
   ArrowUpRight, ArrowDownRight, Building2,
   Award, AlertTriangle, Search,
 } from 'lucide-react';
-import { Card, Button, Badge, SelectField, LoadingSpinner, EmptyState, FeatureHeader, StatCard } from '../ui';
+import { Card, Button, Badge, SelectField, LoadingSpinner, EmptyState, FeatureHeader, StatCard, SkeletonStatsGrid } from '../ui';
 import {
   scoringAdminApi, agencesApi, clientApi,
   type AdminScoreEventsFilter, type AdminScoreStatesFilter,
@@ -258,7 +258,7 @@ function EventsTab() {
 
       {/* Table */}
       {isLoading ? (
-        <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>
+        <SkeletonStatsGrid />
       ) : !data || data.rows.length === 0 ? (
         <EmptyState
           icon={Filter}

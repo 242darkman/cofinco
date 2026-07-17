@@ -140,7 +140,7 @@ export default function ReportFilters({
           onClick={onGenerate}
           isLoading={loading}
           variant="primary"
-          className="bg-gradient-to-r from-accent to-accent hover:from-accent hover:to-accent border-0 shadow-lg shadow-accent/20"
+          className="bg-linear-to-r from-accent to-accent hover:from-accent hover:to-accent border-0 shadow-lg shadow-accent/20"
           icon={Download}
           disabled={noSelection}
         >

@@ -1,9 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import {
-  X, ArrowDownToLine, ArrowUpFromLine, Banknote,
-  Smartphone, Loader2, CheckCircle2, Lock, AlertTriangle,
-  Copy, Printer, ArrowRight,
-} from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { X, ArrowDownToLine, ArrowUpFromLine, Banknote, Smartphone, CheckCircle2, Lock, AlertTriangle, Copy, Printer, ArrowRight } from 'lucide-react';
 import { formatMoney, formatPhoneInput, stripPhoneFormat } from '@/lib/format';
 import {
   MethodePaiement,
@@ -488,7 +485,7 @@ export default function CaisseOperationModal({
                 `}
               >
                 {isSubmitting
-                  ? <Loader2 size={18} className="animate-spin" />
+                  ? <Spinner size="sm" tone="current" />
                   : <CheckCircle2 size={18} />}
                 {isSubmitting ? 'Traitement...' : 'Confirmer'}
               </button>
@@ -534,7 +531,7 @@ export default function CaisseOperationModal({
                   disabled={isSubmitting}
                   className="px-4 py-3 rounded-xl bg-status-warning text-white font-bold hover:bg-status-warning shadow-lg transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <ArrowRight size={18} />}
+                  {isSubmitting ? <Spinner size="sm" tone="current" /> : <ArrowRight size={18} />}
                   {isSubmitting ? 'Traitement...' : 'Continuer'}
                 </button>
               )}

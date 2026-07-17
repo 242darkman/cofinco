@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Target, TrendingUp, Award, Plus, Check, DollarSign, RefreshCw, Loader2, ChevronLeft, ChevronRight, Calendar, UserCheck, X, AlertTriangle } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
+import { Target, TrendingUp, Award, Plus, Check, DollarSign, RefreshCw, ChevronLeft, ChevronRight, Calendar, UserCheck, X, AlertTriangle } from 'lucide-react';
 import { StatutObjectif } from '@shared/enum/status-constants';
 import { ALL_STATUS_LABELS } from '@/lib/status-labels';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
@@ -8,26 +9,7 @@ import { useIsAdmin } from '../../contexts/AbilityContext';
 import { currencySymbol, formatMoney } from '@shared/config/currency';
 import { useAvantages, type Avantage } from '../../hooks/hr/useAvantages';
 import { toast } from '../../lib/toast';
-
-interface Objectif {
-  id: string;
-  agentId: string;
-  periode: string;
-  typeObjectif: string;
-  valeurObjectif: number;
-  valeurRealisee: number;
-  unite: string;
-  statut: string;
-  recompense: number;
-  avantageId: number | null;
-  avantageEmployeId: number | null;
-  primeStatut: string;
-  createdAt: string;
-  agent?: {
-    nom: string;
-    prenom: string;
-  };
-}
+import type { Objectif } from './AgentObjectifs.types';
 
 export default function AgentObjectifs({ agentId }: { agentId?: string }) {
   const [objectifs, setObjectifs] = useState<Objectif[]>([]);
@@ -251,7 +233,7 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
             disabled={recalculating !== null}
             className="px-3 py-1.5 bg-accent hover:bg-accent-primary-hover disabled:opacity-50 text-white rounded-lg flex items-center gap-1.5 text-xs font-bold transition"
           >
-            {recalculating === 'all' ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+            {recalculating === 'all' ? <Spinner size="xs" tone="current" /> : <RefreshCw size={14} />}
             Actualiser
           </button>
         )}
@@ -467,7 +449,7 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
                        disabled={recalculating !== null}
                        className="text-xs font-bold text-accent hover:text-accent flex items-center gap-1"
                      >
-                       {recalculating === selectedObjectif.id ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                       {recalculating === selectedObjectif.id ? <Spinner size="xs" tone="current" /> : <RefreshCw size={12} />}
                        Recalculer auto
                      </button>
                   </div>
