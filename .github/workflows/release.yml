@@ -451,19 +451,21 @@ jobs:
           target: /opt/microflex/env/
           strip_components: 0
 
-      # Sync compose + scripts de déploiement sur le VPS
+      # Sync compose + scripts de déploiement sur le VPS via scp direct (robuste).
       # (sinon les changements du repo — ex: TENANT_IMAGE_SUFFIX — n'y arrivent jamais)
       - name: Sync deploy assets to VPS
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          source: |
-            docker-compose.vps.yml
-            scripts/vps
-          target: /opt/microflex/
-          strip_components: 0
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          umask 077
+          printf '%s\n' "$VPS_SSH_KEY" > /tmp/vps_key
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/vps_key"
+          ssh $SSH_OPTS "$VPS_USER@$VPS_HOST" "mkdir -p /opt/microflex/scripts"
+          scp $SSH_OPTS docker-compose.vps.yml "$VPS_USER@$VPS_HOST:/opt/microflex/docker-compose.vps.yml"
+          scp -r $SSH_OPTS scripts/vps "$VPS_USER@$VPS_HOST:/opt/microflex/scripts/"
+          rm -f /tmp/vps_key
 
       # Run deploy script on VPS
       - name: Deploy to VPS
