@@ -346,6 +346,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ needs.prepare.outputs.environment }}
     steps:
+      # Le repo est nécessaire pour synchroniser compose + scripts vers le VPS.
+      - uses: actions/checkout@v4
+
       # Generate .env.runtime from GitHub Environment secrets/variables
       - name: Generate runtime env file
         run: |
@@ -456,7 +459,9 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          source: "docker-compose.vps.yml,scripts/vps"
+          source: |
+            docker-compose.vps.yml
+            scripts/vps
           target: /opt/microflex/
           strip_components: 0
 
