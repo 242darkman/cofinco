@@ -3,6 +3,7 @@ import { initEncryptionKey, clearEncryptionKey, clearSigningKey } from './offlin
 import { initializeDeviceKey, teardownDeviceKey } from './device-key-manager';
 import { SystemRole, hasRole as hasSystemRole } from '@shared/types/roles';
 import { StatutUser } from '@shared/enum/status-constants';
+import { hardRedirectToLogin } from './navigation';
 
 export interface User {
   id: string;
@@ -32,7 +33,7 @@ class AuthService {
   private currentUser: User | null = null;
   private sessionCheckInterval: NodeJS.Timeout | null = null;
   private onSessionExpired: (() => void) | null = null;
-  private broadcastChannel: BroadcastChannel | null = null;
+  private readonly broadcastChannel: BroadcastChannel | null = null;
 
   constructor() {
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
@@ -42,10 +43,7 @@ class AuthService {
           if (import.meta.env.DEV) console.log('[Auth] Logout triggered from another tab');
           this.clearSession();
           // Force reload to clear React state and redirect to login
-          // Import dynamique pour éviter la dépendance circulaire
-          import('./navigation').then(({ hardRedirectToLogin }) => {
-            hardRedirectToLogin('Déconnecté depuis un autre onglet');
-          });
+          hardRedirectToLogin('Déconnecté depuis un autre onglet');
         }
       };
     }
@@ -211,7 +209,7 @@ class AuthService {
       });
       this.startSessionCheck();
       return this.currentUser;
-    } catch (error) {
+    } catch {
       // Session invalide - essayer le refresh token (Remember Me)
       const refreshed = await this.tryRefreshSession();
       if (refreshed) {

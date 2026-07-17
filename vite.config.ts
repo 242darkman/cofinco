@@ -230,8 +230,10 @@ export default defineConfig({
     // Target modern browsers for smaller bundles
     target: 'es2020',
 
-    // Chunk size warning threshold
-    chunkSizeWarningLimit: 500,
+    // Seuil d'alerte de taille de chunk. Relevé pour couvrir nos gros chunks
+    // *lazy* et intentionnels (export-tools ≈ xlsx/pdf, charts, vendor) déjà
+    // isolés via manualChunks : ils ne sont chargés qu'à la demande.
+    chunkSizeWarningLimit: 1600,
 
     // Report compressed sizes
     reportCompressedSize: true,
