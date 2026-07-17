@@ -57,6 +57,9 @@ x-app-env: &app-env
   BALANCE_RECONCILIATION_INTERVAL_MINUTES: ${BALANCE_RECONCILIATION_INTERVAL_MINUTES:-60}
   ENABLE_BALANCE_AUTO_CORRECTION: ${ENABLE_BALANCE_AUTO_CORRECTION:-false}
   GL_POSTING_MODE: ${GL_POSTING_MODE:-STRICT}
+  # Réassignation d'identité tenant (one-shot) : doit atteindre l'ENVIRONNEMENT
+  # du conteneur (pas seulement l'interpolation d'image). Vide par défaut.
+  TENANT_IDENTITY_REBIND: ${TENANT_IDENTITY_REBIND:-}
 
 x-extra-hosts: &extra-hosts
   # Permet aux containers de joindre le PG natif sur le host
