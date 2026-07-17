@@ -448,6 +448,18 @@ jobs:
           target: /opt/microflex/env/
           strip_components: 0
 
+      # Sync compose + scripts de déploiement sur le VPS
+      # (sinon les changements du repo — ex: TENANT_IMAGE_SUFFIX — n'y arrivent jamais)
+      - name: Sync deploy assets to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "docker-compose.vps.yml,scripts/vps"
+          target: /opt/microflex/
+          strip_components: 0
+
       # Run deploy script on VPS
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.0.3
