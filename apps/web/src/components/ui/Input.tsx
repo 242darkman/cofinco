@@ -17,15 +17,15 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         disabled={disabled}
         className={`
           w-full px-[14px] py-[10px]
-          bg-white border rounded-lg
-          text-[#111827] text-[13px] sm:text-[13px]
-          placeholder:text-[#9CA3AF] placeholder:font-normal
+          bg-input-bg border rounded-lg
+          text-input-text text-[13px] sm:text-[13px]
+          placeholder:text-input-placeholder placeholder:font-normal
           transition-colors duration-200
           focus:outline-none focus:ring-[3px]
           disabled:opacity-50 disabled:cursor-not-allowed
           ${error
             ? 'border-status-danger focus:border-status-danger focus:ring-status-danger/30'
-            : 'border-[#E5E7EB] hover:border-gray-400 focus:border-accent focus:ring-accent/30'
+            : 'border-input-border hover:border-content-muted focus:border-accent focus:ring-accent/30'
           }
           ${className}
         `}

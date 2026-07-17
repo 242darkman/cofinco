@@ -277,9 +277,9 @@ export default function SearchableSelect({
   return (
     <div className={`relative ${className} ${label ? 'mb-4' : ''}`} ref={containerRef}>
       {label && (
-        <label htmlFor={name} className="block font-inter font-medium text-[13px] text-[#374151] mb-[6px]">
+        <label htmlFor={name} className="block font-inter font-medium text-[13px] text-content-secondary mb-[6px]">
           {label}
-          {required && <span className="text-[#EF4444] ml-1">*</span>}
+          {required && <span className="text-status-danger ml-1">*</span>}
         </label>
       )}
 
@@ -300,11 +300,11 @@ export default function SearchableSelect({
               transition-all duration-200
               ${variant === 'dark'
                 ? 'bg-surface-base border-edge text-content-primary'
-                : 'bg-white text-[#111827]'
+                : 'bg-input-bg text-input-text'
               }
-              ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-gray-400'}
-              ${isOpen ? 'border-accent ring-[3px] ring-accent/30' : (variant === 'dark' ? '' : 'border-[#E5E7EB]')}
-              ${error ? '!border-[#EF4444] !ring-[3px] !ring-[#EF4444]/30' : ''}
+              ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-content-muted'}
+              ${isOpen ? 'border-accent ring-[3px] ring-accent/30' : (variant === 'dark' ? '' : 'border-input-border')}
+              ${error ? '!border-status-danger !ring-[3px] !ring-status-danger/30' : ''}
             `}
           >
               {/* Left Icon / Avatar — small (20px) to match SelectField height */}
@@ -338,7 +338,7 @@ export default function SearchableSelect({
                            if (onSearchChange) onSearchChange(e.target.value);
                         }}
                         placeholder="Tapez pour rechercher..."
-                        className="w-full bg-transparent border-none p-0 text-[#111827] placeholder:text-[#9CA3AF] placeholder:font-normal focus:ring-0 focus:outline-none text-[13px]"
+                        className="w-full bg-transparent border-none p-0 text-input-text placeholder:text-input-placeholder placeholder:font-normal focus:ring-0 focus:outline-none text-[13px]"
                         onClick={(e) => e.stopPropagation()}
                         onKeyDown={(e) => {
                            e.stopPropagation();
@@ -346,7 +346,7 @@ export default function SearchableSelect({
                         }}
                      />
                   ) : selectedOption ? (
-                    <span className="text-[13px] text-[#111827] truncate leading-tight block">{selectedOption.label}</span>
+                    <span className="text-[13px] text-input-text truncate leading-tight block">{selectedOption.label}</span>
                   ) : (
                      <span className="text-[#9CA3AF] text-[13px] block">{placeholder}</span>
                   )}
@@ -380,7 +380,7 @@ export default function SearchableSelect({
                     }}
                     className="cursor-pointer transition-colors"
                   >
-                    <ChevronDown size={16} strokeWidth={1.5} className={`text-gray-500 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+                    <ChevronDown size={16} strokeWidth={1.5} className={`text-content-muted transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
                   </div>
                </div>
           </div>
@@ -489,7 +489,7 @@ export default function SearchableSelect({
 
       {/* Errors */}
       {error && (
-        <p className="absolute -bottom-5 left-0 text-[11px] text-[#EF4444] flex items-center gap-1 mt-1">
+        <p className="absolute -bottom-5 left-0 text-[11px] text-status-danger flex items-center gap-1 mt-1">
           <AlertCircle size={12} strokeWidth={2} className="shrink-0" />
           {error}
         </p>

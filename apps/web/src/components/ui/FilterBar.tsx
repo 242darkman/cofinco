@@ -70,7 +70,7 @@ export default function FilterBar({ children, className = '', maxVisible = 4 }: 
                 transition-colors duration-200
                 ${showAdvanced
                   ? 'bg-accent/10 border-accent/30 text-accent'
-                  : 'bg-white border-[#E5E7EB] text-gray-600 hover:border-gray-400'
+                  : 'bg-input-bg border-input-border text-content-secondary hover:border-content-muted'
                 }
               `}
             >
