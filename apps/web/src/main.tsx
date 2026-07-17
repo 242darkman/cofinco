@@ -8,6 +8,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ServerHealthProvider, getServerHealthBridge, isNetworkFailure } from './contexts/ServerHealthContext';
 import { NetworkProvider } from './contexts/NetworkContext';
 import { CurrencyProvider } from './contexts/CurrencyContext';
+import { TopProgressBar } from './components/ui/TopProgressBar';
 import { SERVER_HEALTH_ENDPOINT } from './lib/serverHealthConfig';
 import { networkManager } from './lib/networkManager';
 import { isOfflineError, isApiDownError, CircuitOpenError } from './lib/networkErrors';
@@ -331,6 +332,8 @@ window.fetch = async (
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
+      {/* Barre de progression globale : écoute toute l'activité react-query. */}
+      <TopProgressBar />
       <ServerHealthProvider>
         <NetworkProvider>
           <ThemeProvider>
