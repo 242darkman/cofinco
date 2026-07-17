@@ -67,7 +67,7 @@ export type { ProgressBarProps, ProgressBarColor, ProgressBarSize } from './Prog
 // Loading Components
 export { default as LoadingScreen } from './LoadingScreen';
 export { default as LoadingSpinner } from './LoadingSpinner';
-export { Skeleton, SkeletonTransactionList, SkeletonBankCard } from './Skeleton';
+export { Skeleton, SkeletonTransactionList, SkeletonBankCard, SkeletonStatsGrid, SkeletonCard } from './Skeleton';
 export { Spinner } from './Spinner';
 export { ClearingRing } from './ClearingRing';
 export { TopProgressBar } from './TopProgressBar';

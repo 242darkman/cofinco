@@ -714,7 +714,7 @@ export default function CaisseDemandesTab({
                       <div className="shrink-0">
                         <Avatar
                           photoUrl={resolveStorageUrl(item.photoUrl)}
-                          fullName={item.nom}
+                          fullName={item.displayName}
                           size="md"
                         />
                       </div>

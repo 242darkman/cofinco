@@ -6,7 +6,7 @@ import { usePermissions } from '../../auth/ProtectedFeature';
 import { toast } from '../../../lib/toast';
 import { formatMoney, formatClientName } from '../../../lib/format';
 import ConfirmDialog from '../../ui/ConfirmDialog';
-import { Button, FormField } from '../../ui';
+import { Button, FormField, Avatar } from '../../ui';
 import { StatutCoffre, DisbursementChannel, DISBURSEMENT_CHANNEL_LABELS, type DisbursementChannelType, TypeConditionnement, type TypeConditionnementType, TYPE_CONDITIONNEMENT_OPTIONS } from '@shared/enum/status-constants';
 import mtnLogo from '@/assets/logos/mtn-logo.png';
 import airtelLogo from '@/assets/logos/airtel-logo.png';

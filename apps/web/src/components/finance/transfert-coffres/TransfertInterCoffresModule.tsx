@@ -27,7 +27,7 @@ import {
   CheckSquare,
   Square,
   XCircle,
-  Printer,
+  Printer, Ban,
 } from 'lucide-react';
 import { Button, Card, Badge, Pagination, Modal, StatCard, Tooltip, ResponsiveTable } from '@/components/ui';
 import { toast, handleApiError } from '../../../lib/toast';

@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { Spinner } from '@/components/ui/Spinner';
+import { Spinner, SkeletonCard } from '@/components/ui';
 import { Activity, Banknote, CheckCircle, Clock, AlertTriangle, Send, RefreshCw, ArrowDownRight, ArrowUpRight, Wallet, ShieldCheck, XCircle } from 'lucide-react';
 import { toast } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
